@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { MemberId, RoleId } from '../../../shared/kernel/index.ts';
-import { actorFor } from './actor.ts';
+import { actorFor, type AdminPolicy } from './actor.ts';
 import type { Membership } from './membership.ts';
 import { isExpired, issueSession, SESSION_TTL_SECONDS } from './session.ts';
 
@@ -38,17 +38,31 @@ describe('Session', () => {
 
 describe('actorFor', () => {
   const session = issueSession(membership, now);
+  const policy = (roleId: string | null, memberIds: string[] = []): AdminPolicy => ({
+    roleId: roleId as RoleId | null,
+    memberIds: memberIds as MemberId[],
+  });
 
   test('is an Admin when the session holds the admin role', () => {
-    expect(actorFor(session, 'admin' as RoleId).isAdmin).toBe(true);
+    expect(actorFor(session, policy('admin')).isAdmin).toBe(true);
   });
 
   test('is not an Admin without the admin role', () => {
-    expect(actorFor(session, 'moderator' as RoleId).isAdmin).toBe(false);
+    expect(actorFor(session, policy('moderator')).isAdmin).toBe(false);
+  });
+
+  test('is an Admin when listed by member ID, whatever their roles', () => {
+    expect(actorFor(session, policy('moderator', ['42'])).isAdmin).toBe(true);
+    expect(actorFor(session, policy(null, ['42'])).isAdmin).toBe(true);
+  });
+
+  test('is not an Admin when neither the role nor the member list matches', () => {
+    expect(actorFor(session, policy(null, ['7', '8'])).isAdmin).toBe(false);
+    expect(actorFor(session, policy(null)).isAdmin).toBe(false);
   });
 
   test('carries the member id and role snapshot', () => {
-    expect(actorFor(session, 'admin' as RoleId)).toEqual({
+    expect(actorFor(session, policy('admin'))).toEqual({
       kind: 'member',
       memberId: '42',
       roleIds: ['admin', 'regular'],

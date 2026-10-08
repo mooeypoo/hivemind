@@ -1,5 +1,5 @@
 import type { Store } from '@netlify/blobs';
-import type { Clock, IdGenerator, RoleId } from '../../shared/kernel/index.ts';
+import type { Clock, IdGenerator, MemberId, RoleId } from '../../shared/kernel/index.ts';
 import { makeCompleteLogin } from './application/complete-login.ts';
 import { makeDeleteMyData } from './application/delete-my-data.ts';
 import { makeExportMyData } from './application/export-my-data.ts';
@@ -17,7 +17,8 @@ export interface IdentityModuleDeps {
   readonly clock: Clock;
   readonly ids: IdGenerator;
   readonly discord: DiscordConfig;
-  readonly adminRoleId: string;
+  /** Admins: holders of `roleId`, plus the listed Discord user IDs. Either may be empty. */
+  readonly admins: { readonly roleId: string | null; readonly memberIds: readonly string[] };
   readonly sessionSecret: string;
   /** Every other context that stores member data, for export and erasure. */
   readonly contributors: readonly PersonalDataContributor[];
@@ -37,7 +38,10 @@ export const createIdentityModule = (deps: IdentityModuleDeps) => {
       signer,
       members,
       clock,
-      adminRoleId: deps.adminRoleId as RoleId,
+      admins: {
+        roleId: deps.admins.roleId as RoleId | null,
+        memberIds: deps.admins.memberIds as readonly MemberId[],
+      },
     }),
     getMe: makeGetMe({ members }),
     exportMyData: makeExportMyData({ members, contributors, clock }),

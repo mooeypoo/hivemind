@@ -6,6 +6,7 @@ import {
   cookieValue,
   request,
   setCookies,
+  SITE_ADMIN_ID,
   SITE_URL,
   startHarness,
   type Harness,
@@ -124,6 +125,26 @@ describe('GET /api/me', () => {
       avatarUrl: 'https://cdn.discordapp.com/embed/avatars/5.png',
       isAdmin: true,
     });
+  });
+
+  test('a member listed in ADMIN_MEMBER_IDS is an Admin without the admin role', async () => {
+    h.discord.member = { id: SITE_ADMIN_ID, username: 'dev', roles: [] };
+    const session = await signIn();
+    const response = await getMe(
+      request('GET', '/api/me', { cookies: { [SESSION_COOKIE]: session } }),
+      h.app,
+    );
+    expect(((await response.json()) as MeDto).isAdmin).toBe(true);
+  });
+
+  test('a member with neither the role nor a listing is not an Admin', async () => {
+    h.discord.member = { id: '900000000000000099', username: 'regular', roles: [] };
+    const session = await signIn();
+    const response = await getMe(
+      request('GET', '/api/me', { cookies: { [SESSION_COOKIE]: session } }),
+      h.app,
+    );
+    expect(((await response.json()) as MeDto).isAdmin).toBe(false);
   });
 
   test('ignores a forged session cookie', async () => {

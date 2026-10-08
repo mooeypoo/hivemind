@@ -10,11 +10,13 @@ import type { AppConfig } from '../../config.ts';
 export const SITE_URL = 'https://lists.example.org';
 export const GUILD_ID = '900000000000000001';
 export const ADMIN_ROLE_ID = '900000000000000002';
+/** A member who is an Admin through ADMIN_MEMBER_IDS rather than a role. */
+export const SITE_ADMIN_ID = '900000000000000003';
 
 export const testConfig: AppConfig = {
   siteUrl: SITE_URL,
   discord: { clientId: 'client', clientSecret: 'secret', guildId: GUILD_ID },
-  adminRoleId: ADMIN_ROLE_ID,
+  admins: { roleId: ADMIN_ROLE_ID, memberIds: [SITE_ADMIN_ID] },
   sessionSecret: 'test-session-secret-at-least-32-chars',
   tmdbReadToken: null,
 };

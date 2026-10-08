@@ -45,7 +45,8 @@ beforeEach(() => {
 });
 
 const completeLogin = () => makeCompleteLogin({ discord, members, signer, clock });
-const resolveActor = () => makeResolveActor({ signer, members, clock, adminRoleId: ADMIN });
+const resolveActor = () =>
+  makeResolveActor({ signer, members, clock, admins: { roleId: ADMIN, memberIds: [] } });
 
 const signIn = async (): Promise<string> => {
   const result = await completeLogin()({ code: 'c', state: 's', expectedState: 's' });
@@ -125,6 +126,18 @@ describe('resolve actor', () => {
     discord.willReturn(ok({ ...ada, roleIds: ['role-regular' as RoleId] }));
     const actor = await signedInActor();
     expect(actor.kind === 'member' && actor.isAdmin).toBe(false);
+  });
+
+  test('a member listed by ID is an Admin without the admin role', async () => {
+    discord.willReturn(ok({ ...ada, roleIds: [] }));
+    const token = await signIn();
+    const actor = await makeResolveActor({
+      signer,
+      members,
+      clock,
+      admins: { roleId: null, memberIds: [ada.member.id] },
+    })(token);
+    expect(actor.kind === 'member' && actor.isAdmin).toBe(true);
   });
 
   test('no token is anonymous', async () => {

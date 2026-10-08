@@ -18,7 +18,7 @@ export const createApp = (config: AppConfig, platform: Platform): App => {
       ...config.discord,
       redirectUri: `${config.siteUrl}/api/auth/callback`,
     },
-    adminRoleId: config.adminRoleId,
+    admins: config.admins,
     sessionSecret: config.sessionSecret,
     contributors: [],
   });

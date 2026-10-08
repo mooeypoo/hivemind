@@ -1,10 +1,23 @@
-import type { MemberActor, RoleId } from '../../../shared/kernel/index.ts';
+import type { MemberActor, MemberId, RoleId } from '../../../shared/kernel/index.ts';
 import type { Session } from './session.ts';
 
-/** The Actor for a valid session. Admin is whoever holds the configured admin role. */
-export const actorFor = (session: Session, adminRoleId: RoleId): MemberActor => ({
+/**
+ * Who is an Admin: holders of the admin role, plus specific members by Discord user ID.
+ * Either may be empty. It is evaluated on every request, so a change applies immediately.
+ */
+export interface AdminPolicy {
+  readonly roleId: RoleId | null;
+  readonly memberIds: readonly MemberId[];
+}
+
+export const isAdmin = (session: Session, policy: AdminPolicy): boolean =>
+  policy.memberIds.includes(session.memberId) ||
+  (policy.roleId !== null && session.roleIds.includes(policy.roleId));
+
+/** The Actor for a valid session. */
+export const actorFor = (session: Session, policy: AdminPolicy): MemberActor => ({
   kind: 'member',
   memberId: session.memberId,
   roleIds: session.roleIds,
-  isAdmin: session.roleIds.includes(adminRoleId),
+  isAdmin: isAdmin(session, policy),
 });

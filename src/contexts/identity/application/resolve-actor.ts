@@ -1,5 +1,5 @@
-import { anonymous, type Actor, type Clock, type RoleId } from '../../../shared/kernel/index.ts';
-import { actorFor } from '../domain/actor.ts';
+import { anonymous, type Actor, type Clock } from '../../../shared/kernel/index.ts';
+import { actorFor, type AdminPolicy } from '../domain/actor.ts';
 import { isExpired } from '../domain/session.ts';
 import type { MemberRepository, SessionSigner } from './ports.ts';
 
@@ -7,7 +7,7 @@ export interface ResolveActorDeps {
   readonly signer: SessionSigner;
   readonly members: MemberRepository;
   readonly clock: Clock;
-  readonly adminRoleId: RoleId;
+  readonly admins: AdminPolicy;
 }
 
 /**
@@ -22,5 +22,5 @@ export const makeResolveActor =
     if (session === null || isExpired(session, deps.clock.now())) return anonymous;
     const member = await deps.members.get(session.memberId);
     if (member === null) return anonymous;
-    return actorFor(session, deps.adminRoleId);
+    return actorFor(session, deps.admins);
   };

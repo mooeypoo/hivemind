@@ -9,7 +9,8 @@ export interface AppConfig {
     readonly clientSecret: string;
     readonly guildId: string;
   };
-  readonly adminRoleId: string;
+  /** Admins are holders of `roleId` plus the listed Discord user IDs. At least one is set. */
+  readonly admins: { readonly roleId: string | null; readonly memberIds: readonly string[] };
   readonly sessionSecret: string;
   /** Null when no list uses the `tmdb-movie` source. */
   readonly tmdbReadToken: string | null;
@@ -33,7 +34,11 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
   const clientId = required('DISCORD_CLIENT_ID');
   const clientSecret = required('DISCORD_CLIENT_SECRET');
   const guildId = required('DISCORD_GUILD_ID');
-  const adminRoleId = required('ADMIN_ROLE_ID');
+  const adminRoleId = env.ADMIN_ROLE_ID?.trim() ?? '';
+  const adminMemberIds = (env.ADMIN_MEMBER_IDS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id !== '');
   const sessionSecret = required('SESSION_SECRET');
   const tmdbReadToken = env.TMDB_READ_TOKEN?.trim() ?? '';
 
@@ -46,8 +51,15 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
   }
   if (guildId !== '' && !SNOWFLAKE.test(guildId))
     problems.push('DISCORD_GUILD_ID must be a Discord ID');
-  if (adminRoleId !== '' && !SNOWFLAKE.test(adminRoleId))
+  if (adminRoleId === '' && adminMemberIds.length === 0) {
+    problems.push('Set ADMIN_ROLE_ID, ADMIN_MEMBER_IDS, or both, so someone can manage lists');
+  }
+  if (adminRoleId !== '' && !SNOWFLAKE.test(adminRoleId)) {
     problems.push('ADMIN_ROLE_ID must be a Discord ID');
+  }
+  if (adminMemberIds.some((id) => !SNOWFLAKE.test(id))) {
+    problems.push('ADMIN_MEMBER_IDS must be Discord user IDs, separated by commas');
+  }
   if (sessionSecret !== '' && sessionSecret.length < MIN_SECRET_LENGTH) {
     problems.push(`SESSION_SECRET must be at least ${String(MIN_SECRET_LENGTH)} characters`);
   }
@@ -56,7 +68,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
   return ok({
     siteUrl,
     discord: { clientId, clientSecret, guildId },
-    adminRoleId,
+    admins: { roleId: adminRoleId === '' ? null : adminRoleId, memberIds: adminMemberIds },
     sessionSecret,
     tmdbReadToken: tmdbReadToken === '' ? null : tmdbReadToken,
   });

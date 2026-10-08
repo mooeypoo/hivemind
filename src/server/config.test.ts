@@ -26,8 +26,8 @@ describe('loadConfig', () => {
         'DISCORD_CLIENT_ID is not set',
         'DISCORD_CLIENT_SECRET is not set',
         'DISCORD_GUILD_ID is not set',
-        'ADMIN_ROLE_ID is not set',
         'SESSION_SECRET is not set',
+        'Set ADMIN_ROLE_ID, ADMIN_MEMBER_IDS, or both, so someone can manage lists',
       ]);
     }
   });
@@ -54,6 +54,43 @@ describe('loadConfig', () => {
     expect(!result.ok && result.error).toEqual([
       'SITE_URL must use https:// (http:// is only allowed for localhost)',
     ]);
+  });
+
+  describe('admins', () => {
+    const withoutRole = { ...valid, ADMIN_ROLE_ID: undefined };
+
+    test('can be a role alone', () => {
+      const result = loadConfig(valid);
+      expect(result.ok && result.value.admins).toEqual({
+        roleId: '900000000000000002',
+        memberIds: [],
+      });
+    });
+
+    test('can be member IDs alone, comma separated with optional spaces', () => {
+      const result = loadConfig({
+        ...withoutRole,
+        ADMIN_MEMBER_IDS: '900000000000000003, 900000000000000004,',
+      });
+      expect(result.ok && result.value.admins).toEqual({
+        roleId: null,
+        memberIds: ['900000000000000003', '900000000000000004'],
+      });
+    });
+
+    test('must name at least one way to be an Admin', () => {
+      const result = loadConfig({ ...withoutRole, ADMIN_MEMBER_IDS: ' , ' });
+      expect(!result.ok && result.error).toEqual([
+        'Set ADMIN_ROLE_ID, ADMIN_MEMBER_IDS, or both, so someone can manage lists',
+      ]);
+    });
+
+    test('rejects member IDs that are usernames rather than Discord user IDs', () => {
+      const result = loadConfig({ ...valid, ADMIN_MEMBER_IDS: '900000000000000003,ada' });
+      expect(!result.ok && result.error).toEqual([
+        'ADMIN_MEMBER_IDS must be Discord user IDs, separated by commas',
+      ]);
+    });
   });
 
   test('rejects a short session secret', () => {
