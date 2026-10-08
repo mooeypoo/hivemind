@@ -88,7 +88,7 @@ Every context assembles itself, and the composition root only connects contexts.
 
 **Personal data.** `GET /api/me/export` and `DELETE /api/me` must cover every context. Identity declares the port `PersonalDataContributor { context, exportFor(memberId), eraseFor(memberId) }`. Every context that stores member data exposes one from its module, and composition passes it into `createIdentityModule`. Erasure runs every contributor first and deletes the member record last, so a failure part-way leaves the member able to retry. A context that starts storing member data adds its contributor and a test in the same change.
 
-**Sessions.** Sessions are stateless signed cookies, but `resolveActor` also loads the member, so erasing a member ends their sessions at once. The roles in a session are a snapshot from sign-in, so Discord role changes apply at the next sign-in, within 7 days at most. Rotating `SESSION_SECRET` signs everyone out.
+**Sessions.** Sessions are stateless signed cookies, but `resolveActor` also loads the member, so erasing a member ends their sessions at once. The roles in a session are a snapshot from sign-in, so Discord role and membership changes apply at the next sign-in. Sessions last 12 hours for exactly this reason: no Discord credential is kept after sign-in, so a short session is how changes in Discord reach the app. Re-sign-in asks Discord to skip its consent screen (`prompt=none`), so for members who have already approved the app it is a silent redirect. Rotating `SESSION_SECRET` signs everyone out at once.
 
 **Pattern for cross-context calls.** `voting/application/ports.ts` declares `ListReader`. `voting/infrastructure/lists-reader.ts` implements it on top of the lists module's public interface, which it imports as a type from `lists/index.ts`. `voting/module.ts` takes that interface in its `deps` and builds the reader. `server/composition.ts` passes the lists module into `createVotingModule`.
 
@@ -139,10 +139,12 @@ Each route is one file in `netlify/functions` (`export default handle(endpoint)`
 | `/api/me/export`     | GET    | `MyDataExportDto` as a download                                                      |
 | `/api/me`            | DELETE | Erases the member's data in every context and clears the session cookie              |
 
+**Expired sessions in the web app.** A session can end in the middle of something. When a request returns 401, the web app sends the person through sign-in and back to the page they were on, without losing unsaved input. This needs `/api/auth/login?returnTo=<path>`, which accepts same-site paths only (never another origin). Both arrive with the web app.
+
 ## Security & privacy
 
 - **OAuth.** Discord with the scopes `identify guilds.members.read` only, never `email`. Use a `state` cookie for CSRF. Discard the Discord access token right after the membership check.
-- **Session.** An HMAC-signed cookie with `HttpOnly; Secure; SameSite=Lax; Path=/` and a 7-day TTL. It holds `memberId`, a snapshot of roles, and `exp`. Rotating `SESSION_SECRET` logs everyone out.
+- **Session.** An HMAC-signed cookie with `HttpOnly; Secure; SameSite=Lax; Path=/` and a 12-hour TTL. It holds `memberId`, a snapshot of roles, and `exp`. The TTL bounds how long a Discord role or membership change takes to apply. Rotating `SESSION_SECRET` logs everyone out.
 - **Mutations.** Only `POST`, `PUT` or `DELETE`, and the `Origin` header must match `SITE_URL`.
 - **Authorization** lives in use cases, which receive an `Actor`. It never lives in handlers or in the UI.
 - **Validation.** zod at the boundary. The domain re-checks its own invariants regardless.

@@ -3,8 +3,8 @@ import { clearCookie, readCookie, setCookie } from './cookies.ts';
 
 describe('cookies', () => {
   test('are HttpOnly, Secure, SameSite=Lax and site-wide', () => {
-    expect(setCookie('__Host-session', 'abc', 604_800)).toBe(
-      '__Host-session=abc; Max-Age=604800; Path=/; HttpOnly; Secure; SameSite=Lax',
+    expect(setCookie('__Host-session', 'abc', 43_200)).toBe(
+      '__Host-session=abc; Max-Age=43200; Path=/; HttpOnly; Secure; SameSite=Lax',
     );
   });
 

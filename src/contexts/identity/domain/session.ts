@@ -1,7 +1,12 @@
 import type { MemberId, RoleId } from '../../../shared/kernel/index.ts';
 import type { Membership } from './membership.ts';
 
-export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+/**
+ * Roles and membership are a snapshot from sign-in, so this is also the longest a Discord
+ * change (a removed role, a member who left) takes to apply. Re-sign-in is silent for members
+ * who already approved the app.
+ */
+export const SESSION_TTL_SECONDS = 12 * 60 * 60;
 
 /**
  * A signed-in member. Roles are a snapshot taken at sign-in, so a role change

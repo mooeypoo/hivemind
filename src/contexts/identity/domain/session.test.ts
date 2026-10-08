@@ -15,10 +15,10 @@ const membership: Membership = {
 const now = new Date('2026-01-01T00:00:00Z');
 
 describe('Session', () => {
-  test('lasts exactly 7 days', () => {
-    expect(SESSION_TTL_SECONDS).toBe(604_800);
+  test('lasts exactly 12 hours', () => {
+    expect(SESSION_TTL_SECONDS).toBe(43_200);
     const session = issueSession(membership, now);
-    expect(session.expiresAt).toBe(now.getTime() / 1000 + 604_800);
+    expect(session.expiresAt).toBe(now.getTime() / 1000 + 43_200);
   });
 
   test('snapshots the member id and roles', () => {

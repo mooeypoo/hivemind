@@ -72,7 +72,8 @@ The app never asks for email. It stores only each member's Discord ID, display n
 
 - **Who can sign in:** anyone who is a member of the server at the moment they sign in.
 - **Who is an Admin:** anyone who holds `ADMIN_ROLE_ID` at the moment they sign in.
-- Sessions last 7 days. Role changes in Discord, and removals from the server, take effect the next time the person signs in.
+- Sessions last 12 hours. After that, the site sends people back through Discord automatically. For anyone who has already approved the app, this is a quick redirect with no screen to click through. People who are signed out of Discord in that browser will need to sign in to Discord again.
+- Role changes in Discord, and removals from the server, take effect at the next sign-in, so within 12 hours.
 - To end every session immediately, for example after removing an Admin, change `SESSION_SECRET` and redeploy. This signs everyone out, and they sign back in with their current roles.
 
 ## Changing your domain

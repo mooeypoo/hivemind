@@ -82,7 +82,7 @@ describe('complete login', () => {
     expect(members.all()).toEqual([]);
   });
 
-  test('stores the member and grants a 7-day session', async () => {
+  test('stores the member and grants a 12-hour session', async () => {
     const result = await completeLogin()({ code: 'c', state: 's', expectedState: 's' });
     expect(result.ok && result.value.maxAgeSeconds).toBe(SESSION_TTL_SECONDS);
     expect(members.all()).toEqual([ada.member]);

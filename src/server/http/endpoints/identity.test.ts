@@ -52,7 +52,7 @@ describe('GET /api/auth/login', () => {
 });
 
 describe('GET /api/auth/callback', () => {
-  test('signs a member in with a 7-day session cookie and returns to the site', async () => {
+  test('signs a member in with a 12-hour session cookie and returns to the site', async () => {
     const login = await authLogin(request('GET', '/api/auth/login'), h.app);
     const state = cookieValue(setCookies(login)[LOGIN_STATE_COOKIE]);
     const response = await authCallback(
@@ -66,7 +66,7 @@ describe('GET /api/auth/callback', () => {
     expect(response.headers.get('location')).toBe('/');
     const cookies = setCookies(response);
     expect(cookies[SESSION_COOKIE]).toMatch(
-      /; Max-Age=604800; Path=\/; HttpOnly; Secure; SameSite=Lax$/,
+      /; Max-Age=43200; Path=\/; HttpOnly; Secure; SameSite=Lax$/,
     );
     expect(cookies[LOGIN_STATE_COOKIE]).toContain('Max-Age=0');
   });
@@ -136,7 +136,7 @@ describe('GET /api/me', () => {
 
   test('ends the session after it expires', async () => {
     const session = await signIn();
-    h.clock.advanceSeconds(7 * 24 * 60 * 60);
+    h.clock.advanceSeconds(12 * 60 * 60);
     const response = await getMe(
       request('GET', '/api/me', { cookies: { [SESSION_COOKIE]: session } }),
       h.app,
