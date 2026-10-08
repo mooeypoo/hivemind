@@ -1,4 +1,5 @@
 import type { MemberActor, MemberId, RoleId } from '../../../shared/kernel/index.ts';
+import type { Member } from './member.ts';
 import type { Session } from './session.ts';
 
 /**
@@ -14,10 +15,11 @@ export const isAdmin = (session: Session, policy: AdminPolicy): boolean =>
   policy.memberIds.includes(session.memberId) ||
   (policy.roleId !== null && session.roleIds.includes(policy.roleId));
 
-/** The Actor for a valid session. */
-export const actorFor = (session: Session, policy: AdminPolicy): MemberActor => ({
+/** The Actor for a valid session of a member who still exists. */
+export const actorFor = (session: Session, member: Member, policy: AdminPolicy): MemberActor => ({
   kind: 'member',
   memberId: session.memberId,
+  displayName: member.displayName,
   roleIds: session.roleIds,
   isAdmin: isAdmin(session, policy),
 });

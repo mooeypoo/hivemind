@@ -1,5 +1,5 @@
 export type { Actor, MemberActor, MemberId, RoleId } from './actor.ts';
-export { anonymous, requireMember } from './actor.ts';
+export { anonymous, requireAdmin, requireMember } from './actor.ts';
 export type { Brand } from './brand.ts';
 export type { Clock } from './clock.ts';
 export { withConflictRetry } from './conflict-retry.ts';

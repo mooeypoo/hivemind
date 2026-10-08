@@ -182,6 +182,7 @@ describe('GET /api/me/export', () => {
         displayName: 'ada',
         avatarUrl: 'https://cdn.discordapp.com/embed/avatars/5.png',
       },
+      lists: { nominations: [] },
     });
   });
 

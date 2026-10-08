@@ -20,7 +20,7 @@ export const makeResolveActor =
     if (token === null) return anonymous;
     const session = deps.signer.verify(token);
     if (session === null || isExpired(session, deps.clock.now())) return anonymous;
-    const member = await deps.members.get(session.memberId);
-    if (member === null) return anonymous;
-    return actorFor(session, deps.admins);
+    const found = await deps.members.get(session.memberId);
+    if (found === null) return anonymous;
+    return actorFor(session, found.member, deps.admins);
   };

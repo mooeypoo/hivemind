@@ -1,33 +1,24 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { getStore, type Store } from '@netlify/blobs';
-import { BlobsServer } from '@netlify/blobs/server';
+import type { Store } from '@netlify/blobs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import {
+  startLocalBlobs,
+  type LocalBlobs,
+} from '../../../shared/infrastructure/testing/local-blobs.ts';
 import type { MemberId } from '../../../shared/kernel/index.ts';
 import { identityErrors } from '../domain/errors.ts';
 import type { Member } from '../domain/member.ts';
 import { createBlobsMemberRepository } from './blobs-member-repository.ts';
 
-let server: BlobsServer;
-let directory: string;
+let blobs: LocalBlobs;
 let store: Store;
 
 beforeAll(async () => {
-  directory = await mkdtemp(join(tmpdir(), 'blobs-identity-'));
-  server = new BlobsServer({ directory, token: 'test-token' });
-  const { port } = await server.start();
-  store = getStore({
-    name: 'identity',
-    siteID: 'test-site',
-    token: 'test-token',
-    edgeURL: `http://localhost:${String(port)}`,
-  });
+  blobs = await startLocalBlobs();
+  store = blobs.store('identity');
 });
 
 afterAll(async () => {
-  await server.stop();
-  await rm(directory, { recursive: true, force: true });
+  await blobs.close();
 });
 
 const ada: Member = {

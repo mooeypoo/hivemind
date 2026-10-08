@@ -1,0 +1,203 @@
+import { describe, expect, test } from 'vitest';
+import type { RoleId } from '../../../shared/kernel/index.ts';
+import {
+  archive,
+  DEFAULT_SCALE,
+  editList,
+  lifecycleOf,
+  mayParticipate,
+  newList,
+  nominationsOpen,
+  publish,
+  validateConfig,
+  validateSchedule,
+  type List,
+  type ListConfig,
+  type ListId,
+  type Schedule,
+} from './list.ts';
+
+const t = (iso: string) => new Date(`2026-03-${iso}Z`);
+const config: ListConfig = {
+  title: 'Best Sci-Fi Movies',
+  slug: 'best-sci-fi-movies',
+  description: 'Our favourites.',
+  itemSource: { kind: 'tmdb-movie' },
+  entryMode: 'nominations',
+  scale: DEFAULT_SCALE,
+  maxNominationsPerMember: 3,
+  resultsVisibility: 'live',
+  ranking: { strategy: 'bayesian', minVotes: 5 },
+  showNominators: true,
+  requiredRoleId: null,
+};
+const schedule: Schedule = {
+  opensAt: t('10T00:00:00'),
+  nominationsCloseAt: t('15T00:00:00'),
+  closesAt: t('20T00:00:00'),
+};
+const draft = newList('l1' as ListId, config, t('01T00:00:00'));
+const published = (s: Schedule = schedule): List => {
+  const result = publish(draft, s, t('01T00:00:00'));
+  if (!result.ok) throw new Error(result.error.code);
+  return result.value;
+};
+
+describe('lifecycle', () => {
+  test('a new list is a draft', () => {
+    expect(lifecycleOf(draft, t('12T00:00:00'))).toBe('draft');
+  });
+
+  test('a published list is scheduled, open, then closed, by the clock', () => {
+    const list = published();
+    expect(lifecycleOf(list, t('09T23:59:59'))).toBe('scheduled');
+    expect(lifecycleOf(list, t('10T00:00:00'))).toBe('open');
+    expect(lifecycleOf(list, t('19T23:59:59'))).toBe('open');
+    expect(lifecycleOf(list, t('20T00:00:00'))).toBe('closed');
+  });
+
+  test('archived is set explicitly, and only once closed', () => {
+    expect(archive(published(), t('19T00:00:00')).ok).toBe(false);
+    const archived = archive(published(), t('21T00:00:00'));
+    expect(archived.ok && lifecycleOf(archived.value, t('21T00:00:00'))).toBe('archived');
+  });
+
+  test('only a draft can be published', () => {
+    const result = publish(published(), schedule, t('01T00:00:00'));
+    expect(!result.ok && result.error.code).toBe('lists.not-a-draft');
+  });
+});
+
+describe('schedule', () => {
+  const now = t('01T00:00:00');
+
+  test('requires opensAt < nominationsCloseAt ≤ closesAt', () => {
+    expect(validateSchedule(schedule, now).ok).toBe(true);
+    expect(validateSchedule({ ...schedule, nominationsCloseAt: schedule.closesAt }, now).ok).toBe(
+      true,
+    );
+    expect(validateSchedule({ ...schedule, nominationsCloseAt: schedule.opensAt }, now).ok).toBe(
+      false,
+    );
+    expect(validateSchedule({ ...schedule, nominationsCloseAt: t('21T00:00:00') }, now).ok).toBe(
+      false,
+    );
+  });
+
+  test('nominationsCloseAt is optional, but opensAt < closesAt still holds', () => {
+    expect(validateSchedule({ ...schedule, nominationsCloseAt: null }, now).ok).toBe(true);
+    expect(
+      validateSchedule({ ...schedule, nominationsCloseAt: null, closesAt: schedule.opensAt }, now)
+        .ok,
+    ).toBe(false);
+  });
+
+  test('must close in the future', () => {
+    expect(validateSchedule(schedule, t('20T00:00:00')).ok).toBe(false);
+  });
+});
+
+describe('config', () => {
+  const problems = (patch: Partial<ListConfig>) => {
+    const result = validateConfig({ ...config, ...patch });
+    return result.ok ? [] : (result.error.details ?? []);
+  };
+
+  test('accepts a valid config with the default 1–10 scale', () => {
+    expect(validateConfig(config).ok).toBe(true);
+    expect(DEFAULT_SCALE).toEqual({ min: 1, max: 10 });
+  });
+
+  test('reports every invalid field', () => {
+    expect(
+      problems({
+        title: ' ',
+        slug: 'Not A Slug',
+        scale: { min: 5, max: 5 },
+        maxNominationsPerMember: 0,
+        ranking: { strategy: 'bayesian', minVotes: -1 },
+      }),
+    ).toEqual([
+      'title must be 1 to 120 characters',
+      'slug must be lowercase letters, digits and single hyphens, up to 60 characters',
+      'scale must be whole numbers from 0 to 100 with min below max',
+      'maxNominationsPerMember must be a whole number from 1 to 50',
+      'ranking.minVotes must be a whole number from 0 to 1000',
+    ]);
+  });
+
+  test('a seeded list does not need a nomination cap', () => {
+    expect(problems({ entryMode: 'seeded', maxNominationsPerMember: 0 })).toEqual([]);
+  });
+});
+
+describe('editing', () => {
+  test('a draft can change any part of its config', () => {
+    const result = editList(draft, { title: 'New', scale: { min: 0, max: 5 } }, t('01T00:00:00'));
+    expect(result.ok && result.value.config.title).toBe('New');
+    expect(result.ok && result.value.config.scale).toEqual({ min: 0, max: 5 });
+  });
+
+  test.each([
+    ['scheduled', '05T00:00:00'],
+    ['open', '12T00:00:00'],
+  ])('a %s list can change only its description and extend closesAt', (_, at) => {
+    const list = published();
+    const ok = editList(list, { description: 'Updated', closesAt: t('25T00:00:00') }, t(at));
+    expect(ok.ok && ok.value.config.description).toBe('Updated');
+    expect(ok.ok && ok.value.schedule?.closesAt).toEqual(t('25T00:00:00'));
+
+    const locked = editList(list, { title: 'Renamed', scale: { min: 0, max: 5 } }, t(at));
+    expect(!locked.ok && locked.error.details).toEqual(['title', 'scale']);
+  });
+
+  test('sending unchanged locked fields is not an edit', () => {
+    const result = editList(published(), { ...config, description: 'x' }, t('12T00:00:00'));
+    expect(result.ok).toBe(true);
+  });
+
+  test('closesAt can be extended but never shortened', () => {
+    const result = editList(published(), { closesAt: t('19T00:00:00') }, t('12T00:00:00'));
+    expect(!result.ok && result.error.code).toBe('lists.closes-at-not-extended');
+  });
+
+  test('a closed or archived list cannot be edited', () => {
+    const result = editList(published(), { description: 'Late' }, t('20T00:00:00'));
+    expect(!result.ok && result.error.code).toBe('lists.locked');
+  });
+});
+
+describe('nominations window', () => {
+  test('is open while the list is open and before nominationsCloseAt', () => {
+    const list = published();
+    expect(nominationsOpen(list, t('09T00:00:00'))).toBe(false);
+    expect(nominationsOpen(list, t('10T00:00:00'))).toBe(true);
+    expect(nominationsOpen(list, t('14T23:59:59'))).toBe(true);
+    expect(nominationsOpen(list, t('15T00:00:00'))).toBe(false);
+  });
+
+  test('without nominationsCloseAt, stays open until the list closes', () => {
+    const list = published({ ...schedule, nominationsCloseAt: null });
+    expect(nominationsOpen(list, t('19T23:59:59'))).toBe(true);
+    expect(nominationsOpen(list, t('20T00:00:00'))).toBe(false);
+  });
+
+  test('never opens for a seeded list', () => {
+    const seeded = newList('l2' as ListId, { ...config, entryMode: 'seeded' }, t('01T00:00:00'));
+    const result = publish(seeded, schedule, t('01T00:00:00'));
+    expect(result.ok && nominationsOpen(result.value, t('12T00:00:00'))).toBe(false);
+  });
+});
+
+describe('participation', () => {
+  test('is open to every member unless the list requires a role', () => {
+    expect(mayParticipate(draft, [])).toBe(true);
+    const gated = newList(
+      'l3' as ListId,
+      { ...config, requiredRoleId: 'r1' as RoleId },
+      t('01T00:00:00'),
+    );
+    expect(mayParticipate(gated, [])).toBe(false);
+    expect(mayParticipate(gated, ['r1' as RoleId])).toBe(true);
+  });
+});

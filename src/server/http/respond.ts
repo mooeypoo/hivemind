@@ -28,12 +28,14 @@ export const redirect = (location: string, headers: Headers = baseHeaders()): Re
   return new Response(null, { status: 302, headers });
 };
 
-export const errorBody = (code: string, message: string): ErrorDto => ({
-  error: { code, message },
-});
+export const errorBody = (
+  code: string,
+  message: string,
+  details?: readonly string[],
+): ErrorDto => ({ error: details === undefined ? { code, message } : { code, message, details } });
 
 export const domainErrorResponse = (error: DomainError): Response =>
-  json(errorBody(error.code, error.message), statusFor(error.kind));
+  json(errorBody(error.code, error.message, error.details), statusFor(error.kind));
 
 export const withCookies = (...cookies: string[]): Headers => {
   const headers = baseHeaders();

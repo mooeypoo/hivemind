@@ -10,10 +10,14 @@ export interface DomainError {
   /** Stable, specific identifier, namespaced by context, e.g. `identity.not-a-member`. */
   readonly code: string;
   readonly message: string;
+  /** Itemised problems, e.g. one per invalid CSV row. */
+  readonly details?: readonly string[];
 }
 
-export const domainError = (kind: DomainErrorKind, code: string, message: string): DomainError => ({
-  kind,
-  code,
-  message,
-});
+export const domainError = (
+  kind: DomainErrorKind,
+  code: string,
+  message: string,
+  details?: readonly string[],
+): DomainError =>
+  details === undefined ? { kind, code, message } : { kind, code, message, details };

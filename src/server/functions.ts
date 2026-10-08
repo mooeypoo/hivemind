@@ -8,6 +8,17 @@ import { errorBody, json } from './http/respond.ts';
 export type { Config } from '@netlify/functions';
 export { authCallback, authLogin, authLogout } from './http/endpoints/auth.ts';
 export { deleteMyData, exportMyData, getMe } from './http/endpoints/me.ts';
+export { availableSources, importPreset } from './http/endpoints/catalog.ts';
+export {
+  archiveList,
+  createList,
+  editList,
+  getList,
+  listLists,
+  nominate,
+  scheduleList,
+  searchForList,
+} from './http/endpoints/lists.ts';
 
 export type Endpoint = (request: Request, app: App) => Promise<Response>;
 

@@ -44,27 +44,28 @@ describe('actorFor', () => {
   });
 
   test('is an Admin when the session holds the admin role', () => {
-    expect(actorFor(session, policy('admin')).isAdmin).toBe(true);
+    expect(actorFor(session, membership.member, policy('admin')).isAdmin).toBe(true);
   });
 
   test('is not an Admin without the admin role', () => {
-    expect(actorFor(session, policy('moderator')).isAdmin).toBe(false);
+    expect(actorFor(session, membership.member, policy('moderator')).isAdmin).toBe(false);
   });
 
   test('is an Admin when listed by member ID, whatever their roles', () => {
-    expect(actorFor(session, policy('moderator', ['42'])).isAdmin).toBe(true);
-    expect(actorFor(session, policy(null, ['42'])).isAdmin).toBe(true);
+    expect(actorFor(session, membership.member, policy('moderator', ['42'])).isAdmin).toBe(true);
+    expect(actorFor(session, membership.member, policy(null, ['42'])).isAdmin).toBe(true);
   });
 
   test('is not an Admin when neither the role nor the member list matches', () => {
-    expect(actorFor(session, policy(null, ['7', '8'])).isAdmin).toBe(false);
-    expect(actorFor(session, policy(null)).isAdmin).toBe(false);
+    expect(actorFor(session, membership.member, policy(null, ['7', '8'])).isAdmin).toBe(false);
+    expect(actorFor(session, membership.member, policy(null)).isAdmin).toBe(false);
   });
 
   test('carries the member id and role snapshot', () => {
-    expect(actorFor(session, policy('admin'))).toEqual({
+    expect(actorFor(session, membership.member, policy('admin'))).toEqual({
       kind: 'member',
       memberId: '42',
+      displayName: 'Ada',
       roleIds: ['admin', 'regular'],
       isAdmin: true,
     });

@@ -22,7 +22,8 @@ export const makeDeleteMyData =
     const member = requireMember(actor);
     if (!member.ok) return member;
     for (const contributor of deps.contributors) {
-      await contributor.eraseFor(member.value.memberId);
+      const erased = await contributor.eraseFor(member.value.memberId);
+      if (!erased.ok) return erased;
     }
     await deps.members.delete(member.value.memberId);
     return ok(undefined);

@@ -6,7 +6,7 @@ export interface Platform {
   readonly clock: Clock;
   readonly ids: IdGenerator;
   /** The Blobs store for one context; each context gets its own (AGENTS.md, Persistence). */
-  readonly store: (name: 'identity' | 'lists' | 'voting' | 'ranking') => Store;
+  readonly store: (name: 'identity' | 'catalog' | 'lists' | 'voting' | 'ranking') => Store;
   readonly fetch: typeof fetch;
 }
 

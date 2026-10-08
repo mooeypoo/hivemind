@@ -21,13 +21,13 @@ Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate
 
 ## Bounded contexts
 
-| Context    | Owns                                                                                                                                   | Never owns               |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `identity` | Member, Session, Role, Actor (who is asking and what they may do), Discord membership check                                            | anything about lists     |
-| `catalog`  | CatalogItem (source, externalId, title, subtitle, imageUrl, meta), the `ItemSource` port, and its adapters: `tmdb-movie`, `freeform`   | votes, lists             |
-| `lists`    | the **List** aggregate (config, schedule, lifecycle, policies) and **Entry** (a nominated item, holding a snapshot of its CatalogItem) | scores                   |
-| `voting`   | the **Ballot** aggregate: one per member per list, mapping entryId to score                                                            | ranking math             |
-| `ranking`  | the **Leaderboard** read model: a projection of entries and ballots, plus the ranking strategies                                       | writes to other contexts |
+| Context    | Owns                                                                                                                                                                                         | Never owns               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `identity` | Member, Session, Role, Actor (who is asking and what they may do), Discord membership check                                                                                                  | anything about lists     |
+| `catalog`  | CatalogItem (source, externalId, title, subtitle, imageUrl), the **Preset** aggregate (an Admin's CSV of items), the `ItemSource` port, and its adapters: `tmdb-movie`, `freeform`, `preset` | votes, lists             |
+| `lists`    | the **List** aggregate (config, schedule, lifecycle, policies) and **Entry** (a nominated item, holding a snapshot of its CatalogItem)                                                       | scores                   |
+| `voting`   | the **Ballot** aggregate: one per member per list, mapping entryId to score                                                                                                                  | ranking math             |
+| `ranking`  | the **Leaderboard** read model: a projection of entries and ballots, plus the ranking strategies                                                                                             | writes to other contexts |
 
 **Context map.** `identity` provides an `Actor` to every use case. `catalog` is upstream of `lists`, which snapshots items at nomination time. `lists` is upstream of `voting` (is the list open, does the entry exist, what is the scale). `lists` and `voting` are both upstream of `ranking`.
 
@@ -82,13 +82,23 @@ Every context assembles itself, and the composition root only connects contexts.
 - **`server/composition.ts`** reads and validates env once, creates platform dependencies, and calls the module factories in context-map order (`catalog` → `lists` → `voting` → `ranking`), passing upstream modules downstream. `identity` comes last, because it receives every context's `PersonalDataContributor`. Nothing depends on the identity module itself; other contexts only see the `Actor` it produces.
 - **Tests** inside a context build use cases directly with `InMemory*` adapters from `infrastructure/testing/`. They do not go through `module.ts`. HTTP tests in `src/server` build the real app with `createApp`, a local Blobs server and a fake `fetch`.
 
-**The Actor.** `Actor` lives in `shared/kernel`, because every context's use cases receive one and an application layer cannot import identity. It is either anonymous or a member with `memberId`, a `roleIds` snapshot and `isAdmin`. Only identity creates Actors. A member is an Admin if their sign-in role snapshot includes `ADMIN_ROLE_ID`, or if their Discord user ID is in `ADMIN_MEMBER_IDS`. This is evaluated on every request, so a change to the env list applies on the next deploy. `requireMember(actor)` is the standard first line of a member-only use case.
+**The Actor.** `Actor` lives in `shared/kernel`, because every context's use cases receive one and an application layer cannot import identity. It is either anonymous or a member with `memberId`, `displayName` (for display only, never for authorization), a `roleIds` snapshot and `isAdmin`. Only identity creates Actors. A member is an Admin if their sign-in role snapshot includes `ADMIN_ROLE_ID`, or if their Discord user ID is in `ADMIN_MEMBER_IDS`. This is evaluated on every request, so a change to the env list applies on the next deploy. `requireMember(actor)` and `requireAdmin(actor)` are the standard first lines of member-only and Admin-only use cases.
 
 **Errors.** A `DomainError` has a `kind` (`unauthenticated`, `forbidden`, `not-found`, `conflict`, `invalid`, `unavailable`) and a specific, namespaced `code` such as `identity.not-a-member`. `server/http` maps each kind to one status (401, 403, 404, 409, 422, 503), so a new error never needs an HTTP change.
 
-**Personal data.** `GET /api/me/export` and `DELETE /api/me` must cover every context. Identity declares the port `PersonalDataContributor { context, exportFor(memberId), eraseFor(memberId) }`. Every context that stores member data exposes one from its module, and composition passes it into `createIdentityModule`. Erasure runs every contributor first and deletes the member record last, so a failure part-way leaves the member able to retry. A context that starts storing member data adds its contributor and a test in the same change.
+**Personal data.** `GET /api/me/export` and `DELETE /api/me` must cover every context. Identity declares the port `PersonalDataContributor { context, exportFor(memberId), eraseFor(memberId) }`. Every context that stores member data exposes one from its module, and composition passes it into `createIdentityModule`. Erasure runs every contributor first and deletes the member record last, so a failure part-way leaves the member able to retry. A context that starts storing member data adds its contributor and a test in the same change. A contributor's `eraseFor` returns a `Result`, and an error stops the erasure before the member record is deleted. Lists exports a member's nominations; erasure keeps their entries, because others have rated them, but removes their name from them and deletes their nomination ledgers.
 
 **Sessions.** Sessions are stateless signed cookies, but `resolveActor` also loads the member, so erasing a member ends their sessions at once. The roles in a session are a snapshot from sign-in, so Discord role and membership changes apply at the next sign-in. Sessions last 12 hours for exactly this reason: no Discord credential is kept after sign-in, so a short session is how changes in Discord reach the app. Re-sign-in asks Discord to skip its consent screen (`prompt=none`), so for members who have already approved the app it is a silent redirect. Rotating `SESSION_SECRET` signs everyone out at once.
+
+**Item sources.** When an Admin creates a list, they choose where its items come from. The catalog owns the kinds; lists treat the source reference as opaque and ask the catalog through their `Catalog` port.
+
+| Kind         | Members add items by                                                       | Validation                                                                             |
+| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `tmdb-movie` | searching TMDB and picking a result                                        | re-fetched from TMDB on nomination; adult titles never appear. Needs `TMDB_READ_TOKEN` |
+| `freeform`   | typing a title                                                             | 1–200 characters; duplicates compared after Unicode, case and spacing normalisation    |
+| `preset`     | choosing from an Admin's imported CSV (`title[,subtitle]`, up to 200 rows) | rows validated on import, with errors reported by row; presets are immutable           |
+
+A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item of the source becomes an entry when the list is scheduled, and there are no nominations). Only a preset can seed. To add a source: write an `ItemSource` adapter in `catalog/infrastructure`, register it in `catalog/module.ts`, add its kind to `ItemSourceRef` and to the HTTP schema, and, if it serves images, add the image host to the CSP `img-src`. Free-text and preset items carry no images, because arbitrary image hosts would break the CSP and expose viewers' IP addresses.
 
 **Pattern for cross-context calls.** `voting/application/ports.ts` declares `ListReader`. `voting/infrastructure/lists-reader.ts` implements it on top of the lists module's public interface, which it imports as a type from `lists/index.ts`. `voting/module.ts` takes that interface in its `deps` and builds the reader. `server/composition.ts` passes the lists module into `createVotingModule`.
 
@@ -98,9 +108,12 @@ Every context assembles itself, and the composition root only connects contexts.
 
 - Lifecycle: `draft → scheduled → open → closed → archived`. `draft` and `archived` are set explicitly. The other three are derived from the schedule and the Clock.
 - Schedule: `opensAt`, an optional `nominationsCloseAt`, and `closesAt`, with `opensAt < nominationsCloseAt ≤ closesAt`.
-- Config: `title`, `slug`, `description`, `itemSource`, `scale` (default 1–10), `maxNominationsPerMember`, `resultsVisibility` (`live` or `after-close`), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and an optional `requiredRoleId`.
+- Config: `title`, `slug` (unique), `description`, `itemSource`, `entryMode` (`nominations` or `seeded`; seeded needs a preset), `scale` (default 1–10), `maxNominationsPerMember`, `resultsVisibility` (`live` or `after-close`), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and an optional `requiredRoleId`. Defaults for omitted fields are `LIST_DEFAULTS`.
 - Only Admins create and edit lists. All of the config is editable in `draft`. Once a list is `scheduled` or `open`, only `description` and an extension of `closesAt` may change.
-- Nominations are allowed while the list is open and before `nominationsCloseAt`. A given item (`source` and `externalId`) can be nominated only once per list. Each member has a nomination cap.
+- Scheduling publishes a draft; a list closes in the future. Archiving is allowed only once a list is closed.
+- Nominations are allowed while the list is open and before `nominationsCloseAt`, and never on a seeded list. A given item (`source` and `externalId`) can be nominated only once per list: the entry id derives from them and entries are created with `onlyIfNew`. Each member has a nomination cap, enforced by their nomination ledger; a duplicate gives the nomination back.
+- An entry snapshots the catalog item and the nominator's display name. `showNominators` decides whether members see that name.
+- Every list endpoint needs a signed-in member. Drafts exist only for Admins; everyone else gets not-found. `requiredRoleId` limits who may take part (nominate, and later vote), not who may view.
 
 **Voting**
 
@@ -116,12 +129,13 @@ Every context assembles itself, and the composition root only connects contexts.
 
 Each context has its own store. A context never reads another context's store.
 
-| Store      | Keys                                        |
-| ---------- | ------------------------------------------- |
-| `identity` | `member/{memberId}`                         |
-| `lists`    | `list/{listId}`, `entry/{listId}/{entryId}` |
-| `voting`   | `ballot/{listId}/{memberId}`                |
-| `ranking`  | `leaderboard/{listId}`                      |
+| Store      | Keys                                                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identity` | `member/{memberId}`                                                                                                                                                                                           |
+| `catalog`  | `preset/{presetId}`                                                                                                                                                                                           |
+| `lists`    | `list/{listId}`, `slug/{slug}` (unique slug → listId), `entry/{listId}/{entryId}`, `nominator/{memberId}/{listId}` (a member's nominations in a list; member-first so export and erasure find them by prefix) |
+| `voting`   | `ballot/{listId}/{memberId}`                                                                                                                                                                                  |
+| `ranking`  | `leaderboard/{listId}`                                                                                                                                                                                        |
 
 - Aggregate writes use optimistic concurrency, either `onlyIfMatch` with the ETag or `onlyIfNew`. On a conflict, retry the use case once, then return `409`. Use `withConflictRetry` from the kernel, wrapped around the part of the use case that reads and writes state. Never repeat a single-use external call, such as an OAuth code exchange.
 - Repositories map versioned persistence records (`{ v: 1, ... }`) to and from domain objects. Domain objects are never serialized directly.
@@ -130,14 +144,26 @@ Each context has its own store. A context never reads another context's store.
 
 Each route is one file in `netlify/functions` (`export default handle(endpoint)` plus `config.path` and `config.method`). Its endpoint lives in `src/server/http/endpoints/` and does three things: parse, call one use case, map the result. Wire types live in `contracts.ts`. API responses send `Cache-Control: no-store`.
 
-| Route                | Method | Notes                                                                                |
-| -------------------- | ------ | ------------------------------------------------------------------------------------ |
-| `/api/auth/login`    | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord           |
-| `/api/auth/callback` | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure |
-| `/api/auth/logout`   | POST   | Clears the session cookie                                                            |
-| `/api/me`            | GET    | `MeDto`; 401 when signed out                                                         |
-| `/api/me/export`     | GET    | `MyDataExportDto` as a download                                                      |
-| `/api/me`            | DELETE | Erases the member's data in every context and clears the session cookie              |
+| Route                        | Method | Notes                                                                                |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| `/api/auth/login`            | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord           |
+| `/api/auth/callback`         | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure |
+| `/api/auth/logout`           | POST   | Clears the session cookie                                                            |
+| `/api/me`                    | GET    | `MeDto`; 401 when signed out                                                         |
+| `/api/me/export`             | GET    | `MyDataExportDto` as a download                                                      |
+| `/api/me`                    | DELETE | Erases the member's data in every context and clears the session cookie              |
+| `/api/catalog/sources`       | GET    | Admin: the item sources this site offers                                             |
+| `/api/catalog/presets`       | POST   | Admin: import a CSV preset; errors by row                                            |
+| `/api/lists`                 | GET    | Lists the caller may see                                                             |
+| `/api/lists`                 | POST   | Admin: create a draft                                                                |
+| `/api/lists/:list`           | GET    | Detail with entries. `:list` is an id or a slug                                      |
+| `/api/lists/:list`           | PUT    | Admin: edit, within the lifecycle rules                                              |
+| `/api/lists/:list/schedule`  | POST   | Admin: set the schedule and publish (seeds a seeded list)                            |
+| `/api/lists/:list/archive`   | POST   | Admin: archive a closed list                                                         |
+| `/api/lists/:list/search?q=` | GET    | Search the list's item source while nominations are open                             |
+| `/api/lists/:list/entries`   | POST   | Nominate `{ externalId }`, or `{ title }` for free text                              |
+
+Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
 
 **Expired sessions in the web app.** A session can end in the middle of something. When a request returns 401, the web app sends the person through sign-in and back to the page they were on, without losing unsaved input. This needs `/api/auth/login?returnTo=<path>`, which accepts same-site paths only (never another origin). Both arrive with the web app.
 

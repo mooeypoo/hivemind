@@ -43,5 +43,6 @@ export interface PersonalDataContributor {
   /** Key for this context's section of the export, e.g. `voting`. */
   readonly context: string;
   exportFor(memberId: MemberId): Promise<unknown>;
-  eraseFor(memberId: MemberId): Promise<void>;
+  /** An error stops the erasure; the member record is kept so they can try again. */
+  eraseFor(memberId: MemberId): Promise<Result<void, DomainError>>;
 }

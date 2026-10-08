@@ -117,6 +117,7 @@ describe('resolve actor', () => {
     expect(await signedInActor()).toEqual({
       kind: 'member',
       memberId: '1001',
+      displayName: 'Ada',
       roleIds: [ADMIN],
       isAdmin: true,
     });
@@ -168,7 +169,7 @@ describe('my data', () => {
     exportFor: (memberId) => Promise.resolve({ from: context, memberId }),
     eraseFor: (memberId) => {
       log.push(`${context}:${memberId}`);
-      return Promise.resolve();
+      return Promise.resolve(ok(undefined));
     },
   });
 
@@ -201,6 +202,23 @@ describe('my data', () => {
         lists: { from: 'lists', memberId: '1001' },
       }),
     );
+  });
+
+  test('a failing contributor stops the erasure and keeps the member, so they can retry', async () => {
+    const failing: PersonalDataContributor = {
+      context: 'voting',
+      exportFor: () => Promise.resolve({}),
+      eraseFor: () => Promise.resolve(err(identityErrors.memberConflict)),
+    };
+    const log: string[] = [];
+    const actor = await signedInActor();
+    const result = await makeDeleteMyData({
+      members,
+      contributors: [failing, contributor('lists', log)],
+    })(actor);
+    expect(result).toEqual(err(identityErrors.memberConflict));
+    expect(log).toEqual([]);
+    expect(members.all()).toEqual([ada.member]);
   });
 
   test('delete erases every contributor, then the member', async () => {
