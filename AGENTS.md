@@ -116,7 +116,7 @@ Each context has its own store. A context never reads another context's store.
 
 - **OAuth.** Discord with the scopes `identify guilds.members.read` only, never `email`. Use a `state` cookie for CSRF. Discard the Discord access token right after the membership check.
 - **Session.** An HMAC-signed cookie with `HttpOnly; Secure; SameSite=Lax; Path=/` and a 7-day TTL. It holds `memberId`, a snapshot of roles, and `exp`. Rotating `SESSION_SECRET` logs everyone out.
-- **Mutations.** Only `POST`, `PUT` or `DELETE`, and the `Origin` header must match the site URL.
+- **Mutations.** Only `POST`, `PUT` or `DELETE`, and the `Origin` header must match `SITE_URL`.
 - **Authorization** lives in use cases, which receive an `Actor`. It never lives in handlers or in the UI.
 - **Validation.** zod at the boundary. The domain re-checks its own invariants regardless.
 - **Ballots are private.** The API returns the caller's own ballot plus aggregates, and never anyone else's scores.
@@ -131,16 +131,16 @@ Each context has its own store. A context never reads another context's store.
 
 Everything that varies per deployment lives in env, and everything that varies per list lives in the List aggregate. `server/composition.ts` validates env at startup and fails fast with the name of any missing variable. No other module reads `process.env`.
 
-| Variable                | Required         | Purpose                                                                             |
-| ----------------------- | ---------------- | ----------------------------------------------------------------------------------- |
-| `DISCORD_CLIENT_ID`     | yes              | Discord OAuth application                                                           |
-| `DISCORD_CLIENT_SECRET` | yes              | Discord OAuth application (secret)                                                  |
-| `DISCORD_GUILD_ID`      | yes              | the community's Discord server; only its members can sign in                        |
-| `ADMIN_ROLE_ID`         | yes              | Discord role whose holders are Admins                                               |
-| `SESSION_SECRET`        | yes              | HMAC key for session cookies (secret, at least 32 random bytes)                     |
-| `TMDB_READ_TOKEN`       | for `tmdb-movie` | TMDB API read token (secret). Without it, the `tmdb-movie` source is unavailable    |
-| `VITE_SITE_NAME`        | no               | display name of the site, default `Votable Lists`. Public, baked into the web build |
-| `URL`                   | set by Netlify   | the site's canonical URL. Used for the `Origin` check and the OAuth redirect URI    |
+| Variable                | Required         | Purpose                                                                                                                                                                                                                                               |
+| ----------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SITE_URL`              | yes              | the site's public origin, e.g. `https://lists.example.org` (scheme and host, no path or trailing slash). The single source for the OAuth redirect URI (`${SITE_URL}/api/auth/callback`) and the `Origin` check. Netlify's built-in `URL` is not used. |
+| `DISCORD_CLIENT_ID`     | yes              | Discord OAuth application                                                                                                                                                                                                                             |
+| `DISCORD_CLIENT_SECRET` | yes              | Discord OAuth application (secret)                                                                                                                                                                                                                    |
+| `DISCORD_GUILD_ID`      | yes              | the community's Discord server; only its members can sign in                                                                                                                                                                                          |
+| `ADMIN_ROLE_ID`         | yes              | Discord role whose holders are Admins                                                                                                                                                                                                                 |
+| `SESSION_SECRET`        | yes              | HMAC key for session cookies (secret, at least 32 random bytes)                                                                                                                                                                                       |
+| `TMDB_READ_TOKEN`       | for `tmdb-movie` | TMDB API read token (secret). Without it, the `tmdb-movie` source is unavailable                                                                                                                                                                      |
+| `VITE_SITE_NAME`        | no               | display name of the site, default `Votable Lists`. Public, baked into the web build                                                                                                                                                                   |
 
 `.env.example` lists the same variables and stays in sync with this table.
 

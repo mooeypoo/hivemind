@@ -6,6 +6,8 @@
   directory = "netlify/functions"
 
 [dev]
+  # Keep in sync with SITE_URL in .env.example
+  port = 8888
   framework = "#custom"
   command = "vite --port 5173 --strictPort"
   targetPort = 5173
