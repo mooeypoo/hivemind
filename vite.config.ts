@@ -2,6 +2,10 @@ import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
+// Per-deployment display name (see AGENTS.md, Environment). Unset or blank falls back to the default.
+const siteName = process.env.VITE_SITE_NAME?.trim();
+process.env.VITE_SITE_NAME = siteName === undefined || siteName === '' ? 'Votable Lists' : siteName;
+
 export default defineConfig({
   root: fileURLToPath(new URL('./src/web', import.meta.url)),
   plugins: [vue()],

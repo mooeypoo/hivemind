@@ -6,3 +6,4 @@ dist/
 .env.*
 coverage/
 !test/boundaries/fixture/node_modules/
+!.env.example

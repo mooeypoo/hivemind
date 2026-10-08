@@ -33,10 +33,11 @@ const config: IConfiguration = {
       },
     },
     {
-      name: 'context-index-own-only',
-      comment: "A context's public API re-exports its own context only.",
+      name: 'context-root-own-only',
+      comment:
+        "A context's root files (index.ts, module.ts) import only their own context. Knowledge of other contexts lives in infrastructure.",
       severity: 'error',
-      from: { path: '^src/contexts/([^/]+)/index\\.ts$' },
+      from: { path: '^src/contexts/([^/]+)/[^/]+\\.ts$' },
       to: { path: '^src/contexts/', pathNot: '^src/contexts/$1/' },
     },
     {
@@ -55,7 +56,7 @@ const config: IConfiguration = {
       comment: 'Outside src/contexts, a context is importable only through its index.ts.',
       severity: 'error',
       from: { pathNot: '^src/contexts/' },
-      to: { path: '^src/contexts/[^/]+/(domain|application|infrastructure)/' },
+      to: { path: '^src/contexts/', pathNot: '^src/contexts/[^/]+/index\\.ts$' },
     },
     {
       name: 'functions-only-server',

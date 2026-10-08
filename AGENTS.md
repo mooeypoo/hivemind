@@ -1,6 +1,6 @@
 # AGENTS.md — Votable Lists
 
-Members of one Discord server create ranked lists ("Best sci-fi movies"), nominate items into them, and rate those items. Each list ranks itself. The first list is movies (via TMDB). The architecture must make adding a new item source a new adapter, not a rewrite.
+Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate items into them, and rate those items. Each list ranks itself. The first list is movies (via TMDB). The architecture must make adding a new item source a new adapter, not a rewrite.
 
 ## Non-negotiables
 
@@ -8,6 +8,7 @@ Members of one Discord server create ranked lists ("Best sci-fi movies"), nomina
 2. **TypeScript, strict, everywhere.** That includes the server, the web app, config and scripts.
 3. **Privacy and security by default.** See the section below. When in doubt, store less and expose less.
 4. **Ship small.** Every milestone must be deployable and green on `npm run check`.
+5. **Deployment-agnostic.** One deployment serves one Discord community, and any community can fork and deploy its own. Nothing specific to a community (server, roles, site name, URLs, lists) is written into code: it comes from the environment (see Environment) or from the List aggregate.
 
 ## Stack
 
@@ -41,9 +42,10 @@ src/
     domain/               entities, value objects, aggregates, pure functions
     application/          one file per use case + the ports it needs
     infrastructure/       adapters: Blobs repositories, Discord, TMDB; testing/ holds InMemory* adapters
-    index.ts              PUBLIC API: use-case factories + DTO types. The only importable entry point.
+    module.ts             context composition: builds this context's adapters and use cases
+    index.ts              PUBLIC API: the module factory, its public interface, DTO types. The only importable entry point.
   server/
-    composition.ts        composition root: builds adapters, injects them into use cases
+    composition.ts        composition root: reads env, creates platform deps, connects context modules
     http/                 zod schemas, auth/origin middleware, Result → HTTP mapping, contracts.ts (API types)
   web/                    Vue app
 netlify/functions/        thin handlers: parse → use case → map. No business logic.
@@ -55,10 +57,26 @@ netlify/functions/        thin handlers: parse → use case → map. No business
 - `application` may import its own `domain` and `shared/kernel`. Anything external, including another context, goes behind a **port** that the application layer declares itself.
 - `infrastructure` may import its own context, external SDKs, and **another context's `index.ts`**. This is the only legal path between contexts.
 - No context imports another context's `domain`, `application` or `infrastructure`.
+- Files at a context's root (`index.ts`, `module.ts`) import only their own context. Knowledge of another context lives only in `infrastructure`.
+- Outside `src/contexts`, a context is importable only through its `index.ts`.
+- `shared/kernel` imports nothing outside itself.
+- zod is imported only in `src/server/http`.
 - `netlify/functions` imports only `src/server`.
 - `web` imports only types from `src/server/http/contracts.ts`.
 
-**Pattern for cross-context calls.** `voting/application/ports.ts` declares `ListReader`. `voting/infrastructure/lists-reader.ts` implements it by calling `lists/index.ts`. `server/composition.ts` wires the two together.
+Each rule has a case in `test/boundaries/`. A new rule gets a new fixture case in the same change.
+
+## Composition
+
+Every context assembles itself, and the composition root only connects contexts.
+
+- **`module.ts`** exports one factory, `create<Context>Module(deps)`. It builds the context's repositories and adapters from `infrastructure/`, injects them into the use-case factories, and returns the context's public interface: an object of ready use cases.
+- **`deps`** holds only two kinds of thing: platform dependencies (Blobs store, Clock, IdGenerator, config values read from env) and the public interfaces of upstream modules. It never holds another context's repository or adapter, so a context cannot reach another context's store.
+- **`index.ts`** re-exports the module factory, the public interface type, and DTO types. Nothing else leaves a context.
+- **`server/composition.ts`** reads and validates env once, creates platform dependencies, and calls the module factories in context-map order (`identity`, `catalog` → `lists` → `voting` → `ranking`), passing upstream modules downstream.
+- **Tests** inside a context build use cases directly with `InMemory*` adapters from `infrastructure/testing/`. They do not go through `module.ts`.
+
+**Pattern for cross-context calls.** `voting/application/ports.ts` declares `ListReader`. `voting/infrastructure/lists-reader.ts` implements it on top of the lists module's public interface, which it imports as a type from `lists/index.ts`. `voting/module.ts` takes that interface in its `deps` and builds the reader. `server/composition.ts` passes the lists module into `createVotingModule`.
 
 ## Domain invariants
 
@@ -104,14 +122,27 @@ Each context has its own store. A context never reads another context's store.
 - **Ballots are private.** The API returns the caller's own ballot plus aggregates, and never anyone else's scores.
 - **Data minimization.** Store only the Discord ID, display name and avatar URL. `GET /api/me/export` and `DELETE /api/me` export and erase a member's data.
 - **Secrets** live only in Netlify environment variables. Nothing secret goes in `VITE_*`.
-- **Headers** in `netlify.toml`: a strict CSP that allows the TMDB image host and the Discord avatar CDN (`cdn.discordapp.com`) for `img-src`, HSTS, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and `Permissions-Policy`.
+- **Headers** in `netlify.toml`: a strict CSP whose `img-src` allows only the image hosts of the integrations in use (the Discord avatar CDN `cdn.discordapp.com`, and the TMDB image host for `tmdb-movie`). A new adapter that serves images adds its host here, HSTS, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and `Permissions-Policy`.
 - **Rate limiting** with Netlify's function-level `rateLimit` config on search and on every mutation.
 - **Logs** never contain tokens, cookies or request bodies.
 - **Retention.** Purge catalog snapshots on archived lists after 6 months, per TMDB's terms. Keep TMDB attribution in the UI.
 
 ## Environment
 
-`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_GUILD_ID`, `ADMIN_ROLE_ID`, `SESSION_SECRET`, `TMDB_READ_TOKEN`. Everything that varies per list lives in the List aggregate, not in env.
+Everything that varies per deployment lives in env, and everything that varies per list lives in the List aggregate. `server/composition.ts` validates env at startup and fails fast with the name of any missing variable. No other module reads `process.env`.
+
+| Variable                | Required         | Purpose                                                                             |
+| ----------------------- | ---------------- | ----------------------------------------------------------------------------------- |
+| `DISCORD_CLIENT_ID`     | yes              | Discord OAuth application                                                           |
+| `DISCORD_CLIENT_SECRET` | yes              | Discord OAuth application (secret)                                                  |
+| `DISCORD_GUILD_ID`      | yes              | the community's Discord server; only its members can sign in                        |
+| `ADMIN_ROLE_ID`         | yes              | Discord role whose holders are Admins                                               |
+| `SESSION_SECRET`        | yes              | HMAC key for session cookies (secret, at least 32 random bytes)                     |
+| `TMDB_READ_TOKEN`       | for `tmdb-movie` | TMDB API read token (secret). Without it, the `tmdb-movie` source is unavailable    |
+| `VITE_SITE_NAME`        | no               | display name of the site, default `Votable Lists`. Public, baked into the web build |
+| `URL`                   | set by Netlify   | the site's canonical URL. Used for the `Origin` check and the OAuth redirect URI    |
+
+`.env.example` lists the same variables and stays in sync with this table.
 
 ## Conventions
 

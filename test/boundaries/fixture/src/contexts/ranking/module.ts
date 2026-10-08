@@ -1,0 +1,1 @@
+import '../voting/index.ts';
