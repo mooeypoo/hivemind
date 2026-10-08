@@ -6,7 +6,7 @@ One deployment serves one Discord community. To run it for your own community, f
 
 ## Deploy your own
 
-1. **Discord application.** Create one at <https://discord.com/developers/applications>. Under OAuth2, add the redirect URI `<SITE_URL>/api/auth/callback`, where `SITE_URL` is the public address of your site (for example `https://lists.example.org`). For local development, also add `http://localhost:8888/api/auth/callback`.
+1. **Discord application.** Follow [docs/discord-setup.md](docs/discord-setup.md) to register the app, choose your `SITE_URL`, and collect your server and admin role IDs.
 2. **Netlify site.** Create a site from your fork. The build settings come from `netlify.toml`.
 3. **Environment.** In the Netlify site settings, set the variables listed in `.env.example`, including `SITE_URL`. If you later move to a custom domain, update `SITE_URL` and the Discord redirect URI together. The Environment section of [AGENTS.md](AGENTS.md) describes each one. You only need `TMDB_READ_TOKEN` if a list uses the TMDB movie source.
 4. **Deploy.** Members of your Discord server can now sign in. Holders of the `ADMIN_ROLE_ID` role can create lists.

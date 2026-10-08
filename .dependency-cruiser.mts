@@ -59,6 +59,34 @@ const config: IConfiguration = {
       to: { path: '^src/contexts/', pathNot: '^src/contexts/[^/]+/index\\.ts$' },
     },
     {
+      name: 'shared-infrastructure-for-adapters',
+      comment:
+        'shared/infrastructure holds technical helpers for adapters; only infrastructure and server use it.',
+      severity: 'error',
+      from: {
+        pathNot: [
+          '^src/contexts/[^/]+/infrastructure/',
+          '^src/server/',
+          '^src/shared/infrastructure/',
+        ],
+      },
+      to: { path: '^src/shared/infrastructure/' },
+    },
+    {
+      name: 'shared-infrastructure-no-contexts',
+      comment: 'shared/infrastructure knows nothing about contexts, the server or the web app.',
+      severity: 'error',
+      from: { path: '^src/shared/infrastructure/' },
+      to: { path: '^src/(contexts|server|web)/' },
+    },
+    {
+      name: 'testing-only-from-tests',
+      comment: 'Test doubles under testing/ are never wired into production code.',
+      severity: 'error',
+      from: { pathNot: ['\\.test\\.ts$', '/testing/'] },
+      to: { path: '/testing/' },
+    },
+    {
       name: 'functions-only-server',
       comment: 'netlify/functions are thin handlers and import only src/server.',
       severity: 'error',
@@ -112,6 +140,8 @@ const config: IConfiguration = {
     tsPreCompilationDeps: true,
     enhancedResolveOptions: {
       extensions: ['.ts', '.mts', '.vue', '.js', '.mjs', '.json'],
+      exportsFields: ['exports'],
+      conditionNames: ['import', 'types', 'node', 'default'],
     },
   },
 };

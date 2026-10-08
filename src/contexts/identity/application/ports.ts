@@ -1,0 +1,47 @@
+import type { DomainError, MemberId, Result } from '../../../shared/kernel/index.ts';
+import type { Member } from '../domain/member.ts';
+import type { Membership } from '../domain/membership.ts';
+import type { Session } from '../domain/session.ts';
+
+/**
+ * Discord, as identity needs it. The OAuth access token never crosses this port:
+ * the adapter uses it for the membership check and discards it.
+ */
+export interface DiscordGateway {
+  authorizeUrl(state: string): string;
+  /** Errors: `identity.not-a-member`, `identity.login-rejected`, `identity.discord-unavailable`. */
+  verifyMembership(code: string): Promise<Result<Membership, DomainError>>;
+}
+
+export interface VersionedMember {
+  readonly member: Member;
+  /** Opaque concurrency token (the Blobs ETag). */
+  readonly version: string;
+}
+
+export interface MemberRepository {
+  get(id: MemberId): Promise<VersionedMember | null>;
+  /**
+   * Creates the member when `expectedVersion` is null, otherwise updates it only if
+   * it is unchanged. A lost race returns `identity.member-conflict`.
+   */
+  save(member: Member, expectedVersion: string | null): Promise<Result<void, DomainError>>;
+  delete(id: MemberId): Promise<void>;
+}
+
+export interface SessionSigner {
+  sign(session: Session): string;
+  /** The session, or null if the token is malformed or its signature is wrong. Expiry is not checked here. */
+  verify(token: string): Session | null;
+}
+
+/**
+ * A context that stores data about members. Identity's export and erasure use cases
+ * call every contributor, so "my data" always means all of it.
+ */
+export interface PersonalDataContributor {
+  /** Key for this context's section of the export, e.g. `voting`. */
+  readonly context: string;
+  exportFor(memberId: MemberId): Promise<unknown>;
+  eraseFor(memberId: MemberId): Promise<void>;
+}

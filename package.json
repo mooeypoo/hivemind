@@ -18,10 +18,13 @@
     "check": "npm run typecheck && npm run lint && npm run depcruise && npm run format:check && npm run test"
   },
   "dependencies": {
-    "vue": "3.5.43"
+    "@netlify/blobs": "11.1.4",
+    "vue": "3.5.43",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@netlify/functions": "6.0.2",
     "@types/node": "22.20.5",
     "@vitejs/plugin-vue": "6.0.9",
     "dependency-cruiser": "18.5.0",

@@ -26,6 +26,12 @@ const expected: Record<string, string[]> = {
   'src/contexts/ranking/index.ts': ['context-root-own-only'],
   'src/contexts/ranking/module.ts': ['context-root-own-only'],
   'src/contexts/lists/domain/cycle-a.ts': ['no-circular'],
+  'src/contexts/voting/application/bad-shared-infrastructure.ts': [
+    'application-own-domain-only',
+    'shared-infrastructure-for-adapters',
+  ],
+  'src/shared/infrastructure/bad-context.ts': ['shared-infrastructure-no-contexts'],
+  'src/contexts/voting/bad-testing-module.ts': ['testing-only-from-tests'],
   'src/server/bad-internals.ts': ['outsiders-use-public-api'],
   'src/server/bad-module.ts': ['outsiders-use-public-api'],
   'src/server/bad-zod.ts': ['zod-at-boundary'],

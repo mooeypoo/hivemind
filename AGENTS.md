@@ -37,7 +37,8 @@ Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate
 
 ```
 src/
-  shared/kernel/          Result, Brand<T>, Clock, IdGenerator, DomainError. No context knowledge.
+  shared/kernel/          Result, Brand<T>, Clock, IdGenerator, DomainError, Actor. Pure TypeScript, no context knowledge.
+  shared/infrastructure/  technical helpers for adapters (e.g. versioned Blobs reads). No domain knowledge.
   contexts/<context>/
     domain/               entities, value objects, aggregates, pure functions
     application/          one file per use case + the ports it needs
@@ -46,7 +47,10 @@ src/
     index.ts              PUBLIC API: the module factory, its public interface, DTO types. The only importable entry point.
   server/
     composition.ts        composition root: reads env, creates platform deps, connects context modules
-    http/                 zod schemas, auth/origin middleware, Result → HTTP mapping, contracts.ts (API types)
+    config.ts             env → validated AppConfig
+    platform.ts           Clock, IdGenerator, Blobs stores, fetch: what the runtime provides
+    functions.ts          the only module netlify/functions imports: `handle(endpoint)` and the endpoints
+    http/                 zod schemas, cookies, auth/origin checks, Result → HTTP mapping, endpoints/, contracts.ts (API types)
   web/                    Vue app
 netlify/functions/        thin handlers: parse → use case → map. No business logic.
 ```
@@ -60,6 +64,8 @@ netlify/functions/        thin handlers: parse → use case → map. No business
 - Files at a context's root (`index.ts`, `module.ts`) import only their own context. Knowledge of another context lives only in `infrastructure`.
 - Outside `src/contexts`, a context is importable only through its `index.ts`.
 - `shared/kernel` imports nothing outside itself.
+- `shared/infrastructure` is imported only by `infrastructure` layers and `src/server`, and imports nothing from contexts, server or web.
+- Code under a `testing/` folder is imported only by tests.
 - zod is imported only in `src/server/http`.
 - `netlify/functions` imports only `src/server`.
 - `web` imports only types from `src/server/http/contracts.ts`.
@@ -73,8 +79,16 @@ Every context assembles itself, and the composition root only connects contexts.
 - **`module.ts`** exports one factory, `create<Context>Module(deps)`. It builds the context's repositories and adapters from `infrastructure/`, injects them into the use-case factories, and returns the context's public interface: an object of ready use cases.
 - **`deps`** holds only two kinds of thing: platform dependencies (Blobs store, Clock, IdGenerator, config values read from env) and the public interfaces of upstream modules. It never holds another context's repository or adapter, so a context cannot reach another context's store.
 - **`index.ts`** re-exports the module factory, the public interface type, and DTO types. Nothing else leaves a context.
-- **`server/composition.ts`** reads and validates env once, creates platform dependencies, and calls the module factories in context-map order (`identity`, `catalog` → `lists` → `voting` → `ranking`), passing upstream modules downstream.
-- **Tests** inside a context build use cases directly with `InMemory*` adapters from `infrastructure/testing/`. They do not go through `module.ts`.
+- **`server/composition.ts`** reads and validates env once, creates platform dependencies, and calls the module factories in context-map order (`catalog` → `lists` → `voting` → `ranking`), passing upstream modules downstream. `identity` comes last, because it receives every context's `PersonalDataContributor`. Nothing depends on the identity module itself; other contexts only see the `Actor` it produces.
+- **Tests** inside a context build use cases directly with `InMemory*` adapters from `infrastructure/testing/`. They do not go through `module.ts`. HTTP tests in `src/server` build the real app with `createApp`, a local Blobs server and a fake `fetch`.
+
+**The Actor.** `Actor` lives in `shared/kernel`, because every context's use cases receive one and an application layer cannot import identity. It is either anonymous or a member with `memberId`, a `roleIds` snapshot and `isAdmin`. Only identity creates Actors. `requireMember(actor)` is the standard first line of a member-only use case.
+
+**Errors.** A `DomainError` has a `kind` (`unauthenticated`, `forbidden`, `not-found`, `conflict`, `invalid`, `unavailable`) and a specific, namespaced `code` such as `identity.not-a-member`. `server/http` maps each kind to one status (401, 403, 404, 409, 422, 503), so a new error never needs an HTTP change.
+
+**Personal data.** `GET /api/me/export` and `DELETE /api/me` must cover every context. Identity declares the port `PersonalDataContributor { context, exportFor(memberId), eraseFor(memberId) }`. Every context that stores member data exposes one from its module, and composition passes it into `createIdentityModule`. Erasure runs every contributor first and deletes the member record last, so a failure part-way leaves the member able to retry. A context that starts storing member data adds its contributor and a test in the same change.
+
+**Sessions.** Sessions are stateless signed cookies, but `resolveActor` also loads the member, so erasing a member ends their sessions at once. The roles in a session are a snapshot from sign-in, so Discord role changes apply at the next sign-in, within 7 days at most. Rotating `SESSION_SECRET` signs everyone out.
 
 **Pattern for cross-context calls.** `voting/application/ports.ts` declares `ListReader`. `voting/infrastructure/lists-reader.ts` implements it on top of the lists module's public interface, which it imports as a type from `lists/index.ts`. `voting/module.ts` takes that interface in its `deps` and builds the reader. `server/composition.ts` passes the lists module into `createVotingModule`.
 
@@ -109,8 +123,21 @@ Each context has its own store. A context never reads another context's store.
 | `voting`   | `ballot/{listId}/{memberId}`                |
 | `ranking`  | `leaderboard/{listId}`                      |
 
-- Aggregate writes use optimistic concurrency, either `onlyIfMatch` with the ETag or `onlyIfNew`. On a conflict, retry the use case once, then return `409`.
+- Aggregate writes use optimistic concurrency, either `onlyIfMatch` with the ETag or `onlyIfNew`. On a conflict, retry the use case once, then return `409`. Use `withConflictRetry` from the kernel, wrapped around the part of the use case that reads and writes state. Never repeat a single-use external call, such as an OAuth code exchange.
 - Repositories map versioned persistence records (`{ v: 1, ... }`) to and from domain objects. Domain objects are never serialized directly.
+
+## HTTP API
+
+Each route is one file in `netlify/functions` (`export default handle(endpoint)` plus `config.path` and `config.method`). Its endpoint lives in `src/server/http/endpoints/` and does three things: parse, call one use case, map the result. Wire types live in `contracts.ts`. API responses send `Cache-Control: no-store`.
+
+| Route                | Method | Notes                                                                                |
+| -------------------- | ------ | ------------------------------------------------------------------------------------ |
+| `/api/auth/login`    | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord           |
+| `/api/auth/callback` | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure |
+| `/api/auth/logout`   | POST   | Clears the session cookie                                                            |
+| `/api/me`            | GET    | `MeDto`; 401 when signed out                                                         |
+| `/api/me/export`     | GET    | `MyDataExportDto` as a download                                                      |
+| `/api/me`            | DELETE | Erases the member's data in every context and clears the session cookie              |
 
 ## Security & privacy
 
@@ -129,18 +156,18 @@ Each context has its own store. A context never reads another context's store.
 
 ## Environment
 
-Everything that varies per deployment lives in env, and everything that varies per list lives in the List aggregate. `server/composition.ts` validates env at startup and fails fast with the name of any missing variable. No other module reads `process.env`.
+Everything that varies per deployment lives in env, and everything that varies per list lives in the List aggregate. `server/config.ts` validates env, and `server/composition.ts` is the only module in `src/` that reads `process.env`. A misconfigured deploy fails on its first request, and the function log lists every missing or malformed variable at once. [docs/discord-setup.md](docs/discord-setup.md) explains how to obtain each Discord value.
 
-| Variable                | Required         | Purpose                                                                                                                                                                                                                                               |
-| ----------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SITE_URL`              | yes              | the site's public origin, e.g. `https://lists.example.org` (scheme and host, no path or trailing slash). The single source for the OAuth redirect URI (`${SITE_URL}/api/auth/callback`) and the `Origin` check. Netlify's built-in `URL` is not used. |
-| `DISCORD_CLIENT_ID`     | yes              | Discord OAuth application                                                                                                                                                                                                                             |
-| `DISCORD_CLIENT_SECRET` | yes              | Discord OAuth application (secret)                                                                                                                                                                                                                    |
-| `DISCORD_GUILD_ID`      | yes              | the community's Discord server; only its members can sign in                                                                                                                                                                                          |
-| `ADMIN_ROLE_ID`         | yes              | Discord role whose holders are Admins                                                                                                                                                                                                                 |
-| `SESSION_SECRET`        | yes              | HMAC key for session cookies (secret, at least 32 random bytes)                                                                                                                                                                                       |
-| `TMDB_READ_TOKEN`       | for `tmdb-movie` | TMDB API read token (secret). Without it, the `tmdb-movie` source is unavailable                                                                                                                                                                      |
-| `VITE_SITE_NAME`        | no               | display name of the site, default `Votable Lists`. Public, baked into the web build                                                                                                                                                                   |
+| Variable                | Required         | Purpose                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SITE_URL`              | yes              | the site's public origin, e.g. `https://lists.example.org` (scheme and host, no path or trailing slash). Must be `https://`, except `http://localhost` for development. The single source for the OAuth redirect URI (`${SITE_URL}/api/auth/callback`) and the `Origin` check. Netlify's built-in `URL` is not used. |
+| `DISCORD_CLIENT_ID`     | yes              | Discord OAuth application                                                                                                                                                                                                                                                                                            |
+| `DISCORD_CLIENT_SECRET` | yes              | Discord OAuth application (secret)                                                                                                                                                                                                                                                                                   |
+| `DISCORD_GUILD_ID`      | yes              | the community's Discord server; only its members can sign in                                                                                                                                                                                                                                                         |
+| `ADMIN_ROLE_ID`         | yes              | Discord role whose holders are Admins                                                                                                                                                                                                                                                                                |
+| `SESSION_SECRET`        | yes              | HMAC key for session cookies (secret, at least 32 random bytes)                                                                                                                                                                                                                                                      |
+| `TMDB_READ_TOKEN`       | for `tmdb-movie` | TMDB API read token (secret). Without it, the `tmdb-movie` source is unavailable                                                                                                                                                                                                                                     |
+| `VITE_SITE_NAME`        | no               | display name of the site, default `Votable Lists`. Public, baked into the web build                                                                                                                                                                                                                                  |
 
 `.env.example` lists the same variables and stays in sync with this table.
 
