@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.netlify/
+*.tsbuildinfo
+.env
+.env.*
+coverage/
+!test/boundaries/fixture/node_modules/
