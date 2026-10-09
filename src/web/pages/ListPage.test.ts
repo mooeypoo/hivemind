@@ -68,6 +68,14 @@ describe('ListPage rating', () => {
     expect(page.text()).toContain('Your scores are private');
   });
 
+  test('shows the list before actions and keeps nomination collapsed initially', async () => {
+    const page = await mountWith(games({}));
+    const entries = page.get('.list-entries').element;
+    const sidebar = page.get('.list-sidebar').element;
+    expect(entries.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect((page.get('.sidebar-disclosure').element as HTMLDetailsElement).open).toBe(false);
+  });
+
   test('a public list warns before rating and shows attribution when results are visible', async () => {
     const page = await mountWith(games({ scoreVisibility: 'public' }));
     expect(page.text()).toContain(

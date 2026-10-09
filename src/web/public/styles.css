@@ -815,24 +815,57 @@ legend {
 @media (min-width: 60rem) {
   .list-workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 0.85fr);
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.38fr);
     align-items: start;
     gap: clamp(2rem, 4vw, 4rem);
   }
 
-  .list-workspace__standings {
+  .list-sidebar {
     min-width: 0;
     padding-left: 1.25rem;
     border-left: 1px solid var(--border);
   }
 
-  .list-workspace__standings .leaderboard {
+  .list-sidebar__standings .leaderboard {
     margin: 0;
   }
 }
 
 .list-workspace {
   min-width: 0;
+}
+
+.list-sidebar {
+  min-width: 0;
+}
+
+.list-sidebar__standings {
+  margin-top: 1.25rem;
+}
+
+.sidebar-disclosure {
+  border-block: 1px solid var(--border);
+}
+
+.sidebar-disclosure > summary {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sidebar-disclosure[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-disclosure .nominate {
+  margin: 0;
+  padding: 0.85rem 0.5rem;
+  border: 0;
 }
 
 .list-jump {

@@ -166,15 +166,14 @@ const onScored = (ballot: BallotDto) => {
       Voting stays open until an Admin closes it.
     </p>
 
-    <NominatePanel v-if="showNominate" :list="list" @nominated="load" />
-
     <nav
       v-if="list.lifecycle === 'open' || listClosed"
       class="list-jump"
       aria-label="List sections"
     >
-      <a href="#entries-heading">{{ canVote ? 'Your ballot' : 'Entries' }}</a>
+      <a href="#entries-heading">The list</a>
       <a href="#leaderboard-heading">Standings</a>
+      <a v-if="showNominate" href="#nomination-panel">Nominate</a>
     </nav>
 
     <div class="list-workspace">
@@ -231,17 +230,27 @@ const onScored = (ballot: BallotDto) => {
       </section>
 
       <aside
-        v-if="list.lifecycle === 'open' || listClosed"
-        class="list-workspace__standings"
-        aria-label="Standings"
+        v-if="showNominate || list.lifecycle === 'open' || listClosed"
+        class="list-sidebar"
+        aria-label="List actions and standings"
       >
-        <LeaderboardPanel
-          :key="list.entries.length"
-          :list="list.slug"
-          :my-scores="scores"
-          :public-scores="publicScores"
-          @loaded="onLeaderboardLoaded"
-        />
+        <details v-if="showNominate" id="nomination-panel" class="sidebar-disclosure">
+          <summary>Nominate another item</summary>
+          <NominatePanel :list="list" @nominated="load" />
+        </details>
+        <section
+          v-if="list.lifecycle === 'open' || listClosed"
+          class="list-sidebar__standings"
+          aria-label="Standings"
+        >
+          <LeaderboardPanel
+            :key="list.entries.length"
+            :list="list.slug"
+            :my-scores="scores"
+            :public-scores="publicScores"
+            @loaded="onLeaderboardLoaded"
+          />
+        </section>
       </aside>
     </div>
 
