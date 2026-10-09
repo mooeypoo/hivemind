@@ -7,7 +7,7 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { findList } from './find-list.ts';
-import { archivedSince } from '../domain/list.ts';
+import { archivedSince, visibleTo, type ListId } from '../domain/list.ts';
 import type {
   Catalog,
   EntryRepository,
@@ -25,6 +25,16 @@ export interface GetListDeps {
   readonly clock: Clock;
   readonly catalog: Pick<Catalog, 'snapshotRetentionDays'>;
 }
+
+export const makeGetSharePreview =
+  (deps: Pick<GetListDeps, 'lists' | 'slugs'>) =>
+  async (input: { readonly list: string }): Promise<{ title: string; slug: string } | null> => {
+    const byId = await deps.lists.get(input.list as ListId);
+    const id = byId === null ? await deps.slugs.lookup(input.list) : null;
+    const found = byId ?? (id === null ? null : await deps.lists.get(id));
+    if (found === null || !visibleTo(found.value, false)) return null;
+    return { title: found.value.config.title, slug: found.value.config.slug };
+  };
 
 export const makeGetList =
   (deps: GetListDeps) =>

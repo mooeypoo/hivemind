@@ -5,7 +5,7 @@ import { makeCloseVoting, makeSetVisibility } from './application/close-voting.t
 import { makeSetScoreVisibility } from './application/score-visibility.ts';
 import { makeCreateList } from './application/create-list.ts';
 import { makeEditList } from './application/edit-list.ts';
-import { makeGetList } from './application/get-list.ts';
+import { makeGetList, makeGetSharePreview } from './application/get-list.ts';
 import { makeListLists } from './application/list-lists.ts';
 import { makeNominate } from './application/nominate.ts';
 import { makeListsPersonalData } from './application/personal-data.ts';
@@ -55,6 +55,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     setScoreVisibility: makeSetScoreVisibility(shared),
     listLists: makeListLists(shared),
     getList: makeGetList(shared),
+    getSharePreview: makeGetSharePreview(shared),
     searchForList: makeSearchForList(shared),
     nominate: makeNominate(shared),
     personalData: makeListsPersonalData(repositories),

@@ -16,7 +16,7 @@ import { makeCloseVoting, makeSetVisibility } from './close-voting.ts';
 import { makeSetScoreVisibility } from './score-visibility.ts';
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
-import { makeGetList } from './get-list.ts';
+import { makeGetList, makeGetSharePreview } from './get-list.ts';
 import { makeListLists } from './list-lists.ts';
 import { makeNominate } from './nominate.ts';
 import { makeListsPersonalData } from './personal-data.ts';
@@ -169,6 +169,23 @@ describe('creating and editing', () => {
 });
 
 describe('visibility', () => {
+  test('anonymous share previews expose only published non-hidden list titles and slugs', async () => {
+    const created = await create();
+    if (!created.ok) throw new Error('fixture');
+    const preview = makeGetSharePreview(deps);
+    expect(await preview({ list: 'best-sci-fi' })).toBeNull();
+    expect(await preview({ list: 'missing' })).toBeNull();
+    await scheduleIt(created.value.id);
+    const expected = { title: config.title, slug: config.slug };
+    expect(await preview({ list: config.slug })).toEqual(expected);
+    expect(await preview({ list: created.value.id })).toEqual(expected);
+    await makeSetVisibility(deps)(admin, { list: created.value.id, visibility: 'hidden' });
+    expect(await preview({ list: config.slug })).toBeNull();
+    expect(await preview({ list: created.value.id })).toBeNull();
+    const detail = await makeGetList(deps)(anonymous, { list: config.slug });
+    expect(!detail.ok && detail.error.kind).toBe('unauthenticated');
+  });
+
   test('drafts are visible only to Admins', async () => {
     await create();
     const forMember = await makeListLists(deps)(ada);
