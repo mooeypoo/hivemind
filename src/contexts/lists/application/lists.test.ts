@@ -130,6 +130,25 @@ describe('creating and editing', () => {
     expect(!result.ok && result.error.code).toBe('catalog.cannot-seed');
   });
 
+  test('lifting a published cap applies immediately and cannot be reversed', async () => {
+    await openList({ maxNominationsPerMember: 2 });
+    await nominate(ada, '78');
+    await nominate(ada, '603');
+
+    const lifted = await makeEditList(deps)(admin, {
+      list: 'best-sci-fi',
+      edit: { maxNominationsPerMember: null },
+    });
+    expect(lifted.ok && lifted.value.maxNominationsPerMember).toBeNull();
+    expect((await nominate(ada, '62')).ok).toBe(true);
+
+    const restored = await makeEditList(deps)(admin, {
+      list: 'best-sci-fi',
+      edit: { maxNominationsPerMember: 2 },
+    });
+    expect(!restored.ok && restored.error.details).toEqual(['maxNominationsPerMember']);
+  });
+
   test('renaming the slug frees the old one', async () => {
     const created = await create();
     if (!created.ok) throw new Error('fixture');
@@ -207,6 +226,19 @@ describe('nominating', () => {
     await nominate(ada, '603');
     const third = await nominate(ada, '62');
     expect(!third.ok && third.error.code).toBe('lists.nomination-cap-reached');
+  });
+
+  test('an Admin can lift the active nomination cap and members can continue nominating', async () => {
+    await openList({ maxNominationsPerMember: 2 });
+    await nominate(ada, '78');
+    await nominate(ada, '603');
+    const lifted = await makeEditList(deps)(admin, {
+      list: 'best-sci-fi',
+      edit: { maxNominationsPerMember: null },
+    });
+    expect(lifted.ok && lifted.value.maxNominationsPerMember).toBeNull();
+    expect((await nominate(ada, '62')).ok).toBe(true);
+    expect((await nominate(ada, '1891')).ok).toBe(true);
   });
 
   test('two members nominating the same item at once: one wins, no nomination is lost', async () => {
