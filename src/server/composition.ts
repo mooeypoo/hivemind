@@ -1,8 +1,10 @@
+import { createBackupModule, type BackupModule } from '../contexts/backup/index.ts';
 import { createCatalogModule, type CatalogModule } from '../contexts/catalog/index.ts';
 import { createIdentityModule, type IdentityModule } from '../contexts/identity/index.ts';
 import { createListsModule, type ListsModule } from '../contexts/lists/index.ts';
 import { createRankingModule, type RankingModule } from '../contexts/ranking/index.ts';
 import { createVotingModule, type VotingModule } from '../contexts/voting/index.ts';
+import { createBackupCrypto } from '../shared/infrastructure/backup-crypto.ts';
 import { loadConfig, type AppConfig } from './config.ts';
 import { deployContextFrom, isProduction, type DeployContext } from './deploy-context.ts';
 import { netlifyPlatform, type Platform } from './platform.ts';
@@ -14,6 +16,9 @@ export interface App {
   readonly lists: ListsModule;
   readonly voting: VotingModule;
   readonly ranking: RankingModule;
+  readonly backup: BackupModule;
+  /** Whether backups are configured (`BACKUP_KEY`). */
+  readonly backupsEnabled: boolean;
   readonly deployContext: DeployContext;
   /** Demo mode is on only with `DEMO_MODE=true` and outside production: two locks. */
   readonly demo: boolean;
@@ -26,6 +31,7 @@ export interface App {
 
 /**
  * Connects the context modules in context-map order: catalog → lists → voting → ranking, then identity,
+ * then backup (downstream of all),
  * which receives every context's personal-data contributor. No business logic lives here.
  */
 export const createApp = (
@@ -34,6 +40,7 @@ export const createApp = (
   deployContext: DeployContext = 'production',
 ): App => {
   const demo = config.demoRequested && !isProduction(deployContext);
+  const backupCrypto = config.backupKey === null ? null : createBackupCrypto(config.backupKey);
   const { clock, ids, fetch } = platform;
 
   const catalog = createCatalogModule({
@@ -45,7 +52,11 @@ export const createApp = (
 
   const lists = createListsModule({ store: platform.store('lists'), clock, ids, catalog });
 
-  const voting = createVotingModule({ store: platform.store('voting'), lists });
+  const voting = createVotingModule({
+    store: platform.store('voting'),
+    lists,
+    sealer: backupCrypto,
+  });
 
   const ranking = createRankingModule({ store: platform.store('ranking'), clock, lists, voting });
 
@@ -63,7 +74,17 @@ export const createApp = (
     inviteCode: config.community.inviteCode,
     communityName: config.community.name,
     demo,
+    backupCrypto,
     contributors: [lists.personalData, voting.personalData],
+  });
+
+  const backup = createBackupModule({
+    lists,
+    catalog,
+    voting,
+    identity,
+    keyId: backupCrypto?.keyId ?? null,
+    clock,
   });
 
   return {
@@ -73,6 +94,8 @@ export const createApp = (
     lists,
     voting,
     ranking,
+    backup,
+    backupsEnabled: backupCrypto !== null,
     deployContext,
     demo,
     siteOrigin: (request) =>

@@ -40,6 +40,12 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
         component: () => import('./pages/RolesPage.vue'),
         meta: { member: true, admin: true },
       },
+      {
+        path: '/admin/backups',
+        name: 'backups',
+        component: () => import('./pages/BackupsPage.vue'),
+        meta: { member: true, admin: true },
+      },
       { path: '/:rest(.*)*', name: 'not-found', component: () => import('./pages/NotFound.vue') },
     ],
     scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },

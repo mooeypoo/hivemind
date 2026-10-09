@@ -19,6 +19,7 @@ import { formatDateTime, fromLocalInput, toLocalInput } from '../lib/datetime.ts
 import { clearDraft, loadDraft, saveDraft } from '../lib/drafts.ts';
 import { sourceLabel } from '../lib/labels.ts';
 import { slugify } from '../lib/slugify.ts';
+import { site } from '../state/site.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -681,6 +682,11 @@ const importCsv = async () => {
         </div>
         <p class="meta">Hiding keeps every nomination and score; make it public again any time.</p>
       </fieldset>
+      <p v-if="site.info?.backups === true" class="meta">
+        <a :href="`/api/admin/backup?list=${encodeURIComponent(existing.id)}`" download>
+          Download a backup of this list
+        </a>
+      </p>
       <div class="actions">
         <button
           v-if="existing.lifecycle === 'open'"
@@ -716,16 +722,25 @@ const importCsv = async () => {
       </p>
     </ConfirmDialog>
     <ConfirmDialog
+      v-if="existing !== null"
       :open="confirming === 'archive'"
-      title="Archive this list?"
-      confirm-label="Archive"
+      :title="`Archive “${existing.title}” permanently?`"
+      confirm-label="Archive permanently"
+      :confirm-text="existing.slug"
       danger
       @confirm="archive"
       @cancel="confirming = null"
     >
+      <p class="danger-text"><strong>This can’t be undone.</strong></p>
+      <p>Archiving is permanent. As soon as you confirm:</p>
+      <ul>
+        <li>Voting and nominations end immediately.</li>
+        <li>Every score becomes final, and the results are shown to members.</li>
+        <li>The list can never be edited, reopened or un-archived.</li>
+      </ul>
       <p>
-        Voting ends now and the list becomes read-only, with its final results. It moves to the
-        Archived section. This can’t be undone.
+        It stays visible in the Archived section (unless you hide it). If you might want it back,
+        download a backup first.
       </p>
     </ConfirmDialog>
   </div>

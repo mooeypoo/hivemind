@@ -88,3 +88,64 @@ export const saveRoleLabelsBody = z.strictObject({
 export const demoSignInBody = z.strictObject({ persona: z.string().min(1).max(40) });
 
 export const searchQuery = z.object({ q: z.string().max(200).default('') });
+
+// ---- Backups ----
+
+const isoString = z.iso.datetime({ offset: true });
+
+const backupListPart = z.object({
+  list: z.object({
+    config: z.object(listConfigFields),
+    schedule: z
+      .object({
+        opensAt: isoString,
+        nominationsCloseAt: isoString.nullable(),
+        closesAt: isoString.nullable(),
+      })
+      .nullable(),
+    phase: z.enum(['draft', 'published', 'archived']),
+    visibility: z.enum(['public', 'hidden']),
+    createdAt: isoString,
+    archivedAt: isoString.nullable(),
+  }),
+  entries: z
+    .array(
+      z.object({
+        item: z.object({
+          source: z.string().max(40),
+          externalId: z.string().max(300),
+          title: z.string().max(500),
+          subtitle: z.string().max(500).nullable(),
+          imageUrl: z.url().max(500).nullable(),
+        }),
+        nominatedBy: z
+          .object({ memberId: z.string().max(40), displayName: z.string().max(200) })
+          .nullable(),
+        nominatedAt: isoString,
+        snapshotPurgedAt: isoString.nullable(),
+      }),
+    )
+    .max(2000),
+  nominators: z.array(
+    z.object({ memberId: z.string().max(40), entryIds: z.array(z.string().max(400)).max(2000) }),
+  ),
+  preset: z
+    .object({
+      items: z
+        .array(z.object({ title: z.string().max(500), subtitle: z.string().max(500).nullable() }))
+        .max(200),
+    })
+    .nullable(),
+  ballots: z.string().max(4_000_000).nullable(),
+});
+
+/** A backup file (format version 1). The contexts check the contents again on import. */
+export const backupFileBody = z.object({
+  format: z.literal('votable-lists-backup'),
+  version: z.literal(1),
+  exportedAt: isoString,
+  keyId: z.string().max(64),
+  lists: z.array(backupListPart).max(200),
+});
+
+export const BACKUP_MAX_BYTES = 5 * 1024 * 1024;

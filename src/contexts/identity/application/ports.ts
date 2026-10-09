@@ -64,3 +64,15 @@ export interface RoleLabelRepository {
   /** Replaces the whole table if `expectedVersion` still matches (null: none saved yet). */
   save(labels: readonly RoleLabel[], expectedVersion: string | null): Promise<boolean>;
 }
+
+/**
+ * Remembers that a member erased their data, as a one-way keyed fingerprint and a date,
+ * so restoring an older backup can never bring their data back. Present only when backups
+ * are configured.
+ */
+export interface ErasureRegistry {
+  record(memberId: MemberId, at: Date): Promise<void>;
+  wasErased(memberId: MemberId): Promise<boolean>;
+  /** Removes fingerprints recorded before `cutoff`; returns how many. */
+  forgetBefore(cutoff: Date): Promise<number>;
+}

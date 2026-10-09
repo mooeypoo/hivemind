@@ -11,6 +11,7 @@ import {
   InMemorySlugIndex,
 } from '../infrastructure/testing/in-memory-lists.ts';
 import { makeArchiveList } from './archive-list.ts';
+import { makeExportForBackup, makeRestoreFromBackup } from './backup.ts';
 import { makeCloseVoting, makeSetVisibility } from './close-voting.ts';
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
@@ -445,5 +446,97 @@ describe('hidden lists', () => {
     const shown = await hide('public');
     expect(shown.ok && shown.value.visibility).toBe('public');
     expect((await makeGetList(deps)(ada, { list: 'best-sci-fi' })).ok).toBe(true);
+  });
+});
+
+describe('backups', () => {
+  const exportBackup = (ref: string | null) => makeExportForBackup(deps)(ref);
+  const restore = (
+    backup: Parameters<ReturnType<typeof makeRestoreFromBackup>>[0],
+    keep: (memberId: string) => Promise<boolean> = () => Promise.resolve(true),
+  ) => makeRestoreFromBackup(deps)(backup, { keepMember: keep });
+
+  test('export one list (even hidden or draft) or all of them', async () => {
+    await openList();
+    await nominate(ada, '78');
+    await create({ slug: 'second', title: 'Second' });
+    const one = await exportBackup('best-sci-fi');
+    expect(one.ok && one.value).toHaveLength(1);
+    expect(
+      one.ok && one.value[0]?.backup.entries.map((e) => [e.item.title, e.nominatedBy?.displayName]),
+    ).toEqual([['Blade Runner', 'Member ada']]);
+    expect(one.ok && one.value[0]?.backup.nominators).toEqual([
+      { memberId: 'ada', entryIds: ['tmdb-movie.78'] },
+    ]);
+    const all = await exportBackup(null);
+    expect(all.ok && all.value.map((x) => x.backup.list.config.slug)).toEqual([
+      'best-sci-fi',
+      'second',
+    ]);
+  });
+
+  test('restore never overwrites: a taken address gets a new one, hidden for review', async () => {
+    await openList();
+    await nominate(ada, '78');
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    const restored = await restore(exported.value[0].backup);
+    expect(restored.ok && restored.value).toMatchObject({
+      slug: 'best-sci-fi-2',
+      renamed: true,
+      hidden: true,
+      entries: 1,
+    });
+    const original = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
+    expect(original.ok && original.value.visibility).toBe('public');
+    const copy = await makeGetList(deps)(admin, { list: 'best-sci-fi-2' });
+    expect(copy.ok && copy.value.entries.map((e) => e.nominatedBy)).toEqual(['Member ada']);
+  });
+
+  test('restoring into an empty site keeps the original address and visibility', async () => {
+    await openList();
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    deps.lists = new InMemoryListRepository();
+    deps.slugs = new InMemorySlugIndex();
+    deps.entries = new InMemoryEntryRepository();
+    const restored = await restore(exported.value[0].backup);
+    expect(restored.ok && restored.value).toMatchObject({
+      slug: 'best-sci-fi',
+      renamed: false,
+      hidden: false,
+    });
+  });
+
+  test('members who must not be kept lose their name and nomination record, not the entry', async () => {
+    await openList();
+    await nominate(ada, '78');
+    await nominate(bob, '603');
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    const restored = await restore(exported.value[0].backup, (id) => Promise.resolve(id !== 'ada'));
+    expect(restored.ok && restored.value.membersLeftOut).toEqual(['ada']);
+    if (!restored.ok) throw new Error('restore');
+    const copy = await makeGetList(deps)(admin, { list: restored.value.slug });
+    expect(copy.ok && copy.value.entries.map((e) => [e.item.title, e.nominatedBy])).toEqual([
+      ['Blade Runner', null],
+      ['The Matrix', 'Member bob'],
+    ]);
+    expect((await deps.ledgers.forList(restored.value.listId)).map((l) => l.memberId)).toEqual([
+      'bob',
+    ]);
+  });
+
+  test('an invalid list in a backup is refused with its problems', async () => {
+    await openList();
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    const backup = exported.value[0].backup;
+    const broken = {
+      ...backup,
+      list: { ...backup.list, config: { ...backup.list.config, title: ' ' } },
+    };
+    const result = await restore(broken);
+    expect(!result.ok && result.error.code).toBe('lists.invalid-backup');
   });
 });

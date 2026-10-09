@@ -29,9 +29,10 @@ export const parseWith = <S extends z.ZodType>(schema: S, input: unknown): Parse
 export const readJson = async <S extends z.ZodType>(
   request: Request,
   schema: S,
+  maxBytes: number = MAX_BODY_BYTES,
 ): Promise<Parsed<z.output<S>>> => {
   const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) {
+  if (text.length > maxBytes) {
     return {
       ok: false,
       response: json(errorBody('http.too-large', 'The request is too large.'), 413),

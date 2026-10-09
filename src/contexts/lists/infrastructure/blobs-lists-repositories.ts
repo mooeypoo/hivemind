@@ -232,5 +232,10 @@ export const createBlobsLedgerRepository = (store: Store): LedgerRepository => (
       expectedVersion,
     ),
   forMember: (memberId) => readAll(store, `nominator/${memberId}/`, ledgerFromRecord),
+  async forList(listId) {
+    // Keys are member-first, so this lists all ledgers and keeps this list's. Backups only.
+    const all = await readAll(store, 'nominator/', ledgerFromRecord);
+    return all.filter((ledger) => ledger.listId === listId);
+  },
   delete: (memberId, listId) => store.delete(`nominator/${memberId}/${listId}`),
 });

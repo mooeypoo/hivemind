@@ -8,6 +8,8 @@ import type { PersonalDataContributor } from './application/ports.ts';
 import { makeResolveActor } from './application/resolve-actor.ts';
 import { makeStartLogin } from './application/start-login.ts';
 import { makeGetCommunity } from './application/get-community.ts';
+import { makeForgetOldErasures, makeWasErased } from './application/erasures.ts';
+import { createBlobsErasureRegistry, type Fingerprinter } from './infrastructure/blobs-erasures.ts';
 import { makeStartDemoSession } from './application/start-demo-session.ts';
 import { DEMO_PERSONAS, demoActor, demoVoter, operatorActor } from './domain/demo.ts';
 import { makeGetRoleLabels, makeSaveRoleLabels } from './application/role-labels.ts';
@@ -38,6 +40,8 @@ export interface IdentityModuleDeps {
   readonly communityName: string | null;
   /** Demo mode: `DEMO_MODE=true` outside production. Enables pretend sign-in. */
   readonly demo: boolean;
+  /** From `BACKUP_KEY`; null when backups aren't configured. */
+  readonly backupCrypto: Fingerprinter | null;
 }
 
 export const createIdentityModule = (deps: IdentityModuleDeps) => {
@@ -45,6 +49,8 @@ export const createIdentityModule = (deps: IdentityModuleDeps) => {
   const members = createBlobsMemberRepository(deps.store);
   const signer = createHmacSessionSigner(deps.sessionSecret);
   const roleLabels = createBlobsRoleLabelRepository(deps.store);
+  const erasures =
+    deps.backupCrypto === null ? null : createBlobsErasureRegistry(deps.store, deps.backupCrypto);
   const { clock, ids, contributors } = deps;
 
   return {
@@ -65,7 +71,11 @@ export const createIdentityModule = (deps: IdentityModuleDeps) => {
     }),
     getMe: makeGetMe({ members }),
     exportMyData: makeExportMyData({ members, contributors, clock }),
-    deleteMyData: makeDeleteMyData({ members, contributors }),
+    deleteMyData: makeDeleteMyData({ members, contributors, erasures, clock }),
+    /** For the backup context: did this member erase their data? */
+    wasErased: makeWasErased({ erasures }),
+    /** Scheduled job; never from a request. */
+    forgetOldErasures: makeForgetOldErasures({ erasures, clock }),
     getCommunity: makeGetCommunity({
       lookup:
         deps.inviteCode === null

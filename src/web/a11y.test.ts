@@ -32,6 +32,7 @@ const siteInfo: SiteDto = {
   },
   offersMovieData: true,
   demo: false,
+  backups: true,
 };
 const me = {
   id: '1',
@@ -122,6 +123,7 @@ describe('every page passes automated accessibility checks', () => {
     ['the editor of a published list', '/admin/lists/best-sci-fi', true],
     ['the editor of a draft (schedule choices)', '/admin/lists/draft', true],
     ['the roles page', '/admin/roles', true],
+    ['the backups page', '/admin/backups', true],
     ['the privacy page', '/privacy', false],
     ['not found', '/nope', false],
     ['the welcome page in demo mode', '/', false, true],
@@ -146,6 +148,29 @@ describe('demo mode', () => {
       b.textContent.trim(),
     );
     expect(buttons).toEqual(['Try as Demo Admin', 'Try as Demo Member A', 'Try as Demo Member B']);
+    wrapper.unmount();
+  });
+});
+
+describe('admin menu', () => {
+  test('Admins get links to Roles and Backups', async () => {
+    const wrapper = await renderAt('/', true);
+    const items = [...document.querySelectorAll('.menu__item')].map((item) =>
+      item.textContent.trim(),
+    );
+    expect(items.slice(0, 2)).toEqual(['Roles', 'Backups']);
+    wrapper.unmount();
+  });
+});
+
+describe('archiving', () => {
+  test('explains plainly that it is permanent, and asks for the address to be typed', async () => {
+    const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
+    const dialogs = [...document.querySelectorAll('dialog')].map((d) => d.textContent);
+    const archive = dialogs.find((text) => text.includes('permanently'));
+    expect(archive).toContain('This can’t be undone.');
+    expect(archive).toContain('can never be edited, reopened or un-archived');
+    expect(archive).toContain('Type best-sci-fi to confirm');
     wrapper.unmount();
   });
 });
@@ -177,7 +202,7 @@ describe('site-wide content', () => {
 
   test('without movie lists, the footer does not mention TMDB', async () => {
     const wrapper = await renderAt('/privacy', false);
-    site.info = { community: null, offersMovieData: false, demo: false };
+    site.info = { community: null, offersMovieData: false, demo: false, backups: false };
     await flushPromises();
     expect(document.querySelector('footer')?.textContent).not.toContain('TMDB');
     expect(document.querySelector('footer')?.textContent).toContain(
@@ -204,6 +229,7 @@ describe('site-wide content', () => {
       'Cookies',
       'Download my data',
       'Delete my data',
+      'Backups',
       'Who owns what',
       'Questions',
     ]);

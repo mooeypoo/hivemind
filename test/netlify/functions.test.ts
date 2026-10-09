@@ -4,7 +4,8 @@ import { describe, expect, test } from 'vitest';
 import { rateLimits } from '../../src/server/functions.ts';
 
 /**
- * AGENTS.md: rate limits on search and on every mutation (and on sign-in). Every function file
+ * AGENTS.md: rate limits on search and on every mutation (and on sign-in). Backup export is a
+ * GET, but heavy, so it is limited like a mutation. Every function file
  * is checked, so a new route can't forget its limit.
  */
 const dir = fileURLToPath(new URL('../../netlify/functions/', import.meta.url));
@@ -35,7 +36,7 @@ describe('Netlify functions', () => {
       ? rateLimits.signIn
       : path.endsWith('/search')
         ? rateLimits.search
-        : config.method !== 'GET'
+        : config.method !== 'GET' || path.startsWith('/api/admin/backup')
           ? rateLimits.mutation
           : undefined;
     expect(config.rateLimit).toEqual(expected);

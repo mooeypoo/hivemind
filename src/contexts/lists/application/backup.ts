@@ -1,0 +1,251 @@
+import {
+  domainError,
+  err,
+  ok,
+  type Clock,
+  type DomainError,
+  type IdGenerator,
+  type MemberId,
+  type Result,
+  type RoleId,
+} from '../../../shared/kernel/index.ts';
+import { entryIdFor, type Entry, type EntryId, type ItemSnapshot } from '../domain/entry.ts';
+import {
+  validateConfig,
+  type ItemSourceRef,
+  type List,
+  type ListConfig,
+  type ListId,
+  type Phase,
+  type Visibility,
+} from '../domain/list.ts';
+import type { EntryRepository, LedgerRepository, ListRepository, SlugIndex } from './ports.ts';
+
+/** A list as stored in a backup file: plain JSON, dates as ISO strings. */
+export interface ListBackup {
+  readonly list: {
+    readonly config: Omit<ListConfig, 'requiredRoleIds'> & {
+      readonly requiredRoleIds: readonly string[];
+    };
+    readonly schedule: {
+      readonly opensAt: string;
+      readonly nominationsCloseAt: string | null;
+      readonly closesAt: string | null;
+    } | null;
+    readonly phase: Phase;
+    readonly visibility: Visibility;
+    readonly createdAt: string;
+    readonly archivedAt: string | null;
+  };
+  readonly entries: readonly {
+    readonly item: ItemSnapshot;
+    readonly nominatedBy: { readonly memberId: string; readonly displayName: string } | null;
+    readonly nominatedAt: string;
+    readonly snapshotPurgedAt: string | null;
+  }[];
+  readonly nominators: readonly {
+    readonly memberId: string;
+    readonly entryIds: readonly string[];
+  }[];
+}
+
+export interface RestoredList {
+  readonly listId: ListId;
+  readonly title: string;
+  readonly slug: string;
+  /** The original address was taken: restored under a new one, hidden for review. */
+  readonly renamed: boolean;
+  readonly hidden: boolean;
+  readonly entries: number;
+  /** Members whose personal data was left out (erased, or the backup key didn't match). */
+  readonly membersLeftOut: readonly string[];
+}
+
+interface BackupDeps {
+  readonly lists: ListRepository;
+  readonly slugs: SlugIndex;
+  readonly entries: EntryRepository;
+  readonly ledgers: LedgerRepository;
+}
+
+const iso = (date: Date | null): string | null => date?.toISOString() ?? null;
+
+const toBackup = async (deps: BackupDeps, list: List): Promise<ListBackup> => {
+  const [entries, ledgers] = await Promise.all([
+    deps.entries.forList(list.id),
+    deps.ledgers.forList(list.id),
+  ]);
+  return {
+    list: {
+      config: list.config,
+      schedule:
+        list.schedule === null
+          ? null
+          : {
+              opensAt: list.schedule.opensAt.toISOString(),
+              nominationsCloseAt: iso(list.schedule.nominationsCloseAt),
+              closesAt: iso(list.schedule.closesAt),
+            },
+      phase: list.phase,
+      visibility: list.visibility,
+      createdAt: list.createdAt.toISOString(),
+      archivedAt: iso(list.archivedAt),
+    },
+    entries: entries.map((entry) => ({
+      item: entry.item,
+      nominatedBy: entry.nominatedBy,
+      nominatedAt: entry.nominatedAt.toISOString(),
+      snapshotPurgedAt: iso(entry.snapshotPurgedAt),
+    })),
+    nominators: ledgers.map((ledger) => ({ memberId: ledger.memberId, entryIds: ledger.entryIds })),
+  };
+};
+
+const notFound = domainError('not-found', 'lists.not-found', 'That list does not exist.');
+
+/**
+ * Lists for a backup: one (by id or slug, drafts and hidden lists included) or all.
+ * A service for the backup context, which authorizes the Admin.
+ */
+export const makeExportForBackup =
+  (deps: BackupDeps) =>
+  async (
+    ref: string | null,
+  ): Promise<
+    Result<readonly { readonly listId: ListId; readonly backup: ListBackup }[], DomainError>
+  > => {
+    let lists: List[];
+    if (ref === null) {
+      lists = await deps.lists.all();
+    } else {
+      const byId = await deps.lists.get(ref as ListId);
+      const id = byId === null ? await deps.slugs.lookup(ref) : null;
+      const found = byId ?? (id === null ? null : await deps.lists.get(id));
+      if (found === null) return err(notFound);
+      lists = [found.value];
+    }
+    lists.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return ok(
+      await Promise.all(
+        lists.map(async (list) => ({ listId: list.id, backup: await toBackup(deps, list) })),
+      ),
+    );
+  };
+
+const invalidBackup = (details: readonly string[]) =>
+  domainError('invalid', 'lists.invalid-backup', 'A list in the backup is not valid.', details);
+
+/** The first free address: the original, else `-2`, `-3`… */
+const claimFreeSlug = async (
+  slugs: SlugIndex,
+  wanted: string,
+  id: ListId,
+): Promise<string | null> => {
+  for (let n = 1; n <= 99; n += 1) {
+    const candidate = n === 1 ? wanted : `${wanted.slice(0, 56)}-${String(n)}`;
+    if (await slugs.claim(candidate, id)) return candidate;
+  }
+  return null;
+};
+
+/**
+ * Restores a list from a backup as a new list: never overwrites. Personal data (nominator
+ * names and ids, nomination records) is kept only for members `keepMember` accepts.
+ * The config is checked again; the schedule is history, so past dates are fine.
+ */
+export const makeRestoreFromBackup =
+  (deps: BackupDeps & { readonly ids: IdGenerator; readonly clock: Clock }) =>
+  async (
+    backup: ListBackup,
+    options: {
+      /** Replaces the item source, e.g. a preset restored under a new id. */
+      readonly itemSource?: ItemSourceRef;
+      readonly keepMember: (memberId: string) => Promise<boolean>;
+    },
+  ): Promise<Result<RestoredList, DomainError>> => {
+    const config = validateConfig({
+      ...backup.list.config,
+      requiredRoleIds: backup.list.config.requiredRoleIds as RoleId[],
+      ...(options.itemSource === undefined ? {} : { itemSource: options.itemSource }),
+    });
+    if (!config.ok) return err(invalidBackup(config.error.details ?? [config.error.message]));
+    if (backup.list.phase !== 'draft' && backup.list.schedule === null) {
+      return err(invalidBackup(['a published or archived list needs a schedule']));
+    }
+
+    const id = deps.ids.next() as ListId;
+    const slug = await claimFreeSlug(deps.slugs, config.value.slug, id);
+    if (slug === null) return err(invalidBackup(['no free address for this list']));
+    const renamed = slug !== config.value.slug;
+    const schedule = backup.list.schedule;
+    const list: List = {
+      id,
+      config: { ...config.value, slug },
+      schedule:
+        schedule === null
+          ? null
+          : {
+              opensAt: new Date(schedule.opensAt),
+              nominationsCloseAt:
+                schedule.nominationsCloseAt === null ? null : new Date(schedule.nominationsCloseAt),
+              closesAt: schedule.closesAt === null ? null : new Date(schedule.closesAt),
+            },
+      phase: backup.list.phase,
+      visibility: renamed ? 'hidden' : backup.list.visibility,
+      createdAt: new Date(backup.list.createdAt),
+      archivedAt: backup.list.archivedAt === null ? null : new Date(backup.list.archivedAt),
+    };
+    if (!(await deps.lists.save(list, null))) {
+      await deps.slugs.release(slug);
+      return err(invalidBackup(['the list could not be saved']));
+    }
+
+    const kept = new Map<string, boolean>();
+    const keep = async (memberId: string) => {
+      const known = kept.get(memberId);
+      if (known !== undefined) return known;
+      const decision = await options.keepMember(memberId);
+      kept.set(memberId, decision);
+      return decision;
+    };
+
+    const entryIds = new Set<EntryId>();
+    for (const saved of backup.entries) {
+      const nominator = saved.nominatedBy;
+      const entry: Entry = {
+        id: entryIdFor(saved.item),
+        listId: id,
+        item: saved.item,
+        nominatedBy:
+          nominator !== null && (await keep(nominator.memberId))
+            ? { memberId: nominator.memberId as MemberId, displayName: nominator.displayName }
+            : null,
+        nominatedAt: new Date(saved.nominatedAt),
+        snapshotPurgedAt: saved.snapshotPurgedAt === null ? null : new Date(saved.snapshotPurgedAt),
+      };
+      if (await deps.entries.create(entry)) entryIds.add(entry.id);
+    }
+    for (const ledger of backup.nominators) {
+      if (!(await keep(ledger.memberId))) continue;
+      await deps.ledgers.save(
+        {
+          memberId: ledger.memberId as MemberId,
+          listId: id,
+          entryIds: ledger.entryIds.filter((entryId) =>
+            entryIds.has(entryId as EntryId),
+          ) as EntryId[],
+        },
+        null,
+      );
+    }
+
+    return ok({
+      listId: id,
+      title: list.config.title,
+      slug,
+      renamed,
+      hidden: list.visibility === 'hidden',
+      entries: entryIds.size,
+      membersLeftOut: [...kept].filter(([, isKept]) => !isKept).map(([memberId]) => memberId),
+    });
+  };

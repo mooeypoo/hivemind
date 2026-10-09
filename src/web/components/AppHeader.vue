@@ -49,6 +49,10 @@ const deleteMyData = async () => {
             <span>{{ session.me.displayName }}</span>
           </summary>
           <div class="menu__panel">
+            <template v-if="session.me.isAdmin">
+              <RouterLink class="menu__item" :to="{ name: 'roles' }">Roles</RouterLink>
+              <RouterLink class="menu__item" :to="{ name: 'backups' }">Backups</RouterLink>
+            </template>
             <a class="menu__item" href="/api/me/export" download="my-data.json">Download my data</a>
             <button
               type="button"

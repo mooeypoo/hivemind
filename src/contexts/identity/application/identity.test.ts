@@ -16,6 +16,8 @@ import { FakeSessionSigner } from '../infrastructure/testing/fake-session-signer
 import { InMemoryMemberRepository } from '../infrastructure/testing/in-memory-member-repository.ts';
 import { makeCompleteLogin } from './complete-login.ts';
 import { makeDeleteMyData } from './delete-my-data.ts';
+import { ERASURE_MEMORY_DAYS, makeForgetOldErasures, makeWasErased } from './erasures.ts';
+import { InMemoryErasureRegistry } from '../infrastructure/testing/in-memory-erasures.ts';
 import { makeExportMyData } from './export-my-data.ts';
 import { makeGetMe } from './get-me.ts';
 import type { PersonalDataContributor } from './ports.ts';
@@ -179,7 +181,7 @@ describe('my data', () => {
       const useCases = {
         'get me': makeGetMe({ members }),
         export: makeExportMyData({ members, contributors: [], clock }),
-        delete: makeDeleteMyData({ members, contributors: [] }),
+        delete: makeDeleteMyData({ members, contributors: [], erasures: null, clock }),
       };
       const result = await useCases[name](anonymous);
       expect(result.ok || result.error.kind).toBe('unauthenticated');
@@ -215,6 +217,8 @@ describe('my data', () => {
     const result = await makeDeleteMyData({
       members,
       contributors: [failing, contributor('lists', log)],
+      erasures: null,
+      clock,
     })(actor);
     expect(result).toEqual(err(identityErrors.memberConflict));
     expect(log).toEqual([]);
@@ -225,9 +229,32 @@ describe('my data', () => {
     const log: string[] = [];
     const contributors = [contributor('voting', log), contributor('lists', log)];
     const actor = await signedInActor();
-    const result = await makeDeleteMyData({ members, contributors })(actor);
+    const result = await makeDeleteMyData({ members, contributors, erasures: null, clock })(actor);
     expect(result.ok).toBe(true);
     expect(log).toEqual(['voting:1001', 'lists:1001']);
     expect(members.all()).toEqual([]);
+  });
+});
+
+describe('remembering erasures (when backups are configured)', () => {
+  test('deleting my data records a fingerprint first, so a backup can never restore it', async () => {
+    const erasures = new InMemoryErasureRegistry();
+    const actor = await signedInActor();
+    await makeDeleteMyData({ members, contributors: [], erasures, clock })(actor);
+    expect(await makeWasErased({ erasures })('1001')).toBe(true);
+    expect(await makeWasErased({ erasures })('2002')).toBe(false);
+  });
+
+  test('without backups nothing is recorded, and nobody counts as erased', async () => {
+    expect(await makeWasErased({ erasures: null })('1001')).toBe(false);
+  });
+
+  test('erasures are forgotten after two years', async () => {
+    const erasures = new InMemoryErasureRegistry();
+    await erasures.record('1001' as MemberId, clock.now());
+    clock.advanceSeconds((ERASURE_MEMORY_DAYS - 1) * 86_400);
+    expect(await makeForgetOldErasures({ erasures, clock })()).toBe(0);
+    clock.advanceSeconds(2 * 86_400);
+    expect(await makeForgetOldErasures({ erasures, clock })()).toBe(1);
   });
 });

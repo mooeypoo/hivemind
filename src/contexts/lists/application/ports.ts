@@ -38,6 +38,8 @@ export interface LedgerRepository {
   get(memberId: MemberId, listId: ListId): Promise<Versioned<NominationLedger> | null>;
   save(ledger: NominationLedger, expectedVersion: string | null): Promise<boolean>;
   forMember(memberId: MemberId): Promise<NominationLedger[]>;
+  /** Every member's nominations in one list (backups only). */
+  forList(listId: ListId): Promise<NominationLedger[]>;
   delete(memberId: MemberId, listId: ListId): Promise<void>;
 }
 

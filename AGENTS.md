@@ -21,15 +21,16 @@ Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate
 
 ## Bounded contexts
 
-| Context    | Owns                                                                                                                                                                                         | Never owns               |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `identity` | Member, Session, Role, Actor (who is asking and what they may do), Discord membership check                                                                                                  | anything about lists     |
-| `catalog`  | CatalogItem (source, externalId, title, subtitle, imageUrl), the **Preset** aggregate (an Admin's CSV of items), the `ItemSource` port, and its adapters: `tmdb-movie`, `freeform`, `preset` | votes, lists             |
-| `lists`    | the **List** aggregate (config, schedule, lifecycle, policies) and **Entry** (a nominated item, holding a snapshot of its CatalogItem)                                                       | scores                   |
-| `voting`   | the **Ballot** aggregate: one per member per list, mapping entryId to score                                                                                                                  | ranking math             |
-| `ranking`  | the **Leaderboard** read model: a projection of entries and ballots, plus the ranking strategies                                                                                             | writes to other contexts |
+| Context    | Owns                                                                                                                                                                                         | Never owns                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `identity` | Member, Session, Role, Actor (who is asking and what they may do), Discord membership check                                                                                                  | anything about lists                   |
+| `catalog`  | CatalogItem (source, externalId, title, subtitle, imageUrl), the **Preset** aggregate (an Admin's CSV of items), the `ItemSource` port, and its adapters: `tmdb-movie`, `freeform`, `preset` | votes, lists                           |
+| `lists`    | the **List** aggregate (config, schedule, lifecycle, policies) and **Entry** (a nominated item, holding a snapshot of its CatalogItem)                                                       | scores                                 |
+| `voting`   | the **Ballot** aggregate: one per member per list, mapping entryId to score                                                                                                                  | ranking math                           |
+| `ranking`  | the **Leaderboard** read model: a projection of entries and ballots, plus the ranking strategies                                                                                             | writes to other contexts               |
+| `backup`   | the **backup file** format (versioned) and the export and import of lists, orchestrated through every other context's backup services                                                        | readable ballots; overwriting anything |
 
-**Context map.** `identity` provides an `Actor` to every use case. `catalog` is upstream of `lists`, which snapshots items at nomination time. `lists` is upstream of `voting` (is the list open, does the entry exist, what is the scale). `lists` and `voting` are both upstream of `ranking`.
+**Context map.** `identity` provides an `Actor` to every use case. `catalog` is upstream of `lists`, which snapshots items at nomination time. `lists` is upstream of `voting` (is the list open, does the entry exist, what is the scale). `lists` and `voting` are both upstream of `ranking`. `backup` is downstream of `lists`, `catalog`, `voting` and `identity`, and only ever goes through their public interfaces.
 
 **Ubiquitous language.** List, Entry, Nomination, Ballot, Score, Leaderboard, Member, Admin, Actor. The word "movie" appears only inside the `tmdb-movie` adapter and in UI copy.
 
@@ -88,6 +89,14 @@ Every context assembles itself, and the composition root only connects contexts.
 
 **Personal data.** `GET /api/me/export` and `DELETE /api/me` must cover every context. Identity declares the port `PersonalDataContributor { context, exportFor(memberId), eraseFor(memberId) }`. Every context that stores member data exposes one from its module, and composition passes it into `createIdentityModule`. Erasure runs every contributor first and deletes the member record last, so a failure part-way leaves the member able to retry. A context that starts storing member data adds its contributor and a test in the same change. A contributor's `eraseFor` returns a `Result`, and an error stops the erasure before the member record is deleted. Voting exports a member's ballots and deletes them on erasure. Lists exports a member's nominations; erasure keeps their entries, because others have rated them, but removes their name from them and deletes their nomination ledgers.
 
+**Backups.** Admins export one list or all lists to a versioned JSON file, and import such files.
+
+- **Votes stay private:** each context exports and restores its own part. Ballots leave voting only sealed (AES-256-GCM, from `BACKUP_KEY`), so whoever holds a file can't read anyone's scores.
+- **Deleted data stays deleted:** `deleteMyData` first records `erased/{fingerprint}` (a keyed one-way hash of the member id, and the date; nothing else), kept for 2 years. Imports drop the names, nomination records and ballots of erased members.
+- **A different key restores no personal data:** the file carries a `keyId`. If it doesn't match the current key, the lists and entries come back but no nominator names or votes.
+- **Nothing is overwritten:** an import always adds lists. A taken address gets `-2`, `-3`… and the copy arrives hidden for review.
+- Without `BACKUP_KEY`, backups are off and no fingerprints are recorded.
+
 **Sessions.** Sessions are stateless signed cookies, but `resolveActor` also loads the member, so erasing a member ends their sessions at once. The roles in a session are a snapshot from sign-in, so Discord role and membership changes apply at the next sign-in. Sessions last 12 hours for exactly this reason: no Discord credential is kept after sign-in, so a short session is how changes in Discord reach the app. Re-sign-in asks Discord to skip its consent screen (`prompt=none`), so for members who have already approved the app it is a silent redirect. Rotating `SESSION_SECRET` signs everyone out at once.
 
 **Item sources.** When an Admin creates a list, they choose where its items come from. The catalog owns the kinds; lists treat the source reference as opaque and ask the catalog through their `Catalog` port.
@@ -137,7 +146,7 @@ Each context has its own store. A context never reads another context's store.
 
 | Store      | Keys                                                                                                                                                                                                                             |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identity` | `member/{memberId}`, `community` (cached public name and icon, refreshed daily), `role-labels` (Admin-maintained names for role IDs)                                                                                             |
+| `identity` | `member/{memberId}`, `erased/{fingerprint}` (erasure fingerprints, see Backups; forgotten after 2 years), `community` (cached public name and icon, refreshed daily), `role-labels` (Admin-maintained names for role IDs)        |
 | `catalog`  | `preset/{presetId}`                                                                                                                                                                                                              |
 | `lists`    | `list/{listId}`, `slug/{slug}` (unique slug → listId), `entry/{listId}/{entryId}`, `nominator/{memberId}/{listId}` (a member's nominations in a list; member-first so export and erasure find them by prefix)                    |
 | `voting`   | `ballot/{listId}/{memberId}` (list-first for ranking; a member's ballots, needed only for export and erasure, are found by listing `ballot/` and filtering by the member suffix, so there is no second index to keep consistent) |
@@ -178,6 +187,8 @@ Each route is one file in `netlify/functions` (`export default handle(endpoint)`
 | `/api/site`                    | GET    | Public: the community (name, icon, invite) and whether movie data is offered             |
 | `/api/roles`                   | GET    | Role names, for members                                                                  |
 | `/api/roles`                   | PUT    | Admin: replace the role names; `{ labels, version }`, a stale version is refused         |
+| `/api/admin/backup`            | GET    | Admin: download a backup of every list, or `?list=<id or slug>` for one                  |
+| `/api/admin/backup`            | POST   | Admin: import a backup file (up to 5 MB); returns what was restored                      |
 
 Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
 
@@ -228,6 +239,7 @@ Everything that varies per deployment lives in env, and everything that varies p
 | `ADMIN_MEMBER_IDS`                      | one of these two | comma-separated Discord **user IDs** (never usernames, which can change hands) of members who are Admins whatever their roles, e.g. whoever runs the site. Evaluated on every request                                                                                                                                |
 | `SESSION_SECRET`                        | yes              | HMAC key for session cookies (secret, at least 32 random bytes)                                                                                                                                                                                                                                                      |
 | `TMDB_READ_TOKEN`                       | for `tmdb-movie` | TMDB API read token (secret). Without it, the `tmdb-movie` source is unavailable                                                                                                                                                                                                                                     |
+| `BACKUP_KEY`                            | for backups      | at least 32 random characters (secret). Seals votes in backups and keys erasure fingerprints. Keep a copy: without the same key, votes in a backup can't be restored                                                                                                                                                 |
 | `DEMO_MODE`                             | no               | `true` enables demo mode (pretend sign-in, sample lists) in previews, branch deploys and local dev. Ignored in production                                                                                                                                                                                            |
 | `NETLIFY_SITE_ID`, `NETLIFY_AUTH_TOKEN` | seed script only | point `npm run seed` at the deployed site's data; never set on the site itself                                                                                                                                                                                                                                       |
 | `VITE_SITE_NAME`                        | no               | display name of the site, default `Votable Lists`. Public, baked into the web build                                                                                                                                                                                                                                  |

@@ -33,6 +33,7 @@ describe('GET /api/site', () => {
         community: { name: 'Test Community', iconUrl: null, inviteUrl: null },
         offersMovieData: true,
         demo: false,
+        backups: true,
       },
     });
   });

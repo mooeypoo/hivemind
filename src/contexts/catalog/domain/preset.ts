@@ -83,3 +83,34 @@ export const parsePreset = (id: PresetId, csv: string): Result<Preset, DomainErr
   if (problems.length === 0 && items.length === 0) problems.push('The CSV has no items.');
   return problems.length > 0 ? err(invalid(problems)) : ok({ id, items });
 };
+
+/**
+ * A preset from items restored from a backup. The same rules as an import: valid titles,
+ * no duplicates, at most MAX_PRESET_ITEMS.
+ */
+export const presetFromItems = (
+  id: PresetId,
+  rows: readonly { readonly title: string; readonly subtitle: string | null }[],
+): Result<Preset, DomainError> => {
+  const keys = new Set<string>();
+  const valid =
+    rows.length > 0 &&
+    rows.length <= MAX_PRESET_ITEMS &&
+    rows.every((row) => {
+      const key = titleKey(row.title);
+      const ok =
+        isValidTitle(row.title) &&
+        (row.subtitle ?? '').length <= MAX_TITLE_LENGTH &&
+        !keys.has(key);
+      keys.add(key);
+      return ok;
+    });
+  return valid
+    ? ok({
+        id,
+        items: rows.map((row) => presetItem(row.title, row.subtitle === '' ? null : row.subtitle)),
+      })
+    : err(
+        domainError('invalid', 'catalog.invalid-preset', 'The preset in the backup is not valid.'),
+      );
+};

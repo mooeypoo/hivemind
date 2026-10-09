@@ -77,6 +77,18 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       name is removed from them. This can’t be undone. You can sign in again later and start fresh.
     </p>
 
+    <h2 id="backups">Backups</h2>
+    <p>
+      The site’s Admins can download backups of the lists, to restore them if something goes wrong.
+      A backup holds the lists, their entries, and nominators’ names and Discord IDs. Your scores
+      are sealed inside it: nobody who has the file, Admins included, can see how you voted.
+    </p>
+    <p>
+      When you delete your data, the site keeps a one-way fingerprint of your ID for two years, and
+      nothing else. It can’t be turned back into your ID, but it means restoring an older backup can
+      never bring your data back.
+    </p>
+
     <h2>Who owns what</h2>
     <ul>
       <li>

@@ -72,5 +72,7 @@ export class InMemoryLedgerRepository implements LedgerRepository {
   save = (ledger: NominationLedger, expectedVersion: string | null) =>
     this.table.save(this.key(ledger.memberId, ledger.listId), ledger, expectedVersion);
   forMember = (memberId: MemberId) => Promise.resolve(this.table.values(`${memberId}/`));
+  forList = (listId: ListId) =>
+    Promise.resolve(this.table.values().filter((ledger) => ledger.listId === listId));
   delete = (memberId: MemberId, listId: ListId) => this.table.delete(this.key(memberId, listId));
 }

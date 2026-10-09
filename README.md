@@ -30,6 +30,7 @@ With `DEMO_MODE=true` (set in `.env.example`), local dev and Netlify deploy prev
 
 - `npm run seed` creates the first list, "Best Sci-Fi Movies" (TMDB, 1–10), as a draft. Locally it writes to `netlify dev`'s data; with `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` (a personal access token) set, to the deployed site. Running it again does nothing.
 - `npm run check:headers -- https://your-site.netlify.app` checks a deployed site's security headers. A GitHub Action runs it after every Netlify deploy.
+- **Backups:** set `BACKUP_KEY` and Admins can download and import lists from **Backups** in the account menu. Votes stay sealed inside the file, members who deleted their data are never restored, and imports never overwrite. Keep the key safe: without it, votes in a backup can't be restored.
 - A daily scheduled function removes movie details from lists archived more than 6 months ago, as TMDB's terms require.
 
 ## Architecture

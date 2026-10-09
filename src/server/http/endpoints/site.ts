@@ -12,6 +12,7 @@ export const getSite = async (_request: Request, app: App): Promise<Response> =>
     community: await app.identity.getCommunity(),
     offersMovieData: app.config.tmdbReadToken !== null,
     demo: app.demo,
+    backups: app.backupsEnabled,
   };
   return json(body, 200, new Headers({ 'Cache-Control': 'public, max-age=3600' }));
 };

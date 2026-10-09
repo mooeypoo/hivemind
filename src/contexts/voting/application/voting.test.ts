@@ -9,6 +9,7 @@ import { makeChangeScore } from './change-score.ts';
 import { makeGetMyBallot } from './get-my-ballot.ts';
 import { makeVotingPersonalData } from './personal-data.ts';
 import { makeScoresForList } from './scores-for-list.ts';
+import { makeExportBallots, makeRestoreBallots } from './ballot-backup.ts';
 
 const member = (id: string, roles: string[] = []): Actor => ({
   kind: 'member',
@@ -138,5 +139,52 @@ describe('scores for ranking', () => {
     const scores = await makeScoresForList({ ballots })('l1');
     expect(scores).toEqual([{ e1: 7 }, { e1: 3 }]);
     expect(JSON.stringify(scores)).not.toMatch(/ada|bob/);
+  });
+});
+
+describe('ballot backups', () => {
+  /** A stand-in for the real AES-GCM sealer (tested in shared/infrastructure): base64 per key. */
+  const fakeSealer = (key: string) => ({
+    seal: (data: unknown) => `${key}:${Buffer.from(JSON.stringify(data)).toString('base64url')}`,
+    open: (sealed: string) =>
+      sealed.startsWith(`${key}:`)
+        ? (JSON.parse(Buffer.from(sealed.slice(key.length + 1), 'base64url').toString()) as unknown)
+        : null,
+  });
+  const sealer = fakeSealer('k1');
+
+  test('leave voting only sealed: no scores or member ids are readable', async () => {
+    await score(ada, 'e1', 7);
+    const sealed = await makeExportBallots({ ballots, sealer })('l1');
+    expect(sealed).not.toBeNull();
+    expect(sealed).not.toMatch(/ada|e1|"7"|:7/);
+  });
+
+  test('without a backup key there is nothing to export', async () => {
+    await score(ada, 'e1', 7);
+    expect(await makeExportBallots({ ballots, sealer: null })('l1')).toBeNull();
+  });
+
+  test('restore into a new list, leaving out members who must not be kept', async () => {
+    await score(ada, 'e1', 7);
+    await score(bob, 'e2', 3);
+    const sealed = (await makeExportBallots({ ballots, sealer })('l1')) ?? '';
+    const restored = await makeRestoreBallots({ ballots, sealer })('l9', sealed, (id) =>
+      Promise.resolve(id !== 'bob'),
+    );
+    expect(restored).toEqual({ restored: 1, membersLeftOut: ['bob'], unreadable: false });
+    expect(await ballots.forList('l9' as BallotListId)).toEqual([
+      { listId: 'l9', memberId: 'ada', scores: { e1: 7 } },
+    ]);
+  });
+
+  test('ballots sealed with another key are unreadable and nothing is restored', async () => {
+    await score(ada, 'e1', 7);
+    const sealed = (await makeExportBallots({ ballots, sealer })('l1')) ?? '';
+    const other = fakeSealer('k2');
+    const restored = await makeRestoreBallots({ ballots, sealer: other })('l9', sealed, () =>
+      Promise.resolve(true),
+    );
+    expect(restored).toEqual({ restored: 0, membersLeftOut: [], unreadable: true });
   });
 });

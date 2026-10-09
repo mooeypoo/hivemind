@@ -7,5 +7,6 @@ import type { App } from './composition.ts';
 export const runRetention = async (app: App): Promise<string> => {
   const purged = await app.lists.purgeExpiredSnapshots();
   const stale = await app.ranking.dropStaleLeaderboards();
-  return `Retention: checked ${String(purged.listsChecked)} archived lists, removed details from ${String(purged.entriesPurged)} entries, cleared ${String(stale.dropped)} cached leaderboards.`;
+  const forgotten = await app.identity.forgetOldErasures();
+  return `Retention: checked ${String(purged.listsChecked)} archived lists, removed details from ${String(purged.entriesPurged)} entries, cleared ${String(stale.dropped)} cached leaderboards, forgot ${String(forgotten)} erasures older than two years.`;
 };

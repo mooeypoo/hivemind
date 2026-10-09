@@ -20,6 +20,7 @@ export const testConfig: AppConfig = {
   tmdbReadToken: 'tmdb-test-token',
   community: { inviteCode: null, name: 'Test Community' },
   demoRequested: false,
+  backupKey: 'test-backup-key-at-least-32-characters!!',
 };
 
 /** Discord as the HTTP layer sees it: who is signing in, and whether they are in the server. */

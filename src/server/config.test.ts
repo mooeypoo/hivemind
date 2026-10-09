@@ -117,6 +117,15 @@ describe('loadConfig', () => {
     });
   });
 
+  test('BACKUP_KEY is optional, and long when set', () => {
+    expect(
+      loadConfig(valid).ok &&
+        (loadConfig(valid) as { value: { backupKey: unknown } }).value.backupKey,
+    ).toBeNull();
+    const short = loadConfig({ ...valid, BACKUP_KEY: 'short' });
+    expect(!short.ok && short.error).toEqual(['BACKUP_KEY must be at least 32 characters']);
+  });
+
   test('rejects a short session secret', () => {
     const result = loadConfig({ ...valid, SESSION_SECRET: 'short' });
     expect(!result.ok && result.error).toEqual(['SESSION_SECRET must be at least 32 characters']);

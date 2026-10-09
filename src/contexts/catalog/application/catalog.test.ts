@@ -13,6 +13,7 @@ import type { ItemSources } from './ports.ts';
 import { makeResolve } from './resolve.ts';
 import { makeSearch } from './search.ts';
 import { makeSeedItems } from './seed-items.ts';
+import { makeExportPreset, makeRestorePreset } from './preset-backup.ts';
 
 const member = (isAdmin: boolean): Actor => ({
   kind: 'member',
@@ -166,5 +167,28 @@ describe('seed items', () => {
     expect(await makeSeedItems({ presets })({ kind: 'freeform' })).toEqual(
       err(catalogErrors.cannotSeed),
     );
+  });
+});
+
+describe('preset backups', () => {
+  test('export the rows and restore them under a new id', async () => {
+    const ref = await importAlbums();
+    if (ref.kind !== 'preset') throw new Error('fixture');
+    const rows = await makeExportPreset({ presets })(ref.presetId);
+    expect(rows?.items).toHaveLength(3);
+    const restored = await makeRestorePreset({ presets, ids: new SequentialIds() })(
+      rows ?? { items: [] },
+    );
+    expect(restored.ok && restored.value).not.toBe(ref.presetId);
+  });
+
+  test('refuse invalid rows, like an import would', async () => {
+    const restored = await makeRestorePreset({ presets, ids: new SequentialIds() })({
+      items: [
+        { title: 'Blue', subtitle: null },
+        { title: 'blue', subtitle: null },
+      ],
+    });
+    expect(!restored.ok && restored.error.code).toBe('catalog.invalid-preset');
   });
 });

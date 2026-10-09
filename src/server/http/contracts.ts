@@ -221,6 +221,8 @@ export interface SiteDto {
   readonly offersMovieData: boolean;
   /** Demo mode: pretend sign-in with sample data. Never true in production. */
   readonly demo: boolean;
+  /** Whether backups are set up (`BACKUP_KEY`). */
+  readonly backups: boolean;
 }
 
 export type DemoPersona = 'admin' | 'member-a' | 'member-b';
@@ -246,4 +248,43 @@ export interface RoleLabelsDto {
 export interface SaveRoleLabelsRequest {
   readonly labels: readonly RoleLabelDto[];
   readonly version: string | null;
+}
+
+// ---- Backups ----
+
+/**
+ * What the web app reads from a backup file to preview it before importing. The full format
+ * is the server's; votes inside it are sealed and unreadable.
+ */
+export interface BackupPreview {
+  readonly format: 'votable-lists-backup';
+  readonly version: number;
+  readonly exportedAt: string;
+  readonly lists: readonly {
+    readonly list: { readonly config: { readonly title: string; readonly slug: string } };
+    readonly entries: readonly unknown[];
+    readonly ballots: string | null;
+  }[];
+}
+
+export type ImportedListDto =
+  | {
+      readonly ok: true;
+      readonly title: string;
+      readonly slug: string;
+      /** The original address was taken: imported under a new one, hidden for review. */
+      readonly renamed: boolean;
+      readonly hidden: boolean;
+      readonly entries: number;
+      readonly votesRestored: number;
+      /** Members whose names and votes weren't restored (they deleted their data, or the key differs). */
+      readonly membersLeftOut: number;
+    }
+  | { readonly ok: false; readonly title: string; readonly problem: string };
+
+/** `POST /api/admin/backup` */
+export interface ImportSummaryDto {
+  /** False: made with a different backup key, so no names or votes were restored. */
+  readonly keyMatched: boolean;
+  readonly lists: readonly ImportedListDto[];
 }

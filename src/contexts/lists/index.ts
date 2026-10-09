@@ -5,6 +5,7 @@ export type { NominateInput } from './application/nominate.ts';
 export type { EntryView, ListDetail, ListView } from './application/views.ts';
 export type { VotingRules } from './application/voting-rules.ts';
 export type { RankingContextView } from './application/ranking-services.ts';
+export type { ListBackup, RestoredList } from './application/backup.ts';
 export type { EntryId, ItemSnapshot } from './domain/entry.ts';
 export type {
   EntryMode,

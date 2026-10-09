@@ -891,3 +891,16 @@ legend {
 .list-group {
   margin-bottom: 1.75rem;
 }
+
+.danger-text {
+  color: var(--danger);
+  font-size: 1.05rem;
+}
+
+.dialog__confirm {
+  margin: 0.75rem 0;
+}
+
+.dialog ul {
+  padding-left: 1.25rem;
+}

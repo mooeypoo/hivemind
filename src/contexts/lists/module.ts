@@ -13,6 +13,7 @@ import { makeSearchForList } from './application/search-for-list.ts';
 import { makeEntryExists, makeRulesForVoting } from './application/voting-rules.ts';
 import { makeEntriesForRanking, makeRankingContext } from './application/ranking-services.ts';
 import { makePurgeExpiredSnapshots } from './application/purge-expired-snapshots.ts';
+import { makeExportForBackup, makeRestoreFromBackup } from './application/backup.ts';
 import {
   createBlobsEntryRepository,
   createBlobsLedgerRepository,
@@ -62,6 +63,9 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     entriesForRanking: makeEntriesForRanking(repositories),
     /** Scheduled job (TMDB retention); never from a request. */
     purgeExpiredSnapshots: makePurgeExpiredSnapshots(shared),
+    /** Backup services; the backup context authorizes the Admin. */
+    exportForBackup: makeExportForBackup(repositories),
+    restoreFromBackup: makeRestoreFromBackup({ ...repositories, ids: deps.ids, clock: deps.clock }),
   };
 };
 

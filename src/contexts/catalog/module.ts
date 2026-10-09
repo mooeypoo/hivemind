@@ -7,6 +7,7 @@ import type { ItemSources } from './application/ports.ts';
 import { makeResolve } from './application/resolve.ts';
 import { makeSearch } from './application/search.ts';
 import { makeSeedItems } from './application/seed-items.ts';
+import { makeExportPreset, makeRestorePreset } from './application/preset-backup.ts';
 import { snapshotRetentionDays } from './domain/retention.ts';
 import { createBlobsPresetRepository } from './infrastructure/blobs-preset-repository.ts';
 import { createFreeformSource } from './infrastructure/freeform-source.ts';
@@ -40,6 +41,9 @@ export const createCatalogModule = (deps: CatalogModuleDeps) => {
     checkSource: makeCheckSource({ sources, presets }),
     seedItems: makeSeedItems({ presets }),
     snapshotRetentionDays,
+    /** Backup services. */
+    exportPreset: makeExportPreset({ presets }),
+    restorePreset: makeRestorePreset({ presets, ids: deps.ids }),
   };
 };
 

@@ -18,6 +18,8 @@ export interface AppConfig {
   readonly community: { readonly inviteCode: string | null; readonly name: string | null };
   /** `DEMO_MODE=true`. Demo mode also requires a non-production deploy; see composition. */
   readonly demoRequested: boolean;
+  /** `BACKUP_KEY`: enables backups (sealed votes, erasure fingerprints). Null: backups off. */
+  readonly backupKey: string | null;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -48,6 +50,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
   const inviteRaw = env.DISCORD_INVITE_CODE?.trim() ?? '';
   const inviteCode = inviteRaw === '' ? null : inviteCodeFrom(inviteRaw);
   const communityName = env.COMMUNITY_NAME?.trim() ?? '';
+  const backupKey = env.BACKUP_KEY?.trim() ?? '';
 
   if (siteUrl !== '' && !isOrigin(siteUrl)) {
     problems.push(
@@ -77,6 +80,9 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     );
   }
   if (communityName.length > 100) problems.push('COMMUNITY_NAME must be at most 100 characters');
+  if (backupKey !== '' && backupKey.length < MIN_SECRET_LENGTH) {
+    problems.push(`BACKUP_KEY must be at least ${String(MIN_SECRET_LENGTH)} characters`);
+  }
 
   if (problems.length > 0) return err(problems);
   return ok({
@@ -87,6 +93,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     tmdbReadToken: tmdbReadToken === '' ? null : tmdbReadToken,
     community: { inviteCode, name: communityName === '' ? null : communityName },
     demoRequested: env.DEMO_MODE?.trim().toLowerCase() === 'true',
+    backupKey: backupKey === '' ? null : backupKey,
   });
 };
 
