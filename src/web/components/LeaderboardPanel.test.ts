@@ -82,8 +82,13 @@ describe('LeaderboardPanel', () => {
 
   test('explains when results are hidden until the list closes', async () => {
     const panel = await mountWith({ hidden: true, revealsAt: '2026-01-10T00:00:00.000Z' });
-    expect(panel.text()).toContain('Results are revealed when the list closes');
+    expect(panel.text()).toContain('Results are revealed when voting closes');
     expect(panel.find('.ranking').exists()).toBe(false);
+  });
+
+  test('an open-ended list reveals results when an Admin closes voting', async () => {
+    const panel = await mountWith({ hidden: true, revealsAt: null });
+    expect(panel.text()).toContain('Results are revealed when an Admin closes voting.');
   });
 
   test('says when nobody has voted yet', async () => {

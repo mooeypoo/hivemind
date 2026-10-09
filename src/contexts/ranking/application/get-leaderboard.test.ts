@@ -51,11 +51,19 @@ describe('visibility', () => {
     },
   );
 
-  test('after-close results appear once the list closes', async () => {
+  test('after-close results appear once voting has ended (closed or archived)', async () => {
     sources.settings = { ...sources.settings, resultsVisibility: 'after-close' };
     sources.ballots = [{ a: 3 }];
-    clock.set(new Date('2026-03-20T00:00:00Z'));
+    sources.settings = { ...sources.settings, votingEnded: true };
     expect((await leaderboard()).hidden).toBe(false);
+  });
+
+  test('a hidden list does not exist for members, but does for Admins', async () => {
+    sources.hidden = true;
+    const run = makeGetLeaderboard({ lists: sources, scores: sources, cache, clock });
+    const forMember = await run(member(), { list: 'l1' });
+    expect(!forMember.ok && forMember.error.code).toBe('lists.not-found');
+    expect((await run(member(true), { list: 'l1' })).ok).toBe(true);
   });
 
   test('needs a signed-in member and a visible list', async () => {

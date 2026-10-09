@@ -22,6 +22,28 @@ const loginNotice = computed(() => {
 });
 
 const lists = ref<readonly ListDto[] | null>(null);
+
+/** Open and upcoming first (drafts included, for Admins), then closed, then archived. */
+const groups = computed(() => {
+  const all = lists.value ?? [];
+  return [
+    {
+      id: 'current',
+      title: 'Open and upcoming',
+      lists: all.filter((list) => ['draft', 'scheduled', 'open'].includes(list.lifecycle)),
+    },
+    {
+      id: 'closed',
+      title: 'Voting closed',
+      lists: all.filter((list) => list.lifecycle === 'closed'),
+    },
+    {
+      id: 'archived',
+      title: 'Archived',
+      lists: all.filter((list) => list.lifecycle === 'archived'),
+    },
+  ].filter((group) => group.lists.length > 0);
+});
 const error = ref<ApiError | null>(null);
 
 onMounted(async () => {
@@ -83,8 +105,23 @@ onMounted(async () => {
       >
       <template v-else>Check back soon.</template>
     </p>
-    <div v-else-if="lists !== null" class="grid">
-      <ListCard v-for="list in lists" :key="list.id" :list="list" :can-edit="session.me.isAdmin" />
-    </div>
+    <template v-else-if="lists !== null">
+      <section
+        v-for="group in groups"
+        :key="group.id"
+        class="list-group"
+        :aria-labelledby="`group-${group.id}`"
+      >
+        <h2 :id="`group-${group.id}`">{{ group.title }}</h2>
+        <div class="grid">
+          <ListCard
+            v-for="list in group.lists"
+            :key="list.id"
+            :list="list"
+            :can-edit="session.me.isAdmin"
+          />
+        </div>
+      </section>
+    </template>
   </template>
 </template>

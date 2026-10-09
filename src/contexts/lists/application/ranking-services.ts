@@ -1,12 +1,21 @@
-import { err, ok, type DomainError, type Result } from '../../../shared/kernel/index.ts';
+import {
+  err,
+  ok,
+  type Clock,
+  type DomainError,
+  type Result,
+} from '../../../shared/kernel/index.ts';
 import type { EntryId, ItemSnapshot } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
-import type { ListId, ResultsVisibility } from '../domain/list.ts';
+import { lifecycleOf, visibleTo, type ListId, type ResultsVisibility } from '../domain/list.ts';
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 
 export interface RankingContextView {
   readonly listId: ListId;
   readonly resultsVisibility: ResultsVisibility;
+  /** Voting has ended: closed, or archived. Final results may be shown. */
+  readonly votingEnded: boolean;
+  /** When voting is due to end, if it has an end date. */
   readonly closesAt: Date | null;
   readonly strategy: string;
   readonly minVotes: number;
@@ -15,23 +24,29 @@ export interface RankingContextView {
 
 /**
  * What ranking needs to decide whether to show or rebuild a leaderboard. A service for
- * other contexts; the calling use case authorizes. Drafts are not found.
+ * other contexts; the calling use case authorizes. Drafts and hidden lists are not found unless
+ * the viewer is an Admin.
  */
 export const makeRankingContext =
   (deps: {
     readonly lists: ListRepository;
     readonly slugs: SlugIndex;
     readonly entries: EntryRepository;
+    readonly clock: Clock;
   }) =>
-  async (idOrSlug: string): Promise<Result<RankingContextView, DomainError>> => {
+  async (
+    idOrSlug: string,
+    viewer: { readonly isAdmin: boolean },
+  ): Promise<Result<RankingContextView, DomainError>> => {
     const byId = await deps.lists.get(idOrSlug as ListId);
     const id = byId === null ? await deps.slugs.lookup(idOrSlug) : null;
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
-    if (found === null || found.value.phase === 'draft') return err(listsErrors.notFound);
+    if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
     return ok({
       listId: list.id,
       resultsVisibility: list.config.resultsVisibility,
+      votingEnded: ['closed', 'archived'].includes(lifecycleOf(list, deps.clock.now())),
       closesAt: list.schedule?.closesAt ?? null,
       strategy: list.config.ranking.strategy,
       minVotes: list.config.ranking.minVotes,

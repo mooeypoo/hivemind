@@ -871,3 +871,23 @@ legend {
   align-items: center;
   gap: 0.5rem;
 }
+
+.status-section {
+  margin-top: 1.5rem;
+}
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.badge--hidden {
+  border: 1px dashed var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+
+.list-group {
+  margin-bottom: 1.75rem;
+}

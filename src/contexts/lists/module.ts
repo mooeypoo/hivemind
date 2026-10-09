@@ -1,6 +1,7 @@
 import type { Store } from '@netlify/blobs';
 import type { Clock, IdGenerator } from '../../shared/kernel/index.ts';
 import { makeArchiveList } from './application/archive-list.ts';
+import { makeCloseVoting, makeSetVisibility } from './application/close-voting.ts';
 import { makeCreateList } from './application/create-list.ts';
 import { makeEditList } from './application/edit-list.ts';
 import { makeGetList } from './application/get-list.ts';
@@ -47,6 +48,8 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     editList: makeEditList(shared),
     scheduleList: makeScheduleList(shared),
     archiveList: makeArchiveList(shared),
+    closeVoting: makeCloseVoting(shared),
+    setVisibility: makeSetVisibility(shared),
     listLists: makeListLists(shared),
     getList: makeGetList(shared),
     searchForList: makeSearchForList(shared),
@@ -55,7 +58,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),
     entryExists: makeEntryExists(repositories),
-    rankingContext: makeRankingContext(repositories),
+    rankingContext: makeRankingContext(shared),
     entriesForRanking: makeEntriesForRanking(repositories),
     /** Scheduled job (TMDB retention); never from a request. */
     purgeExpiredSnapshots: makePurgeExpiredSnapshots(shared),

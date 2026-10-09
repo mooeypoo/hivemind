@@ -10,8 +10,11 @@ export interface ListVotingRules {
 
 /** What voting asks lists (upstream). Implemented over the lists module in infrastructure. */
 export interface ListReader {
-  /** By list id or slug. Not found for drafts. */
-  rulesFor(list: string): Promise<Result<ListVotingRules, DomainError>>;
+  /** By list id or slug. Not found for drafts and hidden lists, unless the viewer is an Admin. */
+  rulesFor(
+    list: string,
+    viewer: { readonly isAdmin: boolean },
+  ): Promise<Result<ListVotingRules, DomainError>>;
   entryExists(listId: BallotListId, entryId: BallotEntryId): Promise<boolean>;
 }
 

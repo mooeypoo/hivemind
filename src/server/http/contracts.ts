@@ -95,15 +95,22 @@ export interface ListConfigDto {
 
 /** ISO 8601 timestamps. */
 export interface ScheduleDto {
+  /** From here members can see the list, nominate and rate. */
   readonly opensAt: string;
+  /** After this, no new nominations; rating continues. */
   readonly nominationsCloseAt: string | null;
-  readonly closesAt: string;
+  /** When voting ends and results are final. Null: open until an Admin closes voting. */
+  readonly closesAt: string | null;
 }
+
+/** `hidden`: only Admins can see the list. */
+export type Visibility = 'public' | 'hidden';
 
 export interface ListDto extends ListConfigDto {
   readonly id: string;
   readonly lifecycle: Lifecycle;
   readonly schedule: ScheduleDto | null;
+  readonly visibility: Visibility;
   readonly viewer: {
     readonly canParticipate: boolean;
     readonly canNominate: boolean;
@@ -137,7 +144,15 @@ export type CreateListRequest = Pick<ListConfigDto, 'title' | 'slug' | 'itemSour
   Partial<ListConfigDto>;
 
 /** `PUT /api/lists/:list` body. Once scheduled, only `description` and a later `closesAt`. */
-export type EditListRequest = Partial<ListConfigDto> & { readonly closesAt?: string };
+export type EditListRequest = Partial<ListConfigDto> & {
+  /** A later end, an end for an open-ended list, or null to remove the end. */
+  readonly closesAt?: string | null;
+};
+
+/** `PUT /api/lists/:list/visibility` body. */
+export interface SetVisibilityRequest {
+  readonly visibility: Visibility;
+}
 
 /** `POST /api/lists/:list/schedule` body. */
 export type ScheduleListRequest = ScheduleDto;

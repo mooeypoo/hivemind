@@ -142,4 +142,77 @@ describe('ListEditor', () => {
     expect(disabled('#description')).toBe(false);
     expect(disabled('#closes')).toBe(false);
   });
+
+  test('a draft can be published right away and open-ended, without entering any dates', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+      'PUT /api/lists/list-1': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+      'POST /api/lists/list-1/schedule': () => Response.json(openTmdbList()),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.text()).toContain(
+      'From this moment members can see the list, nominate and rate.',
+    );
+    expect(editor.text()).toContain(
+      'When voting closes, scores are final and the results are shown.',
+    );
+    const publish = editor.findAll('button').find((b) => b.text() === 'Publish now');
+    expect((publish?.element as HTMLButtonElement | undefined)?.disabled).toBe(false);
+    await publish?.trigger('click');
+    await flushPromises();
+    const body = calls.find((call) => call.url.endsWith('/schedule'))?.body as {
+      opensAt: string;
+      closesAt: string | null;
+    };
+    expect(body.closesAt).toBeNull();
+    expect(Math.abs(Date.parse(body.opensAt) - Date.now())).toBeLessThan(60_000);
+  });
+
+  test('choosing a set time without one says what is missing', async () => {
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('input[name=end][value=at]').setValue(true);
+    expect(editor.text()).toContain('Choose when voting closes, or let it stay open.');
+    const button = editor.findAll('button').find((b) => b.text() === 'Publish now');
+    expect((button?.element as HTMLButtonElement | undefined)?.disabled).toBe(true);
+  });
+
+  test('a published list can be hidden, and voting closed after confirming', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList()),
+      'PUT /api/lists/list-1/visibility': () =>
+        Response.json(openTmdbList({ visibility: 'hidden' })),
+      'POST /api/lists/list-1/close': () => Response.json(openTmdbList({ lifecycle: 'closed' })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('input[name=visibility][value=hidden]').setValue(true);
+    await flushPromises();
+    expect(calls.find((call) => call.url.endsWith('/visibility'))?.body).toEqual({
+      visibility: 'hidden',
+    });
+    expect(editor.text()).toContain('Hidden: only Admins can see it now.');
+
+    await editor
+      .findAll('button')
+      .find((b) => b.text() === 'Close voting now')
+      ?.trigger('click');
+    expect(calls.some((call) => call.url.endsWith('/close'))).toBe(false);
+    await editor
+      .findAll('button')
+      .find((b) => b.text() === 'Close voting')
+      ?.trigger('click');
+    await flushPromises();
+    expect(calls.some((call) => call.url.endsWith('/close'))).toBe(true);
+  });
 });

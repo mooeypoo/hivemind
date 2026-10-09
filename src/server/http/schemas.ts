@@ -53,13 +53,16 @@ export const createListBody = z.strictObject({
 export const editListBody = z
   .strictObject(listConfigFields)
   .partial()
-  .extend({ closesAt: isoDate.optional() });
+  .extend({ closesAt: isoDate.nullable().optional() });
 
+/** `closesAt: null`: open-ended, until an Admin closes voting. */
 export const scheduleBody = z.strictObject({
   opensAt: isoDate,
   nominationsCloseAt: isoDate.nullable(),
-  closesAt: isoDate,
+  closesAt: isoDate.nullable(),
 });
+
+export const visibilityBody = z.strictObject({ visibility: z.enum(['public', 'hidden']) });
 
 export const nominateBody = z.union([
   z.strictObject({ externalId: z.string().min(1).max(200) }),

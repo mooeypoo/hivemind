@@ -7,7 +7,7 @@ const scheduleDto = (schedule: Schedule | null): ScheduleDto | null =>
     : {
         opensAt: schedule.opensAt.toISOString(),
         nominationsCloseAt: schedule.nominationsCloseAt?.toISOString() ?? null,
-        closesAt: schedule.closesAt.toISOString(),
+        closesAt: schedule.closesAt?.toISOString() ?? null,
       };
 
 export const listDto = (view: ListView): ListDto => ({
@@ -24,6 +24,7 @@ export const listDto = (view: ListView): ListDto => ({
   showNominators: view.showNominators,
   requiredRoleIds: view.requiredRoleIds,
   lifecycle: view.lifecycle,
+  visibility: view.visibility,
   schedule: scheduleDto(view.schedule),
   viewer: view.viewer,
 });

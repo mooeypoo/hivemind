@@ -58,9 +58,12 @@ const updated = computed(() => {
     <ErrorNotice :error="error" />
 
     <p v-if="board?.hidden === true" class="notice">
-      Results are revealed when the list closes<template v-if="board.revealsAt !== null"
-        >, <time :datetime="board.revealsAt">{{ formatDateTime(board.revealsAt) }}</time></template
-      >.
+      <template v-if="board.revealsAt !== null">
+        Results are revealed when voting closes,
+        <time :datetime="board.revealsAt">{{ formatDateTime(board.revealsAt) }}</time
+        >.
+      </template>
+      <template v-else>Results are revealed when an Admin closes voting.</template>
     </p>
 
     <template v-else-if="visible !== null">

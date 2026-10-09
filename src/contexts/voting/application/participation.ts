@@ -18,7 +18,7 @@ export const mayVote = async (
 ): Promise<Result<{ member: MemberActor; rules: ListVotingRules }, DomainError>> => {
   const member = requireMember(actor);
   if (!member.ok) return member;
-  const rules = await lists.rulesFor(list);
+  const rules = await lists.rulesFor(list, member.value);
   if (!rules.ok) return rules;
   const required = rules.value.requiredRoleIds;
   if (required.length > 0 && !required.some((role) => member.value.roleIds.includes(role))) {

@@ -12,6 +12,7 @@ import type {
   SourcesDto,
 } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { formatDateTime, fromLocalInput, toLocalInput } from '../lib/datetime.ts';
@@ -48,8 +49,12 @@ interface Form {
   /** Ticked role IDs; none means every member may take part. */
   requiredRoleIds: string[];
   /** `datetime-local` values, in the Admin's time zone. */
+  /** `now`: opens when published. */
+  opensMode: 'now' | 'at';
   opensAt: string;
   nominationsCloseAt: string;
+  /** `open-ended`: voting stays open until an Admin closes it. */
+  endMode: 'open-ended' | 'at';
   closesAt: string;
 }
 
@@ -70,8 +75,10 @@ const form = reactive<Form>({
   minVotes: 5,
   showNominators: true,
   requiredRoleIds: [],
+  opensMode: 'now',
   opensAt: '',
   nominationsCloseAt: '',
+  endMode: 'open-ended',
   closesAt: '',
 });
 
@@ -119,12 +126,15 @@ const fillFrom = (list: ListDto) => {
     minVotes: list.ranking.minVotes,
     showNominators: list.showNominators,
     requiredRoleIds: [...list.requiredRoleIds],
+    opensMode: list.schedule === null ? 'now' : 'at',
     opensAt: list.schedule === null ? '' : toLocalInput(list.schedule.opensAt),
     nominationsCloseAt:
       list.schedule?.nominationsCloseAt == null
         ? ''
         : toLocalInput(list.schedule.nominationsCloseAt),
-    closesAt: list.schedule === null ? '' : toLocalInput(list.schedule.closesAt),
+    // A draft without a schedule starts open-ended, so it can be published with no dates.
+    endMode: list.schedule?.closesAt == null ? 'open-ended' : 'at',
+    closesAt: list.schedule?.closesAt == null ? '' : toLocalInput(list.schedule.closesAt),
   } satisfies Partial<Form>);
 };
 
@@ -228,17 +238,27 @@ const create = async () => {
   if (list !== null) await afterSave(list);
 };
 
+/** The end-date change to send for a published list, if any: a later date, a new date, or none. */
+const endChange = (): { closesAt?: string | null } => {
+  const current = existing.value?.schedule?.closesAt ?? null;
+  if (form.endMode === 'open-ended') return current === null ? {} : { closesAt: null };
+  const wanted = fromLocalInput(form.closesAt);
+  return wanted === null || wanted === current ? {} : { closesAt: wanted };
+};
+
+/** Why "Schedule & publish" can't be used yet, or null when it can. */
+const publishBlocker = computed((): string | null => {
+  if (form.opensMode === 'at' && fromLocalInput(form.opensAt) === null)
+    return 'Choose when it opens.';
+  if (form.endMode === 'at' && fromLocalInput(form.closesAt) === null) {
+    return 'Choose when voting closes, or let it stay open.';
+  }
+  return null;
+});
+
 const save = async () => {
   if (existing.value === null) return;
-  const body = locked.value
-    ? {
-        description: form.description,
-        ...(fromLocalInput(form.closesAt) === existing.value.schedule?.closesAt ||
-        form.closesAt === ''
-          ? {}
-          : { closesAt: fromLocalInput(form.closesAt) }),
-      }
-    : config();
+  const body = locked.value ? { description: form.description, ...endChange() } : config();
   const list = await run(
     () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
     'Saved.',
@@ -254,20 +274,46 @@ const schedule = async () => {
   const list = await run(
     () =>
       api.post<ListDto>(`/api/lists/${id}/schedule`, {
-        opensAt: fromLocalInput(form.opensAt),
+        opensAt: form.opensMode === 'now' ? new Date().toISOString() : fromLocalInput(form.opensAt),
         nominationsCloseAt: fromLocalInput(form.nominationsCloseAt),
-        closesAt: fromLocalInput(form.closesAt),
+        closesAt: form.endMode === 'open-ended' ? null : fromLocalInput(form.closesAt),
       }),
-    'Scheduled. Members can see the list now.',
+    form.opensMode === 'now' ? 'Published. Members can see the list now.' : 'Scheduled.',
   );
   if (list !== null) await afterSave(list);
 };
 
+const confirming = ref<'close' | 'archive' | null>(null);
+
 const archive = async () => {
   if (existing.value === null) return;
   const id = existing.value.id;
+  confirming.value = null;
   const list = await run(() => api.post<ListDto>(`/api/lists/${id}/archive`), 'Archived.');
   if (list !== null) await afterSave(list);
+};
+
+const closeVotingNow = async () => {
+  if (existing.value === null) return;
+  const id = existing.value.id;
+  confirming.value = null;
+  const list = await run(
+    () => api.post<ListDto>(`/api/lists/${id}/close`),
+    'Voting closed. Scores are final and the results are shown.',
+  );
+  if (list !== null) await afterSave(list);
+};
+
+const changeVisibility = async (visibility: 'public' | 'hidden') => {
+  if (existing.value === null) return;
+  const id = existing.value.id;
+  const list = await run(
+    () => api.put<ListDto>(`/api/lists/${id}/visibility`, { visibility }),
+    visibility === 'hidden'
+      ? 'Hidden: only Admins can see it now.'
+      : 'Public: all members can see it.',
+  );
+  if (list !== null) existing.value = list;
 };
 
 const readCsvFile = async (event: Event) => {
@@ -292,14 +338,23 @@ const importCsv = async () => {
   <div class="editor">
     <header class="page-header">
       <h1>{{ existing === null ? 'New list' : `Edit “${existing.title}”` }}</h1>
-      <StatusBadge v-if="existing !== null" :lifecycle="existing.lifecycle" />
+      <StatusBadge
+        v-if="existing !== null"
+        :lifecycle="existing.lifecycle"
+        :hidden="existing.visibility === 'hidden'"
+      />
     </header>
 
     <p v-if="locked && !finished" class="notice">
       This list is published, so its settings are fixed. You can still change the description and
-      move the closing time later.
+      when voting ends (later, or not at all).
     </p>
-    <p v-if="finished" class="notice">This list has closed. It can be archived, but not edited.</p>
+    <p v-if="existing?.lifecycle === 'closed'" class="notice">
+      Voting has closed, so the list can’t be edited. You can still hide it or archive it below.
+    </p>
+    <p v-if="existing?.lifecycle === 'archived'" class="notice">
+      This list is archived: read-only, with its final results. You can still hide it.
+    </p>
     <p v-if="snapshotsExpireAt !== null" class="notice">
       Movie details in this archived list will be removed on
       <time :datetime="snapshotsExpireAt">{{ formatDateTime(snapshotsExpireAt) }}</time
@@ -462,7 +517,7 @@ const importCsv = async () => {
               name="visibility"
               value="after-close"
             />
-            Only after the list closes
+            Only after voting closes
           </label>
         </div>
 
@@ -494,19 +549,61 @@ const importCsv = async () => {
       <fieldset v-if="existing !== null" class="card stack" :disabled="finished">
         <legend>Schedule</legend>
         <p class="meta">Times are in your time zone.</p>
-        <label for="opens">Opens</label>
-        <input id="opens" v-model="form.opensAt" type="datetime-local" :disabled="locked" />
+
+        <fieldset class="stack" :disabled="locked">
+          <legend class="legend--small">Opens</legend>
+          <p class="meta">From this moment members can see the list, nominate and rate.</p>
+          <div class="choices">
+            <label class="choice">
+              <input v-model="form.opensMode" type="radio" name="opens" value="now" />
+              Right away when published
+            </label>
+            <label class="choice">
+              <input v-model="form.opensMode" type="radio" name="opens" value="at" />
+              At a set time
+            </label>
+          </div>
+          <template v-if="form.opensMode === 'at'">
+            <label for="opens">Opens at</label>
+            <input id="opens" v-model="form.opensAt" type="datetime-local" />
+          </template>
+        </fieldset>
+
         <template v-if="form.entryMode === 'nominations'">
           <label for="nominations-close">Nominations close (optional)</label>
           <input
             id="nominations-close"
             v-model="form.nominationsCloseAt"
             type="datetime-local"
+            aria-describedby="nominations-close-hint"
             :disabled="locked"
           />
+          <p id="nominations-close-hint" class="meta">
+            After this, no new nominations; members can still rate.
+          </p>
         </template>
-        <label for="closes">Closes</label>
-        <input id="closes" v-model="form.closesAt" type="datetime-local" />
+
+        <fieldset class="stack">
+          <legend class="legend--small">Voting</legend>
+          <p class="meta">
+            When voting closes, scores are final and the results are shown. The list stays visible;
+            archive it to file it away.
+          </p>
+          <div class="choices">
+            <label class="choice">
+              <input v-model="form.endMode" type="radio" name="end" value="open-ended" />
+              Stays open until an Admin closes it
+            </label>
+            <label class="choice">
+              <input v-model="form.endMode" type="radio" name="end" value="at" />
+              Closes at a set time
+            </label>
+          </div>
+          <template v-if="form.endMode === 'at'">
+            <label for="closes">Voting closes at</label>
+            <input id="closes" v-model="form.closesAt" type="datetime-local" />
+          </template>
+        </fieldset>
       </fieldset>
 
       <ErrorNotice :error="error" />
@@ -514,8 +611,9 @@ const importCsv = async () => {
       <p v-if="status !== ''" class="notice notice--success">{{ status }}</p>
 
       <p v-if="existing === null" class="meta">
-        You’ll set when it opens and closes after creating the draft.
+        You’ll choose when it opens, and whether voting ends, after creating the draft.
       </p>
+      <p v-else-if="!locked && publishBlocker !== null" class="meta">{{ publishBlocker }}</p>
       <div class="actions">
         <button
           v-if="existing === null"
@@ -533,21 +631,12 @@ const importCsv = async () => {
             v-if="!locked"
             type="button"
             class="button button--primary"
-            :disabled="busy || form.opensAt === '' || form.closesAt === ''"
+            :disabled="busy || publishBlocker !== null"
             @click="schedule"
           >
-            Schedule &amp; publish
+            {{ form.opensMode === 'now' ? 'Publish now' : 'Schedule & publish' }}
           </button>
         </template>
-        <button
-          v-if="existing?.lifecycle === 'closed'"
-          type="button"
-          class="button"
-          :disabled="busy"
-          @click="archive"
-        >
-          Archive
-        </button>
         <RouterLink
           v-if="existing !== null"
           :to="{ name: 'list', params: { slug: existing.slug } }"
@@ -557,5 +646,87 @@ const importCsv = async () => {
         </RouterLink>
       </div>
     </form>
+
+    <section
+      v-if="existing !== null && existing.lifecycle !== 'draft'"
+      class="card stack status-section"
+      aria-labelledby="status-heading"
+    >
+      <h2 id="status-heading">Status</h2>
+      <fieldset class="stack">
+        <legend class="legend--small">Who can see this list</legend>
+        <div class="choices">
+          <label class="choice">
+            <input
+              type="radio"
+              name="visibility"
+              value="public"
+              :checked="existing.visibility === 'public'"
+              :disabled="busy"
+              @change="changeVisibility('public')"
+            />
+            Public: all members can see it
+          </label>
+          <label class="choice">
+            <input
+              type="radio"
+              name="visibility"
+              value="hidden"
+              :checked="existing.visibility === 'hidden'"
+              :disabled="busy"
+              @change="changeVisibility('hidden')"
+            />
+            Hidden: only Admins can see it
+          </label>
+        </div>
+        <p class="meta">Hiding keeps every nomination and score; make it public again any time.</p>
+      </fieldset>
+      <div class="actions">
+        <button
+          v-if="existing.lifecycle === 'open'"
+          type="button"
+          class="button"
+          :disabled="busy"
+          @click="confirming = 'close'"
+        >
+          Close voting now
+        </button>
+        <button
+          v-if="existing.lifecycle !== 'archived'"
+          type="button"
+          class="button button--danger"
+          :disabled="busy"
+          @click="confirming = 'archive'"
+        >
+          Archive
+        </button>
+      </div>
+    </section>
+
+    <ConfirmDialog
+      :open="confirming === 'close'"
+      title="Close voting now?"
+      confirm-label="Close voting"
+      @confirm="closeVotingNow"
+      @cancel="confirming = null"
+    >
+      <p>
+        Members won’t be able to nominate or change their scores. Scores become final and the
+        results are shown, including results that were hidden until the end.
+      </p>
+    </ConfirmDialog>
+    <ConfirmDialog
+      :open="confirming === 'archive'"
+      title="Archive this list?"
+      confirm-label="Archive"
+      danger
+      @confirm="archive"
+      @cancel="confirming = null"
+    >
+      <p>
+        Voting ends now and the list becomes read-only, with its final results. It moves to the
+        Archived section. This can’t be undone.
+      </p>
+    </ConfirmDialog>
   </div>
 </template>

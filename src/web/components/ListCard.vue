@@ -18,7 +18,7 @@ const next = computed(() => nextEvent(props.list, new Date()));
           list.title
         }}</RouterLink>
       </h2>
-      <StatusBadge :lifecycle="list.lifecycle" />
+      <StatusBadge :lifecycle="list.lifecycle" :hidden="list.visibility === 'hidden'" />
     </header>
     <p v-if="list.description !== ''" class="list-card__description">{{ list.description }}</p>
     <p class="meta">

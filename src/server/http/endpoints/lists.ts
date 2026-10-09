@@ -12,6 +12,7 @@ import {
   nominateBody,
   scheduleBody,
   searchQuery,
+  visibilityBody,
 } from '../schemas.ts';
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
@@ -109,5 +110,30 @@ export const nominate = async (request: Request, app: App): Promise<Response> =>
     }),
     entryDto,
     201,
+  );
+};
+
+/** `POST /api/lists/:list/close` */
+export const closeVoting = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  return respond(
+    await app.lists.closeVoting(await actorOf(request, app), { list: listParam(request) }),
+    (view): ListDto => listDto(view),
+  );
+};
+
+/** `PUT /api/lists/:list/visibility` */
+export const setVisibility = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, visibilityBody);
+  if (!body.ok) return body.response;
+  return respond(
+    await app.lists.setVisibility(await actorOf(request, app), {
+      list: listParam(request),
+      visibility: body.data.visibility,
+    }),
+    (view): ListDto => listDto(view),
   );
 };

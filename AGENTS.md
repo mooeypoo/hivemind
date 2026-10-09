@@ -106,11 +106,14 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 
 **Lists**
 
-- Lifecycle: `draft → scheduled → open → closed → archived`. `draft` and `archived` are set explicitly. The other three are derived from the schedule and the Clock.
-- Schedule: `opensAt`, an optional `nominationsCloseAt`, and `closesAt`, with `opensAt < nominationsCloseAt ≤ closesAt`.
+- Lifecycle: `draft → scheduled → open → closed → archived`. `draft` and `archived` are set explicitly. The other three are derived from the schedule and the Clock; a list without an end date stays `open` until an Admin closes voting.
+- Schedule: `opensAt` (members can see the list, nominate and rate), an optional `nominationsCloseAt` (no new nominations; rating continues) and an optional `closesAt` (voting ends and scores are final; null means open-ended), with `opensAt < nominationsCloseAt ≤ closesAt` for whichever are set. A set `closesAt` must be in the future.
 - Config: `title`, `slug` (unique), `description`, `itemSource`, `entryMode` (`nominations` or `seeded`; seeded needs a preset), `scale` (default 1–10), `maxNominationsPerMember` (null means unlimited), `resultsVisibility` (`live` or `after-close`), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and `requiredRoleIds` (empty means every member; otherwise a member needs any one of them, up to 25 roles). Defaults for omitted fields are `LIST_DEFAULTS`.
-- Only Admins create and edit lists. All of the config is editable in `draft`. Once a list is `scheduled` or `open`, only `description` and an extension of `closesAt` may change.
-- Scheduling publishes a draft; a list closes in the future. Archiving is allowed only once a list is closed.
+- Only Admins create and edit lists. All of the config is editable in `draft`. Once a list is `scheduled` or `open`, only `description` and `closesAt` may change, and `closesAt` only to lengthen voting: later, removed (open-ended), or set in the future on an open-ended list.
+- **Close voting now** (Admins, open lists only) sets `closesAt` to now: scores become final and results waiting for the close are revealed.
+- **Archive** (Admins) works on any published list, at any time: voting and nominations end, the list becomes read-only with its final results. It can't be undone.
+- **Visibility** is `public` (all signed-in members) or `hidden` (only Admins; members get not-found everywhere, including voting and ranking). Admins change it at any time, even on archived lists; nothing is lost while hidden.
+- Scheduling publishes a draft.
 - Nominations are allowed while the list is open and before `nominationsCloseAt`, and never on a seeded list. A given item (`source` and `externalId`) can be nominated only once per list: the entry id derives from them and entries are created with `onlyIfNew`. Each member has a nomination cap, enforced by their nomination ledger; a duplicate gives the nomination back.
 - An entry snapshots the catalog item and the nominator's display name. `showNominators` decides whether members see that name.
 - Every list endpoint needs a signed-in member. Drafts exist only for Admins; everyone else gets not-found. `requiredRoleIds` limit who may take part (nominate, and later vote), not who may view. Admins name roles once on the Roles page (`/admin/roles`, a name → role ID table owned by identity); the list editor offers them as checkboxes, and keeps any required role that has no name yet.
@@ -125,7 +128,7 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 - Ranking is a pure function. The default is a Bayesian average, `(v/(v+m))·R + (m/(v+m))·C`, and entries with `v < m` are flagged `provisional`. Provisional entries stay in their computed place on the leaderboard, tagged with how many more votes they need. `minVotes` never limits voting, which is open the whole time the list is.
 - Entries with no votes are unranked and listed last; with no votes at all, nothing is ranked. Equal scores share a rank (1, 2, 2, 4), ordered by votes, then title. Strategies are pure functions registered in `ranking/domain/strategies.ts`.
 - The leaderboard is cached per list and rebuilt when its TTL (`LEADERBOARD_TTL_SECONDS`, 2 minutes) expires or when a new entry is nominated (the cached board's entry ids differ from the list's). Scores alone do not invalidate it.
-- When `resultsVisibility = 'after-close'`, no aggregate numbers leave the server before `closesAt`, for anyone, Admins included: the response is only `{ hidden: true, revealsAt }`.
+- When `resultsVisibility = 'after-close'`, no aggregate numbers leave the server until voting has ended (closed or archived), for anyone, Admins included: the response is only `{ hidden: true, revealsAt }`, with `revealsAt` null for open-ended lists.
 - Ranking never receives member ids: voting's `scoresForList` hands it anonymous score maps, and the leaderboard stores aggregates only. Ranking has no personal-data contributor. After an erasure, a cached board can include that member's anonymous scores until its TTL ends.
 
 ## Persistence (Netlify Blobs)
@@ -164,7 +167,9 @@ Each route is one file in `netlify/functions` (`export default handle(endpoint)`
 | `/api/lists/:list`             | GET    | Detail with entries. `:list` is an id or a slug                                          |
 | `/api/lists/:list`             | PUT    | Admin: edit, within the lifecycle rules                                                  |
 | `/api/lists/:list/schedule`    | POST   | Admin: set the schedule and publish (seeds a seeded list)                                |
-| `/api/lists/:list/archive`     | POST   | Admin: archive a closed list                                                             |
+| `/api/lists/:list/archive`     | POST   | Admin: archive a published list, at any time                                             |
+| `/api/lists/:list/close`       | POST   | Admin: close voting now on an open list                                                  |
+| `/api/lists/:list/visibility`  | PUT    | Admin: `{ visibility: 'public' \| 'hidden' }`, at any time                               |
 | `/api/lists/:list/search?q=`   | GET    | Search the list's item source while nominations are open                                 |
 | `/api/lists/:list/entries`     | POST   | Nominate `{ externalId }`, or `{ title }` for free text                                  |
 | `/api/lists/:list/ballot`      | GET    | The caller's own scores                                                                  |

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { RoleId } from '../../../shared/kernel/index.ts';
 import {
   archive,
+  closeVoting,
   DEFAULT_SCALE,
   editList,
   lifecycleOf,
@@ -48,6 +49,12 @@ describe('lifecycle', () => {
     expect(lifecycleOf(draft, t('12T00:00:00'))).toBe('draft');
   });
 
+  test('an open-ended list stays open', () => {
+    const list = published({ ...schedule, closesAt: null });
+    expect(lifecycleOf(list, t('09T00:00:00'))).toBe('scheduled');
+    expect(lifecycleOf(list, new Date('2030-01-01T00:00:00Z'))).toBe('open');
+  });
+
   test('a published list is scheduled, open, then closed, by the clock', () => {
     const list = published();
     expect(lifecycleOf(list, t('09T23:59:59'))).toBe('scheduled');
@@ -56,10 +63,19 @@ describe('lifecycle', () => {
     expect(lifecycleOf(list, t('20T00:00:00'))).toBe('closed');
   });
 
-  test('archived is set explicitly, and only once closed', () => {
-    expect(archive(published(), t('19T00:00:00')).ok).toBe(false);
-    const archived = archive(published(), t('21T00:00:00'));
-    expect(archived.ok && lifecycleOf(archived.value, t('21T00:00:00'))).toBe('archived');
+  test.each([
+    ['scheduled', '05T00:00:00'],
+    ['open', '12T00:00:00'],
+    ['closed', '21T00:00:00'],
+  ])('a %s list can be archived, at any time, which ends it', (_, at) => {
+    const archived = archive(published(), t(at));
+    expect(archived.ok && lifecycleOf(archived.value, t(at))).toBe('archived');
+    expect(archived.ok && archived.value.archivedAt).toEqual(t(at));
+  });
+
+  test('a draft cannot be archived', () => {
+    const result = archive(draft, t('01T00:00:00'));
+    expect(!result.ok && result.error.code).toBe('lists.not-published');
   });
 
   test('only a draft can be published', () => {
@@ -89,6 +105,22 @@ describe('schedule', () => {
     expect(
       validateSchedule({ ...schedule, nominationsCloseAt: null, closesAt: schedule.opensAt }, now)
         .ok,
+    ).toBe(false);
+  });
+
+  test('may have no end: voting stays open until an Admin closes it', () => {
+    expect(validateSchedule({ ...schedule, closesAt: null }, now).ok).toBe(true);
+    expect(
+      validateSchedule(
+        { opensAt: schedule.opensAt, nominationsCloseAt: t('15T00:00:00'), closesAt: null },
+        now,
+      ).ok,
+    ).toBe(true);
+    expect(
+      validateSchedule(
+        { opensAt: schedule.opensAt, nominationsCloseAt: t('05T00:00:00'), closesAt: null },
+        now,
+      ).ok,
     ).toBe(false);
   });
 
@@ -176,6 +208,19 @@ describe('editing', () => {
     expect(!result.ok && result.error.code).toBe('lists.closes-at-not-extended');
   });
 
+  test('the end date can be removed, making the list open-ended', () => {
+    const result = editList(published(), { closesAt: null }, t('12T00:00:00'));
+    expect(result.ok && result.value.schedule?.closesAt).toBeNull();
+  });
+
+  test('an open-ended list can be given a future end date, not a past one', () => {
+    const list = published({ ...schedule, closesAt: null });
+    const later = editList(list, { closesAt: t('25T00:00:00') }, t('12T00:00:00'));
+    expect(later.ok && later.value.schedule?.closesAt).toEqual(t('25T00:00:00'));
+    const past = editList(list, { closesAt: t('11T00:00:00') }, t('12T00:00:00'));
+    expect(!past.ok && past.error.code).toBe('lists.closes-at-not-extended');
+  });
+
   test('a closed or archived list cannot be edited', () => {
     const result = editList(published(), { description: 'Late' }, t('20T00:00:00'));
     expect(!result.ok && result.error.code).toBe('lists.locked');
@@ -218,5 +263,32 @@ describe('participation', () => {
     expect(mayParticipate(gated, [])).toBe(false);
     expect(mayParticipate(gated, ['r9' as RoleId])).toBe(false);
     expect(mayParticipate(gated, ['r2' as RoleId])).toBe(true);
+  });
+});
+
+describe('closing voting', () => {
+  test('ends an open list now: scores become final', () => {
+    const result = closeVoting(published({ ...schedule, closesAt: null }), t('12T00:00:00'));
+    expect(result.ok && result.value.schedule?.closesAt).toEqual(t('12T00:00:00'));
+    expect(result.ok && lifecycleOf(result.value, t('12T00:00:00'))).toBe('closed');
+  });
+
+  test('also ends a timed list early', () => {
+    const result = closeVoting(published(), t('12T00:00:00'));
+    expect(result.ok && lifecycleOf(result.value, t('12T00:00:00'))).toBe('closed');
+  });
+
+  test.each([
+    ['before it opens', '05T00:00:00'],
+    ['after it closed', '21T00:00:00'],
+  ])('is only possible while open, not %s', (_, at) => {
+    const result = closeVoting(published(), t(at));
+    expect(!result.ok && result.error.code).toBe('lists.not-open');
+  });
+});
+
+describe('visibility', () => {
+  test('a new list is public', () => {
+    expect(draft.visibility).toBe('public');
   });
 });

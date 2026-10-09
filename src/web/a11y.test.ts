@@ -53,6 +53,8 @@ const renderAt = async (path: string, signedIn: boolean, demo = false) => {
       Response.json({ lists: [list(), list({ id: 'l2', slug: 'draft', lifecycle: 'draft' })] }),
     'GET /api/lists/best-sci-fi': () => Response.json(list()),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
+    'GET /api/lists/draft': () =>
+      Response.json(list({ lifecycle: 'draft', slug: 'draft', schedule: null })),
     'GET /api/lists/best-sci-fi/ballot': () =>
       Response.json({ listId: 'list-1', scores: { a: 8 } }),
     'GET /api/lists/closed/ballot': () => Response.json({ listId: 'list-1', scores: { a: 8 } }),
@@ -118,6 +120,7 @@ describe('every page passes automated accessibility checks', () => {
     ['a closed list with hidden results', '/lists/closed', true],
     ['the new-list editor', '/admin/lists/new', true],
     ['the editor of a published list', '/admin/lists/best-sci-fi', true],
+    ['the editor of a draft (schedule choices)', '/admin/lists/draft', true],
     ['the roles page', '/admin/roles', true],
     ['the privacy page', '/privacy', false],
     ['not found', '/nope', false],
@@ -143,6 +146,16 @@ describe('demo mode', () => {
       b.textContent.trim(),
     );
     expect(buttons).toEqual(['Try as Demo Admin', 'Try as Demo Member A', 'Try as Demo Member B']);
+    wrapper.unmount();
+  });
+});
+
+describe('lists index', () => {
+  test('groups lists into open and upcoming, closed and archived', async () => {
+    const wrapper = await renderAt('/', true);
+    expect([...document.querySelectorAll('.list-group > h2')].map((h) => h.textContent)).toEqual([
+      'Open and upcoming',
+    ]);
     wrapper.unmount();
   });
 });

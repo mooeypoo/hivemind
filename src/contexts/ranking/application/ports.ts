@@ -4,7 +4,9 @@ import type { ItemSnapshot, Leaderboard } from '../domain/leaderboard.ts';
 export interface RankingContext {
   readonly listId: string;
   readonly resultsVisibility: 'live' | 'after-close';
-  /** Null before the list is scheduled. */
+  /** Voting has ended (closed or archived): final results may be shown. */
+  readonly votingEnded: boolean;
+  /** When voting is due to end; null when open-ended (or not scheduled). */
   readonly closesAt: Date | null;
   readonly strategy: string;
   readonly minVotes: number;
@@ -15,7 +17,11 @@ export interface RankingContext {
 /** What ranking reads from lists (upstream). */
 export interface ListSource {
   /** By id or slug. Not found for drafts. */
-  context(list: string): Promise<Result<RankingContext, DomainError>>;
+  /** Not found for drafts and hidden lists, unless the viewer is an Admin. */
+  context(
+    list: string,
+    viewer: { readonly isAdmin: boolean },
+  ): Promise<Result<RankingContext, DomainError>>;
   entries(listId: string): Promise<readonly { readonly id: string; readonly item: ItemSnapshot }[]>;
 }
 

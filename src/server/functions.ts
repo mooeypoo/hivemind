@@ -17,6 +17,7 @@ export { getLeaderboard } from './http/endpoints/ranking.ts';
 export { getRoleLabels, getSite, saveRoleLabels } from './http/endpoints/site.ts';
 export {
   archiveList,
+  closeVoting,
   createList,
   editList,
   getList,
@@ -24,6 +25,7 @@ export {
   nominate,
   scheduleList,
   searchForList,
+  setVisibility,
 } from './http/endpoints/lists.ts';
 
 /**

@@ -23,6 +23,7 @@ import {
 import { availableSources, importPreset } from './catalog.ts';
 import {
   archiveList,
+  closeVoting,
   createList,
   editList,
   getList,
@@ -30,6 +31,7 @@ import {
   nominate,
   scheduleList,
   searchForList,
+  setVisibility,
 } from './lists.ts';
 import { deleteMyData, exportMyData } from './me.ts';
 
@@ -356,13 +358,13 @@ describe('validation and access', () => {
       closesAt: '2026-02-01T00:00:00.000Z',
     });
     expect(allowed.body.schedule?.closesAt).toBe('2026-02-01T00:00:00.000Z');
-    const archived = await call<ErrorDto>(
+    const archived = await call<ListDto>(
       archiveList,
       'POST',
       `/api/lists/${list.id}/archive`,
       admin,
     );
-    expect(archived.body.error.code).toBe('lists.not-closed');
+    expect(archived.body.lifecycle).toBe('archived');
   });
 });
 
@@ -379,5 +381,58 @@ describe('my data covers lists', () => {
     expect(detail.body.entries.map((entry) => [entry.item.title, entry.nominatedBy])).toEqual([
       ['Root', null],
     ]);
+  });
+});
+
+describe('open-ended lists, closing voting and visibility', () => {
+  test('a list can be published right away with no end date, then closed by an Admin', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Forever',
+      slug: 'forever',
+      itemSource: { kind: 'freeform' },
+    });
+    const published = await call<ListDto>(
+      scheduleList,
+      'POST',
+      `/api/lists/${created.body.id}/schedule`,
+      admin,
+      {
+        opensAt: OPENS,
+        nominationsCloseAt: null,
+        closesAt: null,
+      },
+    );
+    expect(published.body.lifecycle).toBe('open');
+    expect(published.body.schedule?.closesAt).toBeNull();
+
+    expect((await call(closeVoting, 'POST', '/api/lists/forever/close', ada)).status).toBe(403);
+    const closed = await call<ListDto>(closeVoting, 'POST', '/api/lists/forever/close', admin);
+    expect(closed.body.lifecycle).toBe('closed');
+  });
+
+  test('a hidden list is not found for members until it is public again', async () => {
+    await openList({ title: 'Secret', slug: 'secret', itemSource: { kind: 'freeform' } });
+    const hidden = await call<ListDto>(
+      setVisibility,
+      'PUT',
+      '/api/lists/secret/visibility',
+      admin,
+      {
+        visibility: 'hidden',
+      },
+    );
+    expect(hidden.body.visibility).toBe('hidden');
+    expect((await call(getList, 'GET', '/api/lists/secret', ada)).status).toBe(404);
+    expect(
+      (
+        await call(setVisibility, 'PUT', '/api/lists/secret/visibility', ada, {
+          visibility: 'public',
+        })
+      ).status,
+    ).toBe(403);
+    await call(setVisibility, 'PUT', '/api/lists/secret/visibility', admin, {
+      visibility: 'public',
+    });
+    expect((await call(getList, 'GET', '/api/lists/secret', ada)).status).toBe(200);
   });
 });

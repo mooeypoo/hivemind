@@ -10,12 +10,14 @@ import {
   type ListConfig,
   type ListId,
   type Schedule,
+  type Visibility,
 } from '../domain/list.ts';
 
 export interface ListView extends ListConfig {
   readonly id: ListId;
   readonly lifecycle: Lifecycle;
   readonly schedule: Schedule | null;
+  readonly visibility: Visibility;
   /** What the caller may do here. */
   readonly viewer: {
     readonly canParticipate: boolean;
@@ -51,6 +53,7 @@ export const toListView = (
     id: list.id,
     lifecycle: lifecycleOf(list, now),
     schedule: list.schedule,
+    visibility: list.visibility,
     viewer: {
       canParticipate,
       canNominate:

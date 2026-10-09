@@ -61,10 +61,13 @@ export class FakeListReader implements ListReader {
     });
   }
 
-  rulesFor(list: string) {
+  /** Lists marked hidden here are not found unless the viewer is an Admin. */
+  readonly hidden = new Set<string>();
+
+  rulesFor(list: string, viewer: { readonly isAdmin: boolean }) {
     const found = this.lists.get(list);
     return Promise.resolve(
-      found === undefined
+      found === undefined || (this.hidden.has(list) && !viewer.isAdmin)
         ? err(domainError('not-found', 'lists.not-found', 'Not found'))
         : ok(found),
     );

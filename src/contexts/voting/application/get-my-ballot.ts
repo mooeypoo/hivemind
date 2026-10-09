@@ -18,7 +18,7 @@ export const makeGetMyBallot =
   ): Promise<Result<MyBallot, DomainError>> => {
     const member = requireMember(actor);
     if (!member.ok) return member;
-    const rules = await deps.lists.rulesFor(input.list);
+    const rules = await deps.lists.rulesFor(input.list, member.value);
     if (!rules.ok) return rules;
     const found = await deps.ballots.get(rules.value.listId, member.value.memberId);
     return ok(toMyBallot(found?.ballot ?? emptyBallot(rules.value.listId, member.value.memberId)));

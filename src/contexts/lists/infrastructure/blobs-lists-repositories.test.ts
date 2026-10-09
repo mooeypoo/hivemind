@@ -85,6 +85,22 @@ describe('Blobs lists repositories', () => {
     expect((await repo.get('old' as ListId))?.value.config.requiredRoleIds).toEqual([]);
   });
 
+  test('reads v2 lists stored before visibility existed, and open-ended schedules', async () => {
+    const store = blobs.store('lists-v2');
+    await store.setJSON('list/old', {
+      v: 2,
+      id: 'old',
+      config: draft.config,
+      schedule: { opensAt: '2026-03-10T00:00:00.000Z', nominationsCloseAt: null, closesAt: null },
+      phase: 'published',
+      createdAt: '2026-03-01T00:00:00.000Z',
+    });
+    const read = (await createBlobsListRepository(store).get('old' as ListId))?.value;
+    expect(read?.visibility).toBe('public');
+    expect(read?.schedule?.closesAt).toBeNull();
+    expect(read?.archivedAt).toBeNull();
+  });
+
   test('a slug can be claimed by one list at a time', async () => {
     const slugs = createBlobsSlugIndex(blobs.store('lists'));
     expect(await slugs.claim('taken', listId)).toBe(true);

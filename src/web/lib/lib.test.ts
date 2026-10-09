@@ -48,12 +48,19 @@ describe('nextEvent', () => {
   test('while nominating: when nominations close, then when the list closes', () => {
     const open = { lifecycle: 'open', schedule, entryMode: 'nominations' } as const;
     expect(nextEvent(open, now)?.label).toBe('Nominations close');
-    expect(nextEvent(open, new Date('2026-03-16T00:00:00Z'))?.label).toBe('Closes');
+    expect(nextEvent(open, new Date('2026-03-16T00:00:00Z'))?.label).toBe('Voting closes');
+  });
+
+  test('an open-ended list has nothing to count down to once nominations are done', () => {
+    const openEnded = { ...schedule, nominationsCloseAt: null, closesAt: null };
+    expect(
+      nextEvent({ lifecycle: 'open', schedule: openEnded, entryMode: 'nominations' }, now),
+    ).toBeNull();
   });
 
   test('a seeded list goes straight to its close; a closed list has no next event', () => {
     expect(nextEvent({ lifecycle: 'open', schedule, entryMode: 'seeded' }, now)?.label).toBe(
-      'Closes',
+      'Voting closes',
     );
     expect(nextEvent({ lifecycle: 'closed', schedule, entryMode: 'nominations' }, now)).toBeNull();
   });

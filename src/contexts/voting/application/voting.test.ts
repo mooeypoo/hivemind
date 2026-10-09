@@ -74,6 +74,14 @@ describe('scoring', () => {
     expect((await score(member('cy', ['r2']), 'e1', 5, 'club')).ok).toBe(true);
   });
 
+  test('a hidden list does not exist for members', async () => {
+    lists.hidden.add('l1');
+    const result = await score(ada, 'e1', 5);
+    expect(!result.ok && result.error.code).toBe('lists.not-found');
+    const read = await myBallot(ada);
+    expect(!read.ok && read.error.code).toBe('lists.not-found');
+  });
+
   test('a list that does not exist (or is a draft) is not found', async () => {
     const result = await score(ada, 'e1', 5, 'nope');
     expect(!result.ok && result.error.code).toBe('lists.not-found');

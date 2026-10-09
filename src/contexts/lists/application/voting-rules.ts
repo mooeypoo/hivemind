@@ -7,7 +7,7 @@ import {
 } from '../../../shared/kernel/index.ts';
 import type { EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
-import { lifecycleOf, type ListId, type Scale } from '../domain/list.ts';
+import { lifecycleOf, visibleTo, type ListId, type Scale } from '../domain/list.ts';
 import type { RoleId } from '../../../shared/kernel/index.ts';
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 
@@ -21,15 +21,18 @@ export interface VotingRules {
 
 /**
  * What voting needs to know about a list. A service for other contexts: the calling
- * use case authorizes. Drafts are reported as not found, as they are to members.
+ * use case authorizes. Drafts and hidden lists are not found unless the viewer is an Admin.
  */
 export const makeRulesForVoting =
   (deps: { readonly lists: ListRepository; readonly slugs: SlugIndex; readonly clock: Clock }) =>
-  async (idOrSlug: string): Promise<Result<VotingRules, DomainError>> => {
+  async (
+    idOrSlug: string,
+    viewer: { readonly isAdmin: boolean },
+  ): Promise<Result<VotingRules, DomainError>> => {
     const byId = await deps.lists.get(idOrSlug as ListId);
     const id = byId === null ? await deps.slugs.lookup(idOrSlug) : null;
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
-    if (found === null || found.value.phase === 'draft') return err(listsErrors.notFound);
+    if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
     return ok({
       listId: list.id,

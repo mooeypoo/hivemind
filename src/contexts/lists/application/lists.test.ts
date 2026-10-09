@@ -11,6 +11,7 @@ import {
   InMemorySlugIndex,
 } from '../infrastructure/testing/in-memory-lists.ts';
 import { makeArchiveList } from './archive-list.ts';
+import { makeCloseVoting, makeSetVisibility } from './close-voting.ts';
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
 import { makeGetList } from './get-list.ts';
@@ -134,12 +135,14 @@ describe('creating and editing', () => {
     expect(await deps.slugs.lookup('renamed')).toBe(created.value.id);
   });
 
-  test('archives only after closing', async () => {
+  test('archives a published list at any time, which ends voting', async () => {
     const list = await openList();
-    expect((await makeArchiveList(deps)(admin, { list: list.id })).ok).toBe(false);
-    clock.set(at(21));
     const archived = await makeArchiveList(deps)(admin, { list: list.id });
     expect(archived.ok && archived.value.lifecycle).toBe('archived');
+    const rules = await makeRulesForVoting(deps)(list.id, { isAdmin: false });
+    expect(rules.ok && rules.value.isOpen).toBe(false);
+    const ranking = await makeRankingContext(deps)(list.id, { isAdmin: false });
+    expect(ranking.ok && ranking.value.votingEnded).toBe(true);
   });
 });
 
@@ -342,18 +345,18 @@ describe('services for voting', () => {
   test('report the scale, required roles and whether the list is open', async () => {
     const list = await openList({ scale: { min: 0, max: 5 }, requiredRoleIds: ['r1' as RoleId] });
     const rules = makeRulesForVoting(deps);
-    expect(await rules('best-sci-fi')).toEqual({
+    expect(await rules('best-sci-fi', { isAdmin: false })).toEqual({
       ok: true,
       value: { listId: list.id, isOpen: true, scale: { min: 0, max: 5 }, requiredRoleIds: ['r1'] },
     });
     clock.set(at(20));
-    const closed = await rules(list.id);
+    const closed = await rules(list.id, { isAdmin: false });
     expect(closed.ok && closed.value.isOpen).toBe(false);
   });
 
   test('treat drafts as not found', async () => {
     await create();
-    const result = await makeRulesForVoting(deps)('best-sci-fi');
+    const result = await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false });
     expect(!result.ok && result.error.code).toBe('lists.not-found');
   });
 
@@ -370,11 +373,12 @@ describe('services for ranking', () => {
   test('report visibility, close time, strategy and current entry ids', async () => {
     const list = await openList({ resultsVisibility: 'after-close' });
     await nominate(ada, '78');
-    expect(await makeRankingContext(deps)('best-sci-fi')).toEqual({
+    expect(await makeRankingContext(deps)('best-sci-fi', { isAdmin: false })).toEqual({
       ok: true,
       value: {
         listId: list.id,
         resultsVisibility: 'after-close',
+        votingEnded: false,
         closesAt: at(20),
         strategy: 'bayesian',
         minVotes: 3,
@@ -384,5 +388,62 @@ describe('services for ranking', () => {
     expect((await makeEntriesForRanking(deps)(list.id)).map((entry) => entry.item.title)).toEqual([
       'Blade Runner',
     ]);
+  });
+});
+
+describe('open-ended lists and closing voting', () => {
+  test('a list without an end date stays open until an Admin closes voting', async () => {
+    const created = await create();
+    if (!created.ok) throw new Error('fixture');
+    await scheduleIt(created.value.id, { ...schedule, closesAt: null });
+    clock.set(new Date('2030-01-01T00:00:00Z'));
+    expect((await nominate(ada, '78')).ok).toBe(false); // nominations closed on day 15
+    const rules = await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false });
+    expect(rules.ok && rules.value.isOpen).toBe(true);
+
+    expect((await makeCloseVoting(deps)(ada, { list: 'best-sci-fi' })).ok).toBe(false);
+    const closed = await makeCloseVoting(deps)(admin, { list: 'best-sci-fi' });
+    expect(closed.ok && closed.value.lifecycle).toBe('closed');
+    const ranking = await makeRankingContext(deps)('best-sci-fi', { isAdmin: false });
+    expect(ranking.ok && ranking.value.votingEnded).toBe(true);
+  });
+});
+
+describe('hidden lists', () => {
+  const hide = (visibility: 'public' | 'hidden') =>
+    makeSetVisibility(deps)(admin, { list: 'best-sci-fi', visibility });
+
+  test('exist only for Admins, everywhere', async () => {
+    await openList();
+    await nominate(ada, '78');
+    expect((await hide('hidden')).ok).toBe(true);
+
+    const index = await makeListLists(deps)(ada);
+    expect(index.ok && index.value).toEqual([]);
+    for (const result of [
+      await makeGetList(deps)(ada, { list: 'best-sci-fi' }),
+      await nominate(ada, '603'),
+      await makeSearchForList(deps)(ada, { list: 'best-sci-fi', query: 'the' }),
+      await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false }),
+      await makeRankingContext(deps)('best-sci-fi', { isAdmin: false }),
+    ]) {
+      expect(!result.ok && result.error.code).toBe('lists.not-found');
+    }
+
+    const adminView = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
+    expect(adminView.ok && adminView.value.visibility).toBe('hidden');
+    expect(adminView.ok && adminView.value.entries).toHaveLength(1);
+  });
+
+  test('can be made public again, and only by Admins, even when archived', async () => {
+    const list = await openList();
+    await makeArchiveList(deps)(admin, { list: list.id });
+    expect((await makeSetVisibility(deps)(ada, { list: list.id, visibility: 'hidden' })).ok).toBe(
+      false,
+    );
+    expect((await hide('hidden')).ok).toBe(true);
+    const shown = await hide('public');
+    expect(shown.ok && shown.value.visibility).toBe('public');
+    expect((await makeGetList(deps)(ada, { list: 'best-sci-fi' })).ok).toBe(true);
   });
 });

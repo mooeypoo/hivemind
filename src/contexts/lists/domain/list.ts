@@ -50,11 +50,16 @@ export interface ListConfig {
 }
 
 export interface Schedule {
+  /** From here, members can see the list, nominate and rate. */
   readonly opensAt: Date;
-  /** Null: nominations stay open until the list closes. */
+  /** After this, no new nominations; rating continues. Null: nominations stay open while voting is. */
   readonly nominationsCloseAt: Date | null;
-  readonly closesAt: Date;
+  /** When voting ends and scores are final. Null: open-ended, until an Admin closes voting. */
+  readonly closesAt: Date | null;
 }
+
+/** `hidden`: only Admins can see the list. Changeable at any time. */
+export type Visibility = 'public' | 'hidden';
 
 /** What is stored. `scheduled`, `open` and `closed` are derived from the schedule and the Clock. */
 export type Phase = 'draft' | 'published' | 'archived';
@@ -68,6 +73,7 @@ export interface List {
   readonly createdAt: Date;
   /** When it was archived; snapshot retention counts from here. */
   readonly archivedAt: Date | null;
+  readonly visibility: Visibility;
 }
 
 export const DEFAULT_SCALE: Scale = { min: 1, max: 10 };
@@ -119,18 +125,21 @@ export const validateConfig = (config: ListConfig): Result<ListConfig, DomainErr
     : ok({ ...config, title: config.title.trim(), description: config.description.trim() });
 };
 
-/** AGENTS.md: `opensAt < nominationsCloseAt ≤ closesAt`. A list must also close in the future. */
+/**
+ * AGENTS.md: `opensAt < nominationsCloseAt ≤ closesAt`, for whichever dates are set.
+ * A list with an end date must end in the future; without one it is open-ended.
+ */
 export const validateSchedule = (schedule: Schedule, now: Date): Result<Schedule, DomainError> => {
   const { opensAt, nominationsCloseAt, closesAt } = schedule;
   const problems: string[] = [];
-  if (opensAt >= closesAt) problems.push('opensAt must be before closesAt');
+  if (closesAt !== null && opensAt >= closesAt) problems.push('opensAt must be before closesAt');
   if (
     nominationsCloseAt !== null &&
-    (nominationsCloseAt <= opensAt || nominationsCloseAt > closesAt)
+    (nominationsCloseAt <= opensAt || (closesAt !== null && nominationsCloseAt > closesAt))
   ) {
     problems.push('nominationsCloseAt must be after opensAt and no later than closesAt');
   }
-  if (closesAt <= now) problems.push('closesAt must be in the future');
+  if (closesAt !== null && closesAt <= now) problems.push('closesAt must be in the future');
   return problems.length > 0 ? err(invalidSchedule(problems)) : ok(schedule);
 };
 
@@ -141,6 +150,7 @@ export const newList = (id: ListId, config: ListConfig, now: Date): List => ({
   phase: 'draft',
   createdAt: now,
   archivedAt: null,
+  visibility: 'public',
 });
 
 export const lifecycleOf = (list: List, now: Date): Lifecycle => {
@@ -148,7 +158,7 @@ export const lifecycleOf = (list: List, now: Date): Lifecycle => {
     return list.phase === 'archived' ? 'archived' : 'draft';
   }
   if (now < list.schedule.opensAt) return 'scheduled';
-  if (now < list.schedule.closesAt) return 'open';
+  if (list.schedule.closesAt === null || now < list.schedule.closesAt) return 'open';
   return 'closed';
 };
 
@@ -158,13 +168,26 @@ export const publish = (list: List, schedule: Schedule, now: Date): Result<List,
   return valid.ok ? ok({ ...list, schedule: valid.value, phase: 'published' }) : valid;
 };
 
+/**
+ * Files a published list away, at any time: voting and nominations end now, the list becomes
+ * read-only and its final results are shown. It can't be undone.
+ */
 export const archive = (list: List, now: Date): Result<List, DomainError> =>
-  lifecycleOf(list, now) === 'closed'
+  list.phase === 'published'
     ? ok({ ...list, phase: 'archived', archivedAt: now })
-    : err(listsErrors.notClosed);
+    : err(listsErrors.notPublished);
 
-/** A change to a list. Config fields replace the current ones; `closesAt` moves the close. */
-export type ListEdit = Partial<ListConfig> & { readonly closesAt?: Date };
+/**
+ * Ends voting now on an open list, timed or open-ended: scores become final and results
+ * that wait for the close are revealed. Distinct from editing, which never shortens a list.
+ */
+export const closeVoting = (list: List, now: Date): Result<List, DomainError> =>
+  lifecycleOf(list, now) === 'open' && list.schedule !== null
+    ? ok({ ...list, schedule: { ...list.schedule, closesAt: now } })
+    : err(listsErrors.notOpen);
+
+/** A change to a list. Config fields replace the current ones; `closesAt` moves the end (null: no end). */
+export type ListEdit = Partial<ListConfig> & { readonly closesAt?: Date | null };
 
 const EDITABLE_WHEN_LIVE: ReadonlySet<string> = new Set(['description', 'closesAt']);
 const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -190,7 +213,12 @@ export const editList = (list: List, edit: ListEdit, now: Date): Result<List, Do
   let schedule = list.schedule;
   if (closesAt !== undefined) {
     if (schedule === null) return err(listsErrors.notScheduled);
-    if (closesAt < schedule.closesAt) return err(listsErrors.closesAtNotExtended);
+    // Removing the end date or moving it later only lengthens voting. An open-ended list may
+    // be given an end in the future. Ending sooner is "close voting", not an edit.
+    const current = schedule.closesAt;
+    const lengthens =
+      closesAt === null || (current === null ? closesAt > now : closesAt >= current);
+    if (!lengthens) return err(listsErrors.closesAtNotExtended);
     schedule = { ...schedule, closesAt };
   }
 
@@ -212,6 +240,16 @@ export const mayParticipate = (list: List, roleIds: readonly RoleId[]): boolean 
 /** Whether a member who has used this many nominations may make another. */
 export const underNominationCap = (list: List, used: number): boolean =>
   list.config.maxNominationsPerMember === null || used < list.config.maxNominationsPerMember;
+
+/** Hidden lists exist only for Admins. */
+export const setVisibility = (list: List, visibility: Visibility): List => ({
+  ...list,
+  visibility,
+});
+
+/** Whether this member may see the list at all: drafts and hidden lists are Admin-only. */
+export const visibleTo = (list: List, isAdmin: boolean): boolean =>
+  isAdmin || (list.phase !== 'draft' && list.visibility === 'public');
 
 /** When retention starts for an archived list. Lists archived before `archivedAt` existed use their close. */
 export const archivedSince = (list: List): Date | null =>

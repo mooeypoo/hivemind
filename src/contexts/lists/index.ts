@@ -14,4 +14,5 @@ export type {
   ListEdit,
   ResultsVisibility,
   Schedule,
+  Visibility,
 } from './domain/list.ts';

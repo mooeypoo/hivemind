@@ -20,6 +20,7 @@ export class FakeRankingSources implements ListSource, ScoreSource {
   settings: Omit<RankingContext, 'entryIds'> = {
     listId: 'l1',
     resultsVisibility: 'live',
+    votingEnded: false,
     closesAt: new Date('2026-03-20T00:00:00Z'),
     strategy: 'bayesian',
     minVotes: 0,
@@ -36,9 +37,11 @@ export class FakeRankingSources implements ListSource, ScoreSource {
     this.entryList.push({ id, item: item(title) });
   }
 
-  context(list: string) {
+  hidden = false;
+
+  context(list: string, viewer: { readonly isAdmin: boolean }) {
     return Promise.resolve(
-      list === 'l1'
+      list === 'l1' && (!this.hidden || viewer.isAdmin)
         ? ok({ ...this.settings, entryIds: this.entryList.map((entry) => entry.id) })
         : err(domainError('not-found', 'lists.not-found', 'Not found')),
     );

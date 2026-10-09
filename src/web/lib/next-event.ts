@@ -24,5 +24,6 @@ export const nextEvent = (
   ) {
     return { label: 'Nominations close', at: nominationsClose };
   }
-  return { label: 'Closes', at: schedule.closesAt };
+  // Open-ended lists have no closing moment to count down to.
+  return schedule.closesAt === null ? null : { label: 'Voting closes', at: schedule.closesAt };
 };

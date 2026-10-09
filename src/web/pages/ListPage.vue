@@ -93,7 +93,7 @@ const onScored = (ballot: BallotDto) => {
       <div>
         <h1>{{ list.title }}</h1>
         <p class="meta">
-          <StatusBadge :lifecycle="list.lifecycle" />
+          <StatusBadge :lifecycle="list.lifecycle" :hidden="list.visibility === 'hidden'" />
           {{ sourceLabel[list.itemSource.kind] }} · rated {{ list.scale.min }}–{{ list.scale.max }}
         </p>
       </div>
@@ -108,6 +108,12 @@ const onScored = (ballot: BallotDto) => {
 
     <p v-if="list.description !== ''" class="lead">{{ list.description }}</p>
     <EventCountdown v-if="next !== null" :label="next.label" :at="next.at" />
+    <p
+      v-if="list.lifecycle === 'open' && list.schedule !== null && list.schedule.closesAt === null"
+      class="meta"
+    >
+      Voting stays open until an Admin closes it.
+    </p>
 
     <LeaderboardPanel v-if="listClosed" :list="list.slug" :my-scores="scores" />
 

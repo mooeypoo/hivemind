@@ -15,7 +15,16 @@ export const listsErrors = {
     'lists.closes-at-not-extended',
     'Once a list is scheduled, its closing time can only move later.',
   ),
-  notClosed: domainError('invalid', 'lists.not-closed', 'Only a closed list can be archived.'),
+  notPublished: domainError(
+    'invalid',
+    'lists.not-published',
+    'Only a published list can be archived.',
+  ),
+  notOpen: domainError(
+    'invalid',
+    'lists.not-open',
+    'Voting can only be closed while the list is open.',
+  ),
   nominationsClosed: domainError(
     'forbidden',
     'lists.nominations-closed',

@@ -31,7 +31,7 @@ const unknownStrategy = domainError(
 
 /**
  * A list's leaderboard. AGENTS.md: with `after-close`, no aggregate numbers leave the
- * server before the list closes, for anyone. Cached until the TTL ends or an entry is added.
+ * server until voting ends (closed, or archived), for anyone. Cached until the TTL ends or an entry is added.
  */
 export const makeGetLeaderboard =
   (deps: GetLeaderboardDeps) =>
@@ -41,12 +41,12 @@ export const makeGetLeaderboard =
   ): Promise<Result<LeaderboardView, DomainError>> => {
     const member = requireMember(actor);
     if (!member.ok) return member;
-    const context = await deps.lists.context(input.list);
+    const context = await deps.lists.context(input.list, member.value);
     if (!context.ok) return context;
     const now = deps.clock.now();
-    const { closesAt, resultsVisibility, minVotes } = context.value;
+    const { closesAt, resultsVisibility, minVotes, votingEnded } = context.value;
 
-    if (resultsVisibility === 'after-close' && (closesAt === null || now < closesAt)) {
+    if (resultsVisibility === 'after-close' && !votingEnded) {
       return ok({ hidden: true, revealsAt: closesAt });
     }
 

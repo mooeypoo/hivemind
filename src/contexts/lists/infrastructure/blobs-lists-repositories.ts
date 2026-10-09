@@ -9,7 +9,7 @@ import type {
 } from '../application/ports.ts';
 import type { Entry, EntryId } from '../domain/entry.ts';
 import type { NominationLedger } from '../domain/ledger.ts';
-import type { List, ListConfig, ListId, Phase, Schedule } from '../domain/list.ts';
+import type { List, ListConfig, ListId, Phase, Schedule, Visibility } from '../domain/list.ts';
 
 /*
  * Store: `lists`. Lists are written as v2 and read from v1 or v2. Keys:
@@ -23,7 +23,8 @@ import type { List, ListConfig, ListId, Phase, Schedule } from '../domain/list.t
 interface ScheduleRecord {
   readonly opensAt: string;
   readonly nominationsCloseAt: string | null;
-  readonly closesAt: string;
+  /** Null: open-ended. */
+  readonly closesAt: string | null;
 }
 
 type ConfigRecord = Omit<ListConfig, 'requiredRoleIds'> & {
@@ -40,6 +41,8 @@ interface ListRecordV2 {
   readonly createdAt: string;
   /** Added after v2 shipped; absent on lists archived before it existed. */
   readonly archivedAt?: string | null;
+  /** Added after v2 shipped; absent means public. */
+  readonly visibility?: Visibility;
 }
 
 /** v1: a single optional required role. Still read; never written. */
@@ -79,7 +82,7 @@ const scheduleToRecord = (schedule: Schedule | null): ScheduleRecord | null =>
     : {
         opensAt: schedule.opensAt.toISOString(),
         nominationsCloseAt: schedule.nominationsCloseAt?.toISOString() ?? null,
-        closesAt: schedule.closesAt.toISOString(),
+        closesAt: schedule.closesAt?.toISOString() ?? null,
       };
 
 const scheduleFromRecord = (record: ScheduleRecord | null): Schedule | null =>
@@ -89,7 +92,7 @@ const scheduleFromRecord = (record: ScheduleRecord | null): Schedule | null =>
         opensAt: new Date(record.opensAt),
         nominationsCloseAt:
           record.nominationsCloseAt === null ? null : new Date(record.nominationsCloseAt),
-        closesAt: new Date(record.closesAt),
+        closesAt: record.closesAt === null ? null : new Date(record.closesAt),
       };
 
 const listToRecord = (list: List): ListRecordV2 => ({
@@ -100,6 +103,7 @@ const listToRecord = (list: List): ListRecordV2 => ({
   phase: list.phase,
   createdAt: list.createdAt.toISOString(),
   archivedAt: list.archivedAt?.toISOString() ?? null,
+  visibility: list.visibility,
 });
 
 const upgradeList = (data: unknown): ListRecordV2 => {
@@ -123,6 +127,7 @@ const listFromRecord = (data: unknown): List => {
     schedule: scheduleFromRecord(record.schedule),
     phase: record.phase,
     createdAt: new Date(record.createdAt),
+    visibility: record.visibility ?? 'public',
     archivedAt: record.archivedAt == null ? null : new Date(record.archivedAt),
   };
 };
