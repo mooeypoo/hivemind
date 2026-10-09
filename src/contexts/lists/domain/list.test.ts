@@ -191,7 +191,7 @@ describe('editing', () => {
   test.each([
     ['scheduled', '05T00:00:00'],
     ['open', '12T00:00:00'],
-  ])('a %s list can change only its description and extend closesAt', (_, at) => {
+  ])('a %s list can change its description and extend closesAt', (_, at) => {
     const list = published();
     const ok = editList(list, { description: 'Updated', closesAt: t('25T00:00:00') }, t(at));
     expect(ok.ok && ok.value.config.description).toBe('Updated');
@@ -199,6 +199,16 @@ describe('editing', () => {
 
     const locked = editList(list, { title: 'Renamed', scale: { min: 0, max: 5 } }, t(at));
     expect(!locked.ok && locked.error.details).toEqual(['title', 'scale']);
+  });
+
+  test('an active list may remove a nomination cap but may not add one back', () => {
+    const unlimited = editList(published(), { maxNominationsPerMember: null }, t('12T00:00:00'));
+    expect(unlimited.ok && unlimited.value.config.maxNominationsPerMember).toBeNull();
+
+    const cappedAgain = unlimited.ok
+      ? editList(unlimited.value, { maxNominationsPerMember: 5 }, t('12T00:00:00'))
+      : unlimited;
+    expect(!cappedAgain.ok && cappedAgain.error.details).toEqual(['maxNominationsPerMember']);
   });
 
   test('sending unchanged locked fields is not an edit', () => {

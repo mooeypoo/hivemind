@@ -46,21 +46,31 @@ const deleteMyData = async () => {
       <details ref="siteMenu" class="menu site-menu" @keydown.escape="closeMenu(siteMenu)">
         <summary class="menu__trigger">Menu</summary>
         <div class="menu__panel">
-          <RouterLink class="menu__item" :to="{ name: 'lists' }">Lists</RouterLink>
-          <RouterLink class="menu__item" :to="{ name: 'about' }">About</RouterLink>
-          <RouterLink class="menu__item" :to="{ name: 'privacy' }">Privacy</RouterLink>
+          <RouterLink class="menu__item" :to="{ name: 'lists' }" @click="closeMenu(siteMenu)">
+            Lists
+          </RouterLink>
+          <RouterLink class="menu__item" :to="{ name: 'about' }" @click="closeMenu(siteMenu)">
+            About
+          </RouterLink>
+          <RouterLink class="menu__item" :to="{ name: 'privacy' }" @click="closeMenu(siteMenu)">
+            Privacy
+          </RouterLink>
         </div>
       </details>
       <template v-if="session.loaded && session.me !== null">
         <details ref="menu" class="menu" @keydown.escape="closeMenu(menu)">
-          <summary class="menu__trigger">
+          <summary class="menu__trigger" :aria-label="`Account menu for ${session.me.displayName}`">
             <img :src="session.me.avatarUrl" alt="" class="avatar" width="32" height="32" />
-            <span>{{ session.me.displayName }}</span>
+            <span class="account-name">{{ session.me.displayName }}</span>
           </summary>
           <div class="menu__panel">
             <template v-if="session.me.isAdmin">
-              <RouterLink class="menu__item" :to="{ name: 'roles' }">Roles</RouterLink>
-              <RouterLink class="menu__item" :to="{ name: 'backups' }">Backups</RouterLink>
+              <RouterLink class="menu__item" :to="{ name: 'roles' }" @click="closeMenu(menu)">
+                Roles
+              </RouterLink>
+              <RouterLink class="menu__item" :to="{ name: 'backups' }" @click="closeMenu(menu)">
+                Backups
+              </RouterLink>
             </template>
             <a class="menu__item" href="/api/me/export" download="my-data.json">Download my data</a>
             <button
@@ -74,9 +84,9 @@ const deleteMyData = async () => {
           </div>
         </details>
       </template>
-      <a v-else-if="session.loaded" class="button button--primary" :href="loginUrl()"
-        >Sign in with Discord</a
-      >
+      <a v-else-if="session.loaded" class="button button--primary" :href="loginUrl()">
+        <span class="signin-label">Sign in with Discord</span>
+      </a>
     </nav>
   </header>
 

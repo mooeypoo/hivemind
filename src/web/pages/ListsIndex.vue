@@ -85,8 +85,11 @@ onMounted(async () => {
   </section>
 
   <template v-else>
-    <div class="page-header">
-      <h1>Lists</h1>
+    <div class="page-header lists-heading">
+      <div>
+        <p class="eyebrow">Community index</p>
+        <h1>Lists</h1>
+      </div>
       <RouterLink
         v-if="session.me.isAdmin"
         :to="{ name: 'new-list' }"
@@ -115,10 +118,11 @@ onMounted(async () => {
         <h2 :id="`group-${group.id}`">{{ group.title }}</h2>
         <div class="grid">
           <ListCard
-            v-for="list in group.lists"
+            v-for="(list, index) in group.lists"
             :key="list.id"
             :list="list"
             :can-edit="session.me.isAdmin"
+            :index="index + 1"
           />
         </div>
       </section>

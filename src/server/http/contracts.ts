@@ -148,7 +148,7 @@ export interface ListDetailDto extends ListDto {
 export type CreateListRequest = Pick<ListConfigDto, 'title' | 'slug' | 'itemSource'> &
   Partial<ListConfigDto>;
 
-/** `PUT /api/lists/:list` body. Once scheduled, only `description` and a later `closesAt`. */
+/** `PUT /api/lists/:list` body. Published lists may remove, but never restore, a nomination cap. */
 export type EditListRequest = Partial<ListConfigDto> & {
   /** A later end, an end for an open-ended list, or null to remove the end. */
   readonly closesAt?: string | null;

@@ -12,6 +12,7 @@ const props = defineProps<{
   myScores: Readonly<Record<string, number>>;
   publicScores?: PublicScoresDto;
 }>();
+const emit = defineEmits<{ loaded: [board: LeaderboardDto] }>();
 
 const board = ref<LeaderboardDto | null>(null);
 const error = ref<ApiError | null>(null);
@@ -26,6 +27,7 @@ const load = async () => {
   if (result.ok) {
     board.value = result.data;
     error.value = null;
+    emit('loaded', result.data);
   } else {
     error.value = result.error;
   }

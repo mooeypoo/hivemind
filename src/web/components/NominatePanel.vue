@@ -41,6 +41,11 @@ const blocked = computed((): string | null => {
 const error = ref<ApiError | null>(null);
 const busy = ref(false);
 const announcement = ref('');
+const query = ref('');
+const results = ref<readonly CatalogItemDto[]>([]);
+const searched = ref(false);
+const searching = ref(false);
+let debounce: ReturnType<typeof setTimeout> | undefined;
 
 const nominate = async (body: { externalId: string } | { title: string }) => {
   busy.value = true;
@@ -52,32 +57,38 @@ const nominate = async (body: { externalId: string } | { title: string }) => {
     return false;
   }
   announcement.value = `Nominated ${result.data.item.title}.`;
+  if ('externalId' in body) {
+    clearTimeout(debounce);
+    query.value = '';
+    results.value = [];
+    searched.value = false;
+    searching.value = false;
+  }
   emit('nominated', result.data);
   return true;
 };
 
 // Search (TMDB and preset pools)
-const query = ref('');
-const results = ref<readonly CatalogItemDto[]>([]);
-const searched = ref(false);
-let debounce: ReturnType<typeof setTimeout> | undefined;
-
 const search = async () => {
   const q = query.value.trim();
   if (q === '') {
     results.value = [];
     searched.value = false;
+    searching.value = false;
     return;
   }
+  searching.value = true;
   const result = await api.get<SearchResultsDto>(
     `/api/lists/${props.list.id}/search?q=${encodeURIComponent(q)}`,
   );
   if (q !== query.value.trim()) return; // a newer search is on its way
-  searched.value = true;
+  searching.value = false;
   if (result.ok) {
+    searched.value = true;
     results.value = result.data.items;
     error.value = null;
   } else {
+    searched.value = false;
     error.value = result.error;
   }
 };
@@ -114,6 +125,14 @@ const submitTitle = async () => {
     <p v-if="blocked !== null" class="notice">{{ blocked }}</p>
 
     <template v-else>
+      <p
+        v-if="announcement !== ''"
+        class="notice notice--success nomination-feedback"
+        role="status"
+      >
+        {{ announcement }}
+      </p>
+
       <p v-if="left === null" class="meta">
         Nominate as many as you like.
         <template v-if="list.viewer.nominationsUsed > 0">
@@ -152,11 +171,15 @@ const submitTitle = async () => {
           maxlength="100"
           autocomplete="off"
           aria-describedby="nominate-search-hint"
+          @input="announcement = ''"
         />
         <p id="nominate-search-hint" class="meta">Type at least a few letters of the title.</p>
 
-        <p v-if="searched && results.length === 0" class="meta">No matches.</p>
-        <ul v-else class="results" aria-label="Search results">
+        <p v-if="searching" class="search-status meta" role="status">Searching the catalog…</p>
+        <p v-else-if="searched && results.length === 0" class="meta">
+          No matches. Try another title.
+        </p>
+        <ul v-else-if="results.length > 0" class="results" aria-label="Search results">
           <li v-for="item in results" :key="item.externalId" class="result">
             <img
               v-if="item.imageUrl !== null"
@@ -169,7 +192,9 @@ const submitTitle = async () => {
             />
             <span class="result__text">
               <strong>{{ item.title }}</strong>
-              <span v-if="item.subtitle !== null" class="meta"> {{ item.subtitle }}</span>
+              <span v-if="item.subtitle !== null" class="result__subtitle">{{
+                item.subtitle
+              }}</span>
             </span>
             <span v-if="inList.has(`${item.source}:${item.externalId}`)" class="tag"
               >Already in the list</span
@@ -189,6 +214,5 @@ const submitTitle = async () => {
     </template>
 
     <ErrorNotice :error="error" />
-    <p class="visually-hidden" aria-live="polite">{{ announcement }}</p>
   </section>
 </template>

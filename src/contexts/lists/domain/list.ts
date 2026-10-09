@@ -194,15 +194,15 @@ export const closeVoting = (list: List, now: Date): Result<List, DomainError> =>
     ? ok({ ...list, schedule: { ...list.schedule, closesAt: now } })
     : err(listsErrors.notOpen);
 
-/** A change to a list. Config fields replace the current ones; `closesAt` moves the end (null: no end). */
+/** A change to a list. `closesAt` moves the end; a live cap can only be removed, never restored. */
 export type ListEdit = Partial<ListConfig> & { readonly closesAt?: Date | null };
 
 const EDITABLE_WHEN_LIVE: ReadonlySet<string> = new Set(['description', 'closesAt']);
 const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * AGENTS.md: all of the config is editable in `draft`. Once `scheduled` or `open`, only
- * `description` and an extension of `closesAt`. Nothing after that.
+ * All config is editable in `draft`. Once published, description and an extension of `closesAt`
+ * may change; an active finite nomination cap may be removed, but never added or restored.
  */
 export const editList = (list: List, edit: ListEdit, now: Date): Result<List, DomainError> => {
   const lifecycle = lifecycleOf(list, now);
@@ -212,8 +212,12 @@ export const editList = (list: List, edit: ListEdit, now: Date): Result<List, Do
 
   if (lifecycle !== 'draft') {
     const locked = Object.entries(configEdit)
-      .filter(([field]) => !EDITABLE_WHEN_LIVE.has(field))
-      .filter(([field, value]) => !sameValue(value, list.config[field as keyof ListConfig]))
+      .filter(([field, value]) => {
+        const current = list.config[field as keyof ListConfig];
+        const removesCap =
+          field === 'maxNominationsPerMember' && current !== null && value === null;
+        return !EDITABLE_WHEN_LIVE.has(field) && !removesCap && !sameValue(value, current);
+      })
       .map(([field]) => field);
     if (locked.length > 0) return err(lockedFields(locked));
   }

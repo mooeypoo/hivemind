@@ -42,7 +42,13 @@ const me = {
 };
 
 /** Mounts the whole app (header, page, footer) at `path`, as a signed-in Admin or signed out. */
-const renderAt = async (path: string, signedIn: boolean, demo = false, publicScores = false) => {
+const renderAt = async (
+  path: string,
+  signedIn: boolean,
+  demo = false,
+  publicScores = false,
+  unlimitedCap = false,
+) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
   site.info = { ...siteInfo, demo };
@@ -53,7 +59,12 @@ const renderAt = async (path: string, signedIn: boolean, demo = false, publicSco
     'GET /api/lists': () =>
       Response.json({ lists: [list(), list({ id: 'l2', slug: 'draft', lifecycle: 'draft' })] }),
     'GET /api/lists/best-sci-fi': () =>
-      Response.json(list({ scoreVisibility: publicScores ? 'public' : 'private' })),
+      Response.json(
+        list({
+          scoreVisibility: publicScores ? 'public' : 'private',
+          maxNominationsPerMember: unlimitedCap ? null : 3,
+        }),
+      ),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
     'GET /api/lists/draft': () =>
       Response.json(list({ lifecycle: 'draft', slug: 'draft', schedule: null })),
@@ -176,6 +187,18 @@ describe('admin menu', () => {
     expect(items.map((link) => link.innerText.trim())).toEqual(['Lists', 'About', 'Privacy']);
     wrapper.unmount();
   });
+
+  test('the site menu closes after following a navigation link', async () => {
+    const wrapper = await renderAt('/', false);
+    const menu = document.querySelector<HTMLDetailsElement>('details.site-menu');
+    await wrapper.get('details.site-menu summary').trigger('click');
+    expect(menu?.open).toBe(true);
+    await wrapper.get('details.site-menu a[href="/about"]').trigger('click');
+    await flushPromises();
+    expect(menu?.open).toBe(false);
+    expect(document.querySelector('main h1')?.textContent).toContain('About');
+    wrapper.unmount();
+  });
 });
 
 describe('archiving', () => {
@@ -209,8 +232,22 @@ describe('score visibility editor', () => {
     const ratingFieldset = [
       ...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset'),
     ].find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Rating');
-    expect(ratingFieldset?.disabled).toBe(true);
+    expect(ratingFieldset?.disabled).toBe(false);
+    expect(ratingFieldset?.querySelector<HTMLFieldSetElement>('fieldset.stack')?.disabled).toBe(
+      true,
+    );
+    const unlimited = document.querySelector<HTMLInputElement>('#unlimited');
+    expect(unlimited?.disabled).toBe(false);
+    unlimited?.click();
+    expect(unlimited?.checked).toBe(true);
+    expect(document.querySelector('main')?.textContent).toContain(
+      'You can remove this limit to allow unlimited nominations.',
+    );
     published.unmount();
+
+    const alreadyUnlimited = await renderAt('/admin/lists/best-sci-fi', true, false, false, true);
+    expect(document.querySelector<HTMLInputElement>('#unlimited')?.disabled).toBe(true);
+    alreadyUnlimited.unmount();
   });
 
   test('a published public list confirms the one-way switch to private', async () => {

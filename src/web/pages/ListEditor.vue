@@ -105,7 +105,7 @@ const busy = ref(false);
 const csv = ref('');
 const csvError = ref<ApiError | null>(null);
 
-/** Once a list is scheduled, only its description and a later close may change. */
+/** Once published, only description, a later close, and removal of a finite cap may change. */
 const locked = computed(() => existing.value !== null && existing.value.lifecycle !== 'draft');
 const finished = computed(
   () => existing.value?.lifecycle === 'closed' || existing.value?.lifecycle === 'archived',
@@ -263,7 +263,13 @@ const publishBlocker = computed((): string | null => {
 
 const save = async () => {
   if (existing.value === null) return;
-  const body = locked.value ? { description: form.description, ...endChange() } : config();
+  const removeNominationCap =
+    existing.value.maxNominationsPerMember !== null && form.unlimitedNominations
+      ? { maxNominationsPerMember: null }
+      : {};
+  const body = locked.value
+    ? { description: form.description, ...endChange(), ...removeNominationCap }
+    : config();
   const list = await run(
     () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
     'Saved.',
@@ -358,7 +364,10 @@ const importCsv = async () => {
 <template>
   <div class="editor">
     <header class="page-header">
-      <h1>{{ existing === null ? 'New list' : `Edit “${existing.title}”` }}</h1>
+      <div>
+        <p class="eyebrow">List setup</p>
+        <h1>{{ existing === null ? 'New list' : `Edit “${existing.title}”` }}</h1>
+      </div>
       <StatusBadge
         v-if="existing !== null"
         :lifecycle="existing.lifecycle"
@@ -368,7 +377,11 @@ const importCsv = async () => {
 
     <p v-if="locked && !finished" class="notice">
       This list is published, so its settings are fixed. You can still change the description and
-      when voting ends (later, or not at all).
+      when voting ends (later, or not at all).<template
+        v-if="existing?.entryMode === 'nominations' && existing.maxNominationsPerMember !== null"
+      >
+        You can also remove its nomination cap, but you can’t add one back.</template
+      >
     </p>
     <p v-if="existing?.lifecycle === 'closed'" class="notice">
       Voting has closed, so the list can’t be edited. You can still hide it or archive it below.
@@ -382,8 +395,18 @@ const importCsv = async () => {
       >, as TMDB’s terms require. Titles become “details removed”; scores and ranks stay.
     </p>
 
+    <nav class="editor-index" aria-label="List settings">
+      <a href="#editor-basics">Basics</a>
+      <a href="#editor-items">Items</a>
+      <a href="#editor-rating">Rating</a>
+      <a v-if="existing !== null" href="#editor-schedule">Schedule</a>
+      <a v-if="existing !== null && existing.lifecycle !== 'draft'" href="#status-heading">
+        Status
+      </a>
+    </nav>
+
     <form class="stack" @submit.prevent="existing === null ? create() : save()">
-      <fieldset class="card stack" :disabled="finished">
+      <fieldset id="editor-basics" class="card stack" :disabled="finished">
         <legend>Basics</legend>
         <label for="title">Title</label>
         <input
@@ -416,7 +439,7 @@ const importCsv = async () => {
         <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
       </fieldset>
 
-      <fieldset class="card stack" :disabled="locked">
+      <fieldset id="editor-items" class="card stack" :disabled="locked">
         <legend>Items</legend>
         <p class="meta">Where do the things in this list come from?</p>
         <div class="choices" role="radiogroup" aria-label="Item source">
@@ -466,135 +489,163 @@ const importCsv = async () => {
         </template>
       </fieldset>
 
-      <fieldset class="card stack" :disabled="locked">
+      <fieldset id="editor-rating" class="card stack" :disabled="finished">
         <legend>Rating</legend>
-        <fieldset class="stack">
-          <legend class="legend--small">Scores</legend>
-          <div class="choices" role="radiogroup" aria-label="Score visibility">
-            <label class="choice">
+        <fieldset class="stack" :disabled="locked">
+          <fieldset class="stack">
+            <legend class="legend--small">Scores</legend>
+            <div class="choices" role="radiogroup" aria-label="Score visibility">
+              <label class="choice">
+                <input
+                  v-model="form.scoreVisibility"
+                  type="radio"
+                  name="score-visibility"
+                  value="private"
+                />
+                Private: each member sees only their own score
+              </label>
+              <label class="choice">
+                <input
+                  v-model="form.scoreVisibility"
+                  type="radio"
+                  name="score-visibility"
+                  value="public"
+                />
+                Public: everyone can see who gave what score
+              </label>
+            </div>
+            <p class="meta">
+              Choose before publishing. Public scores appear when results do; after publishing, a
+              public list can only become private.
+            </p>
+          </fieldset>
+          <div class="row">
+            <div class="stack">
+              <label for="scale-min">Lowest score</label>
               <input
-                v-model="form.scoreVisibility"
-                type="radio"
-                name="score-visibility"
-                value="private"
+                id="scale-min"
+                v-model.number="form.scaleMin"
+                type="number"
+                min="0"
+                max="99"
+                required
               />
-              Private: each member sees only their own score
-            </label>
-            <label class="choice">
+            </div>
+            <div class="stack">
+              <label for="scale-max">Highest score</label>
               <input
-                v-model="form.scoreVisibility"
-                type="radio"
-                name="score-visibility"
-                value="public"
+                id="scale-max"
+                v-model.number="form.scaleMax"
+                type="number"
+                min="1"
+                max="100"
+                required
               />
-              Public: everyone can see who gave what score
-            </label>
+            </div>
           </div>
-          <p class="meta">
-            Choose before publishing. Public scores appear when results do; after publishing, a
-            public list can only become private.
+
+          <label for="min-votes">Votes before a rank is confirmed</label>
+          <input
+            id="min-votes"
+            v-model.number="form.minVotes"
+            type="number"
+            min="0"
+            max="1000"
+            required
+            aria-describedby="min-votes-hint"
+          />
+          <p id="min-votes-hint" class="meta">
+            Members can vote the whole time the list is open. Entries with fewer votes than this
+            still appear on the leaderboard, marked provisional, so one early 10 can’t top the list.
           </p>
-        </fieldset>
-        <div class="row">
-          <div class="stack">
-            <label for="scale-min">Lowest score</label>
-            <input
-              id="scale-min"
-              v-model.number="form.scaleMin"
-              type="number"
-              min="0"
-              max="99"
-              required
-            />
+
+          <p class="meta">When can members see the results?</p>
+          <div class="choices" role="radiogroup" aria-label="Results visibility">
+            <label class="choice">
+              <input v-model="form.resultsVisibility" type="radio" name="visibility" value="live" />
+              While voting is open
+            </label>
+            <label class="choice">
+              <input
+                v-model="form.resultsVisibility"
+                type="radio"
+                name="visibility"
+                value="after-close"
+              />
+              Only after voting closes
+            </label>
           </div>
-          <div class="stack">
-            <label for="scale-max">Highest score</label>
+
+          <label class="choice">
+            <input v-model="form.showNominators" type="checkbox" />
+            Show who nominated each entry
+          </label>
+
+          <fieldset class="stack">
+            <legend class="legend--small">Who can take part</legend>
+            <p id="roles-hint" class="meta">
+              Leave every role unticked to let all members take part. Otherwise, members need at
+              least one of the ticked roles.
+            </p>
+            <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
+              <label v-for="role in roleChoices" :key="role.roleId" class="choice">
+                <input v-model="form.requiredRoleIds" type="checkbox" :value="role.roleId" />
+                {{ role.name }}
+              </label>
+            </div>
+            <p class="meta">
+              Role not listed?
+              <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
+              back.
+            </p>
+          </fieldset>
+        </fieldset>
+
+        <fieldset v-if="form.entryMode === 'nominations'" class="stack" :disabled="finished">
+          <legend class="legend--small">Nominations per member</legend>
+          <template v-if="locked">
+            <p v-if="existing?.maxNominationsPerMember !== null" class="meta">
+              You can remove this limit to allow unlimited nominations. After saving, the limit
+              cannot be restored; existing nominations stay as they are.
+            </p>
+            <p v-else class="meta">
+              Nominations are already unlimited; a cap cannot be added after publishing.
+            </p>
+            <label class="choice" for="unlimited">
+              <input
+                id="unlimited"
+                v-model="form.unlimitedNominations"
+                type="checkbox"
+                :disabled="existing?.maxNominationsPerMember === null"
+              />
+              Unlimited
+            </label>
+          </template>
+          <template v-else>
+            <label for="cap">Nominations per member</label>
             <input
-              id="scale-max"
-              v-model.number="form.scaleMax"
+              id="cap"
+              v-model.number="form.maxNominationsPerMember"
               type="number"
               min="1"
-              max="100"
-              required
+              max="50"
+              :required="!form.unlimitedNominations"
+              :disabled="form.unlimitedNominations"
             />
-          </div>
-        </div>
-
-        <template v-if="form.entryMode === 'nominations'">
-          <label for="cap">Nominations per member</label>
-          <input
-            id="cap"
-            v-model.number="form.maxNominationsPerMember"
-            type="number"
-            min="1"
-            max="50"
-            :required="!form.unlimitedNominations"
-            :disabled="locked || form.unlimitedNominations"
-          />
-          <label class="choice">
-            <input v-model="form.unlimitedNominations" type="checkbox" />
-            Unlimited
-          </label>
-        </template>
-
-        <label for="min-votes">Votes before a rank is confirmed</label>
-        <input
-          id="min-votes"
-          v-model.number="form.minVotes"
-          type="number"
-          min="0"
-          max="1000"
-          required
-          aria-describedby="min-votes-hint"
-        />
-        <p id="min-votes-hint" class="meta">
-          Members can vote the whole time the list is open. Entries with fewer votes than this still
-          appear on the leaderboard, marked provisional, so one early 10 can’t top the list.
-        </p>
-
-        <p class="meta">When can members see the results?</p>
-        <div class="choices" role="radiogroup" aria-label="Results visibility">
-          <label class="choice">
-            <input v-model="form.resultsVisibility" type="radio" name="visibility" value="live" />
-            While voting is open
-          </label>
-          <label class="choice">
-            <input
-              v-model="form.resultsVisibility"
-              type="radio"
-              name="visibility"
-              value="after-close"
-            />
-            Only after voting closes
-          </label>
-        </div>
-
-        <label class="choice">
-          <input v-model="form.showNominators" type="checkbox" />
-          Show who nominated each entry
-        </label>
-
-        <fieldset class="stack">
-          <legend class="legend--small">Who can take part</legend>
-          <p id="roles-hint" class="meta">
-            Leave every role unticked to let all members take part. Otherwise, members need at least
-            one of the ticked roles.
-          </p>
-          <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
-            <label v-for="role in roleChoices" :key="role.roleId" class="choice">
-              <input v-model="form.requiredRoleIds" type="checkbox" :value="role.roleId" />
-              {{ role.name }}
+            <label class="choice" for="unlimited">
+              <input id="unlimited" v-model="form.unlimitedNominations" type="checkbox" />
+              Unlimited
             </label>
-          </div>
-          <p class="meta">
-            Role not listed?
-            <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
-            back.
-          </p>
+          </template>
         </fieldset>
       </fieldset>
 
-      <fieldset v-if="existing !== null" class="card stack" :disabled="finished">
+      <fieldset
+        v-if="existing !== null"
+        id="editor-schedule"
+        class="card stack"
+        :disabled="finished"
+      >
         <legend>Schedule</legend>
         <p class="meta">Times are in your time zone.</p>
 
@@ -662,7 +713,7 @@ const importCsv = async () => {
         You’ll choose when it opens, and whether voting ends, after creating the draft.
       </p>
       <p v-else-if="!locked && publishBlocker !== null" class="meta">{{ publishBlocker }}</p>
-      <div class="actions">
+      <div class="actions editor-actions">
         <button
           v-if="existing === null"
           type="submit"

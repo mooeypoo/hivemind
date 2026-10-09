@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import type {
   BallotDto,
+  LeaderboardDto,
+  LeaderboardRowDto,
   ListDetailDto,
   PublicScoresDto,
   RoleLabelsDto,
@@ -28,8 +30,25 @@ const error = ref<ApiError | null>(null);
 /** The caller's own scores, by entry id. Nobody else's are ever loaded. */
 const scores = ref<Readonly<Record<string, number>>>({});
 const publicScores = ref<PublicScoresDto>({ visible: false });
+const leaderboardRows = ref<readonly LeaderboardRowDto[] | null>(null);
+const shareStatus = ref('');
+
+const orderedEntries = computed(() => {
+  const entries = [...(list.value?.entries ?? [])];
+  if (leaderboardRows.value === null) return entries;
+  const position = new Map(leaderboardRows.value.map((row, index) => [row.entryId, index]));
+  return entries.sort(
+    (a, b) =>
+      (position.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+      (position.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+});
+const standingsByEntry = computed(() =>
+  Object.fromEntries((leaderboardRows.value ?? []).map((row) => [row.entryId, row])),
+);
 
 const load = async () => {
+  leaderboardRows.value = null;
   const slug = encodeURIComponent(String(route.params.slug));
   const [detail, ballot, attribution] = await Promise.all([
     api.get<ListDetailDto>(`/api/lists/${slug}`),
@@ -44,6 +63,21 @@ const load = async () => {
   }
   if (ballot.ok) scores.value = ballot.data.scores;
   if (attribution.ok) publicScores.value = attribution.data;
+};
+
+const onLeaderboardLoaded = (board: LeaderboardDto) => {
+  leaderboardRows.value = board.hidden ? null : board.rows;
+};
+
+const copyMemberLink = async () => {
+  if (list.value === null) return;
+  const url = new URL(route.fullPath, window.location.origin).toString();
+  try {
+    await navigator.clipboard.writeText(url);
+    shareStatus.value = 'Member link copied. Sign-in is required to view or take part.';
+  } catch {
+    shareStatus.value = 'Copy failed. You can share this page address with community members.';
+  }
 };
 watch(() => route.params.slug, load, { immediate: true });
 usePageTitle(() => list.value?.title ?? null);
@@ -117,7 +151,11 @@ const onScored = (ballot: BallotDto) => {
       >
         Edit
       </RouterLink>
+      <button type="button" class="button share-link" @click="copyMemberLink">
+        Copy member link
+      </button>
     </header>
+    <p v-if="shareStatus !== ''" class="share-status" role="status">{{ shareStatus }}</p>
 
     <p v-if="list.description !== ''" class="lead">{{ list.description }}</p>
     <EventCountdown v-if="next !== null" :label="next.label" :at="next.at" />
@@ -128,65 +166,106 @@ const onScored = (ballot: BallotDto) => {
       Voting stays open until an Admin closes it.
     </p>
 
-    <LeaderboardPanel
-      v-if="listClosed"
-      :list="list.slug"
-      :my-scores="scores"
-      :public-scores="publicScores"
-    />
+    <nav
+      v-if="list.lifecycle === 'open' || listClosed"
+      class="list-jump"
+      aria-label="List sections"
+    >
+      <a href="#entries-heading">The list</a>
+      <a href="#leaderboard-heading">Standings</a>
+      <a v-if="showNominate" href="#nomination-panel">Nominate</a>
+    </nav>
 
-    <NominatePanel v-if="showNominate" :list="list" @nominated="load" />
-
-    <section aria-labelledby="entries-heading">
-      <h2 id="entries-heading">
-        {{ list.entryMode === 'seeded' && canVote ? 'Rate these' : 'Entries' }}
-        <span class="meta">({{ list.entries.length }})</span>
-      </h2>
-      <p v-if="list.scoreVisibility === 'public'" class="notice">
-        Scores on this list are public: other members can see the score you give each entry.
-      </p>
-      <p v-if="canVote && list.entries.length > 0" class="meta">
-        <template v-if="list.scoreVisibility === 'public'">
-          You’ve rated {{ ratedCount }} of {{ list.entries.length }}.
-        </template>
-        <template v-else>
-          You’ve rated {{ ratedCount }} of {{ list.entries.length }}. Your scores are private: only
-          you can see them.
-        </template>
-      </p>
-      <p v-else-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="meta">
-        This list is open only to members with {{ requiredRolesText }}, so you can’t rate it.
-      </p>
-      <p v-if="list.entries.length === 0" class="empty">Nothing nominated yet.</p>
-      <ul v-else class="entries">
-        <EntryCard v-for="entry in list.entries" :key="entry.id" :entry="entry">
-          <PublicScoreDisclosure
-            v-if="publicScores.visible"
-            :scores="publicScores.entries[entry.id] ?? []"
-          />
-          <ScorePicker
+    <div class="list-workspace">
+      <section class="list-entries" aria-labelledby="entries-heading">
+        <h2 id="entries-heading">
+          {{
+            list.entryMode === 'seeded'
+              ? canVote
+                ? 'Rate these'
+                : 'List items'
+              : 'All community nominations'
+          }}
+          <span class="meta">({{ list.entries.length }})</span>
+        </h2>
+        <p v-if="list.entryMode === 'nominations'" class="meta list-context">
+          This is the full list, including entries nominated by other members.<template
             v-if="canVote"
-            :list-id="list.id"
-            :entry-id="entry.id"
-            :entry-title="entry.item.title"
-            :scale="list.scale"
-            :score="scores[entry.id] ?? null"
-            @changed="onScored"
-          />
-          <p v-else-if="listClosed && scores[entry.id] !== undefined" class="entry__meta">
-            Your score: <strong>{{ scores[entry.id] }}</strong>
-          </p>
-        </EntryCard>
-      </ul>
-    </section>
+          >
+            You can rate any entry while voting is open.</template
+          >
+        </p>
+        <p v-if="list.scoreVisibility === 'public'" class="notice public-score-notice">
+          Scores on this list are public: other members can see the score you give each entry.
+        </p>
+        <p v-if="canVote && list.entries.length > 0" class="meta ballot-progress">
+          <strong>{{ ratedCount }} of {{ list.entries.length }}</strong> rated.
+          <template v-if="list.scoreVisibility !== 'public'">
+            Your scores are private: only you can see them.
+          </template>
+        </p>
+        <p v-else-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="meta">
+          This list is open only to members with {{ requiredRolesText }}, so you can’t rate it.
+        </p>
+        <p v-if="list.entries.length === 0" class="empty">Nothing nominated yet.</p>
+        <ul v-else class="entries">
+          <EntryCard v-for="entry in orderedEntries" :key="entry.id" :entry="entry">
+            <p v-if="standingsByEntry[entry.id] !== undefined" class="entry__standing">
+              <template v-if="standingsByEntry[entry.id]?.rank === null">
+                Pending · no votes yet
+              </template>
+              <template v-else>
+                Rank {{ standingsByEntry[entry.id]?.rank }} ·
+                {{ standingsByEntry[entry.id]?.score?.toFixed(1) }} ·
+                {{ standingsByEntry[entry.id]?.votes }}
+                {{ standingsByEntry[entry.id]?.votes === 1 ? 'vote' : 'votes' }}
+                <span v-if="standingsByEntry[entry.id]?.provisional" class="tag">Provisional</span>
+              </template>
+            </p>
+            <PublicScoreDisclosure
+              v-if="publicScores.visible"
+              :scores="publicScores.entries[entry.id] ?? []"
+            />
+            <ScorePicker
+              v-if="canVote"
+              :list-id="list.id"
+              :entry-id="entry.id"
+              :entry-title="entry.item.title"
+              :scale="list.scale"
+              :score="scores[entry.id] ?? null"
+              @changed="onScored"
+            />
+            <p v-else-if="listClosed && scores[entry.id] !== undefined" class="entry__meta">
+              Your score: <strong>{{ scores[entry.id] }}</strong>
+            </p>
+          </EntryCard>
+        </ul>
+      </section>
 
-    <LeaderboardPanel
-      v-if="list.lifecycle === 'open'"
-      :key="list.entries.length"
-      :list="list.slug"
-      :my-scores="scores"
-      :public-scores="publicScores"
-    />
+      <aside
+        v-if="showNominate || list.lifecycle === 'open' || listClosed"
+        class="list-sidebar"
+        aria-label="List actions and standings"
+      >
+        <details v-if="showNominate" id="nomination-panel" class="sidebar-disclosure">
+          <summary>Nominate another item</summary>
+          <NominatePanel :list="list" @nominated="load" />
+        </details>
+        <section
+          v-if="list.lifecycle === 'open' || listClosed"
+          class="list-sidebar__standings"
+          aria-label="Standings"
+        >
+          <LeaderboardPanel
+            :key="list.entries.length"
+            :list="list.slug"
+            :my-scores="scores"
+            :public-scores="publicScores"
+            @loaded="onLeaderboardLoaded"
+          />
+        </section>
+      </aside>
+    </div>
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />
   </article>

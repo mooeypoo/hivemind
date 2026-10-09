@@ -67,6 +67,6 @@ export const lockedFields = (fields: readonly string[]): DomainError =>
   domainError(
     'invalid',
     'lists.locked-fields',
-    'Once a list is scheduled, only its description and closing time can change.',
+    'Once a list is published, only its description, a later closing time, and removing its nomination cap can change.',
     fields,
   );

@@ -49,6 +49,30 @@ describe('NominatePanel', () => {
     await flushPromises();
     expect(calls[1]).toMatchObject({ method: 'POST', body: { externalId: '78' } });
     expect(panel.emitted('nominated')).toHaveLength(1);
+    expect((panel.get('input[type=search]').element as HTMLInputElement).value).toBe('');
+    expect(panel.find('.results').exists()).toBe(false);
+    expect(panel.get('[role=status]').text()).toContain('Nominated Blade Runner');
+  });
+
+  test('announces when the catalog search is still loading', async () => {
+    let finishSearch: ((response: Response) => void) | undefined;
+    stubApi({
+      'GET /api/lists/list-1/search': () =>
+        new Promise<Response>((resolve) => {
+          finishSearch = resolve;
+        }) as unknown as Response,
+    });
+    const panel = mount(NominatePanel, { props: { list: openTmdbList() } });
+
+    await panel.get('input[type=search]').setValue('blade');
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    expect(panel.get('[role=status]').text()).toContain('Searching the catalog');
+
+    finishSearch?.(Response.json({ items: [bladeRunner] }));
+    await flushPromises();
+    expect(panel.text()).toContain('Blade Runner');
+    expect(panel.find('[role=status]').exists()).toBe(false);
   });
 
   test('marks results that are already in the list', async () => {

@@ -12,17 +12,18 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ changed: [ballot: BallotDto] }>();
 
-const options = computed(() =>
-  Array.from({ length: props.scale.max - props.scale.min + 1 }, (_, i) => props.scale.min + i),
-);
 const id = computed(() => `score-${props.entryId}`);
+const sliderValue = computed(() => props.score ?? props.scale.min);
+const sliderDescription = computed(() =>
+  props.score === null
+    ? `Not rated. Low ${String(props.scale.min)} is on the left; high ${String(props.scale.max)} is on the right.`
+    : `${String(props.score)}. Low ${String(props.scale.min)} is on the left; high ${String(props.scale.max)} is on the right.`,
+);
 const saving = ref(false);
 const status = ref('');
 const error = ref<ApiError | null>(null);
 
-const change = async (event: Event) => {
-  const raw = (event.target as HTMLSelectElement).value;
-  const score = raw === '' ? null : Number(raw);
+const saveScore = async (score: number | null, slider?: HTMLInputElement) => {
   saving.value = true;
   error.value = null;
   status.value = '';
@@ -33,11 +34,20 @@ const change = async (event: Event) => {
   saving.value = false;
   if (!result.ok) {
     error.value = result.error;
-    (event.target as HTMLSelectElement).value = props.score === null ? '' : String(props.score);
+    if (slider !== undefined) slider.value = String(sliderValue.value);
     return;
   }
   status.value = score === null ? 'Score cleared' : 'Saved';
   emit('changed', result.data);
+};
+
+const change = (event: Event) => {
+  const slider = event.currentTarget as HTMLInputElement;
+  void saveScore(Number(slider.value), slider);
+};
+
+const clear = () => {
+  void saveScore(null);
 };
 </script>
 
@@ -46,17 +56,36 @@ const change = async (event: Event) => {
     <label :for="id" class="score__label">
       Your score<span class="visually-hidden"> for {{ entryTitle }}</span>
     </label>
-    <select
+    <output :for="id" class="score__value" :aria-label="`Current score for ${entryTitle}`">
+      {{ score ?? 'Not rated' }}
+    </output>
+    <input
       :id="id"
-      class="score__select"
-      :value="score === null ? '' : String(score)"
+      class="score__range"
+      type="range"
+      :min="scale.min"
+      :max="scale.max"
+      step="1"
+      :value="sliderValue"
+      :aria-valuetext="sliderDescription"
       :disabled="saving"
-      :aria-describedby="`${id}-status`"
+      :aria-describedby="`${id}-ends ${id}-status`"
       @change="change"
+    />
+    <div :id="`${id}-ends`" class="score__ends" aria-hidden="true">
+      <span>Low · {{ scale.min }}</span>
+      <span>High · {{ scale.max }}</span>
+    </div>
+    <button
+      v-if="score !== null"
+      type="button"
+      class="score__clear"
+      :disabled="saving"
+      :aria-label="`Clear score for ${entryTitle}`"
+      @click="clear"
     >
-      <option value="">Not rated</option>
-      <option v-for="option in options" :key="option" :value="String(option)">{{ option }}</option>
-    </select>
+      Clear score
+    </button>
     <span :id="`${id}-status`" class="score__status" aria-live="polite">
       <template v-if="error !== null">{{ error.message }}</template>
       <template v-else>{{ status }}</template>
