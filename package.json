@@ -20,6 +20,7 @@
   "dependencies": {
     "@netlify/blobs": "11.1.4",
     "vue": "3.5.43",
+    "vue-router": "5.4.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -27,10 +28,12 @@
     "@netlify/functions": "6.0.2",
     "@types/node": "22.20.5",
     "@vitejs/plugin-vue": "6.0.9",
+    "@vue/test-utils": "2.5.1",
     "dependency-cruiser": "18.5.0",
     "eslint": "10.12.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.11.1",
+    "happy-dom": "20.14.6",
     "jiti": "2.7.0",
     "netlify-cli": "27.12.0",
     "prettier": "3.9.9",

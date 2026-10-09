@@ -5,6 +5,8 @@
 export const SESSION_COOKIE = '__Host-session';
 export const LOGIN_STATE_COOKIE = '__Host-login_state';
 export const LOGIN_STATE_MAX_AGE_SECONDS = 600;
+/** Where to go after sign-in; validated again when read. */
+export const LOGIN_RETURN_COOKIE = '__Host-login_return';
 
 /** AGENTS.md: HttpOnly; Secure; SameSite=Lax; Path=/. */
 export const setCookie = (name: string, value: string, maxAgeSeconds: number): string =>

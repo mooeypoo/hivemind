@@ -7,7 +7,7 @@ Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate
 1. **Domain-driven design with strict bounded contexts.** The boundaries below are enforced by tooling, not by convention.
 2. **TypeScript, strict, everywhere.** That includes the server, the web app, config and scripts.
 3. **Privacy and security by default.** See the section below. When in doubt, store less and expose less.
-4. **Ship small.** Every milestone must be deployable and green on `npm run check`.
+4. **Ship small.** Every milestone must be deployable and green on `npm run check`, and ships the UI for what it adds, so it can be tried in a browser.
 5. **Deployment-agnostic.** One deployment serves one Discord community, and any community can fork and deploy its own. Nothing specific to a community (server, roles, site name, URLs, lists) is written into code: it comes from the environment (see Environment) or from the List aggregate.
 
 ## Stack
@@ -51,7 +51,7 @@ src/
     platform.ts           Clock, IdGenerator, Blobs stores, fetch: what the runtime provides
     functions.ts          the only module netlify/functions imports: `handle(endpoint)` and the endpoints
     http/                 zod schemas, cookies, auth/origin checks, Result → HTTP mapping, endpoints/, contracts.ts (API types)
-  web/                    Vue app
+  web/                    Vue app: pages/, components/, services/api.ts (typed fetch), state/, lib/ (pure helpers), public/styles.css
 netlify/functions/        thin handlers: parse → use case → map. No business logic.
 ```
 
@@ -165,7 +165,16 @@ Each route is one file in `netlify/functions` (`export default handle(endpoint)`
 
 Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
 
-**Expired sessions in the web app.** A session can end in the middle of something. When a request returns 401, the web app sends the person through sign-in and back to the page they were on, without losing unsaved input. This needs `/api/auth/login?returnTo=<path>`, which accepts same-site paths only (never another origin). Both arrive with the web app.
+**Expired sessions.** A session can end in the middle of something. When a request returns 401, the web app sends the person to `/api/auth/login?returnTo=<current path>` and back again. `returnTo` accepts same-site paths only; anything else becomes `/`, and it is checked again when read back from its cookie, so sign-in can never be an open redirect. Forms keep unsaved input in `sessionStorage` (`lib/drafts.ts`) so nothing typed is lost.
+
+## Web app
+
+- Vue 3 with `<script setup lang="ts">`, `vue-router`, and no UI kit. The web app imports only types from `contracts.ts`; it calls the API through `services/api.ts`.
+- **Styling lives only in `src/web/public/styles.css`.** The CSP (`style-src 'self'`) blocks `<style>` blocks and inline `style` attributes, including the ones Vite injects in development. ESLint rejects `<style>` blocks and `style` bindings in `.vue` files.
+- **Mobile-first and accessible:** semantic landmarks and a skip link, a label for every input, errors announced with `role="alert"`, visible focus, WCAG AA contrast, light and dark themes from `prefers-color-scheme`, 44 px touch targets, and no horizontal scrolling at 320 px.
+- Authorization stays in use cases. The UI hides what a member can't do (it reads `viewer` and `isAdmin`), but the server decides.
+- Logic worth testing goes in `lib/` as pure functions. Components are tested with `@vue/test-utils` in happy-dom (`// @vitest-environment happy-dom`).
+- Netlify serves `index.html` for any path that isn't a file or a function, so deep links work.
 
 ## Security & privacy
 
@@ -206,3 +215,16 @@ Everything that varies per deployment lives in env, and everything that varies p
 - **Domain errors** are returned as values, not thrown. `server/http` maps them to status codes.
 - **Testing.** Domain and application tests use `InMemory*` adapters. Each Blobs repository gets one integration test against `@netlify/blobs/server`. Write a test first for every invariant listed above.
 - **Definition of done.** `npm run check` (tsc, eslint, depcruise, vitest) is green, and the milestone works under `netlify dev`.
+
+## Milestones
+
+| Milestone | Scope                                                                                       | Status |
+| --------- | ------------------------------------------------------------------------------------------- | ------ |
+| M0        | Skeleton, tooling, boundary rules                                                           | done   |
+| M1        | Identity: Discord sign-in, sessions, Actor, my data                                         | done   |
+| M2        | Catalog and lists, with choosable item sources                                              | done   |
+| Web slice | Browser UI for identity and lists                                                           | done   |
+| M3        | Voting, with its rating UI                                                                  | next   |
+| M4        | Ranking, with the leaderboard UI                                                            |        |
+| M5        | Web polish and an accessibility audit                                                       |        |
+| M6        | Hardening and launch: rate limits, CSP check, retention purge, seed script, deploy previews |        |

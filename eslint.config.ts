@@ -22,12 +22,30 @@ export default defineConfig(
     },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
+      // TypeScript already reports undefined names, including browser globals in .vue files.
+      'no-undef': 'off',
     },
   },
   {
     files: ['**/*.vue'],
     languageOptions: {
       parserOptions: { parser: tseslint.parser },
+    },
+  },
+  {
+    // AGENTS.md: the CSP (style-src 'self') blocks inline styles, so all styling lives in
+    // src/web/public/styles.css.
+    files: ['src/web/**/*.vue'],
+    rules: {
+      'vue/no-restricted-block': [
+        'error',
+        { element: 'style', message: 'Put styles in src/web/public/styles.css (CSP).' },
+      ],
+      'vue/no-restricted-static-attribute': [
+        'error',
+        { key: 'style', message: 'Use a class (CSP).' },
+      ],
+      'vue/no-restricted-v-bind': ['error', { argument: 'style', message: 'Use a class (CSP).' }],
     },
   },
   {

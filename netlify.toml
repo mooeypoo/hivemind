@@ -12,6 +12,12 @@
   command = "vite --port 5173 --strictPort"
   targetPort = 5173
 
+# The web app routes on the client: any path that isn't a file or a function gets index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]

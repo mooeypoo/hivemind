@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { MeDto, MyDataExportDto } from '../contracts.ts';
-import { LOGIN_STATE_COOKIE, SESSION_COOKIE } from '../cookies.ts';
+import { LOGIN_RETURN_COOKIE, LOGIN_STATE_COOKIE, SESSION_COOKIE } from '../cookies.ts';
 import {
   ADMIN_ROLE_ID,
   cookieValue,
@@ -49,6 +49,51 @@ describe('GET /api/auth/login', () => {
     const stateCookie = setCookies(response)[LOGIN_STATE_COOKIE];
     expect(stateCookie).toMatch(/; Max-Age=600; Path=\/; HttpOnly; Secure; SameSite=Lax$/);
     expect(cookieValue(stateCookie)).toBe(location.searchParams.get('state'));
+  });
+});
+
+describe('returning after sign-in', () => {
+  const signInFrom = async (returnTo: string) => {
+    const login = await authLogin(
+      request('GET', `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`),
+      h.app,
+    );
+    const cookies = setCookies(login);
+    const state = cookieValue(cookies[LOGIN_STATE_COOKIE]);
+    const back = cookieValue(cookies[LOGIN_RETURN_COOKIE]);
+    const callback = await authCallback(
+      request('GET', `/api/auth/callback?code=c&state=${state}`, {
+        cookies: { [LOGIN_STATE_COOKIE]: state, [LOGIN_RETURN_COOKIE]: back },
+      }),
+      h.app,
+    );
+    return callback.headers.get('location');
+  };
+
+  test('goes back to the page the member came from', async () => {
+    expect(await signInFrom('/lists/best-sci-fi?tab=entries')).toBe(
+      '/lists/best-sci-fi?tab=entries',
+    );
+  });
+
+  test.each(['https://evil.example', '//evil.example', '/\\evil.example'])(
+    'never redirects off-site, even for %j',
+    async (returnTo) => {
+      expect(await signInFrom(returnTo)).toBe('/');
+    },
+  );
+
+  test('a tampered return cookie is validated again', async () => {
+    const callback = await authCallback(
+      request('GET', '/api/auth/callback?code=c&state=s', {
+        cookies: {
+          [LOGIN_STATE_COOKIE]: 's',
+          [LOGIN_RETURN_COOKIE]: encodeURIComponent('//evil.example'),
+        },
+      }),
+      h.app,
+    );
+    expect(callback.headers.get('location')).toBe('/');
   });
 });
 

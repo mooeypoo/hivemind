@@ -1,9 +1,11 @@
 <script setup lang="ts">
-const siteName = import.meta.env.VITE_SITE_NAME;
+import AppHeader from './components/AppHeader.vue';
 </script>
 
 <template>
-  <main>
-    <h1>{{ siteName }}</h1>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <AppHeader />
+  <main id="main" tabindex="-1" class="page">
+    <RouterView />
   </main>
 </template>

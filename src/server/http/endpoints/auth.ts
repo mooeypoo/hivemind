@@ -1,6 +1,7 @@
 import type { App } from '../../composition.ts';
 import {
   clearCookie,
+  LOGIN_RETURN_COOKIE,
   LOGIN_STATE_COOKIE,
   LOGIN_STATE_MAX_AGE_SECONDS,
   readCookie,
@@ -10,15 +11,20 @@ import {
 import type { LoginOutcomeCode } from '../contracts.ts';
 import { rejectForeignOrigin } from '../origin.ts';
 import { noContent, redirect, withCookies } from '../respond.ts';
+import { safeReturnPath } from '../return-to.ts';
 import { loginCallbackQuery } from '../schemas.ts';
 
-/** `GET /api/auth/login` */
-export const authLogin = (_request: Request, app: App): Promise<Response> => {
+/** `GET /api/auth/login?returnTo=<same-site path>` */
+export const authLogin = (request: Request, app: App): Promise<Response> => {
   const { state, redirectTo } = app.identity.startLogin();
+  const returnTo = safeReturnPath(new URL(request.url).searchParams.get('returnTo'));
   return Promise.resolve(
     redirect(
       redirectTo,
-      withCookies(setCookie(LOGIN_STATE_COOKIE, state, LOGIN_STATE_MAX_AGE_SECONDS)),
+      withCookies(
+        setCookie(LOGIN_STATE_COOKIE, state, LOGIN_STATE_MAX_AGE_SECONDS),
+        setCookie(LOGIN_RETURN_COOKIE, encodeURIComponent(returnTo), LOGIN_STATE_MAX_AGE_SECONDS),
+      ),
     ),
   );
 };
@@ -26,7 +32,7 @@ export const authLogin = (_request: Request, app: App): Promise<Response> => {
 const backToSite = (outcome: LoginOutcomeCode, ...cookies: string[]): Response =>
   redirect(
     `/?login=${encodeURIComponent(outcome)}`,
-    withCookies(clearCookie(LOGIN_STATE_COOKIE), ...cookies),
+    withCookies(clearCookie(LOGIN_STATE_COOKIE), clearCookie(LOGIN_RETURN_COOKIE), ...cookies),
   );
 
 /** `GET /api/auth/callback` */
@@ -40,10 +46,12 @@ export const authCallback = async (request: Request, app: App): Promise<Response
   });
   if (!result.ok) return backToSite(result.error.code as LoginOutcomeCode);
 
+  const returnTo = readCookie(request, LOGIN_RETURN_COOKIE);
   return redirect(
-    '/',
+    safeReturnPath(returnTo === null ? null : decodeURIComponent(returnTo)),
     withCookies(
       clearCookie(LOGIN_STATE_COOKIE),
+      clearCookie(LOGIN_RETURN_COOKIE),
       setCookie(SESSION_COOKIE, result.value.token, result.value.maxAgeSeconds),
     ),
   );
