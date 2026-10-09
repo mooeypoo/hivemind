@@ -55,7 +55,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <p v-if="loginNotice !== null" class="notice" role="status">{{ loginNotice }}</p>
+  <p v-if="loginNotice !== null" class="notice" role="alert">{{ loginNotice }}</p>
 
   <section v-if="session.me === null" class="hero">
     <h1>{{ siteName }}</h1>

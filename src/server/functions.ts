@@ -5,6 +5,7 @@
 import { getApp, type App } from './composition.ts';
 import { runRetention } from './jobs.ts';
 import { errorBody, json } from './http/respond.ts';
+import { authCallback, authLogin, backToSite } from './http/endpoints/auth.ts';
 
 import type { Context } from '@netlify/functions';
 
@@ -48,7 +49,7 @@ export const rateLimits = {
 
 export type Endpoint = (request: Request, app: App) => Promise<Response>;
 
-/** Adapts an endpoint to a Netlify function. Unexpected failures become a bare 500. */
+/** Adapts an endpoint to a Netlify function, returning sign-in failures to the site. */
 export const handle =
   (endpoint: Endpoint) =>
   async (request: Request, context?: Context): Promise<Response> => {
@@ -61,6 +62,7 @@ export const handle =
       console.error(
         `Unhandled error in ${request.method} ${new URL(request.url).pathname}: ${detail}`,
       );
+      if (endpoint === authLogin || endpoint === authCallback) return backToSite('http.internal');
       return json(errorBody('http.internal', 'Something went wrong.'), 500);
     }
   };

@@ -86,7 +86,8 @@ describe('login messages', () => {
   test('cover every outcome the server sends', () => {
     expect(isLoginOutcome('identity.not-a-member')).toBe(true);
     expect(isLoginOutcome('something-else')).toBe(false);
-    expect(Object.keys(loginMessage)).toHaveLength(6);
+    expect(isLoginOutcome('http.internal')).toBe(true);
+    expect(Object.keys(loginMessage)).toHaveLength(7);
   });
 });
 

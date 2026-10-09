@@ -32,7 +32,7 @@ export const authLogin = (request: Request, app: App): Promise<Response> => {
   );
 };
 
-const backToSite = (outcome: LoginOutcomeCode, ...cookies: string[]): Response =>
+export const backToSite = (outcome: LoginOutcomeCode, ...cookies: string[]): Response =>
   redirect(
     `/?login=${encodeURIComponent(outcome)}`,
     withCookies(clearCookie(LOGIN_STATE_COOKIE), clearCookie(LOGIN_RETURN_COOKIE), ...cookies),

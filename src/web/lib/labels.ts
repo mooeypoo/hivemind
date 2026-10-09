@@ -17,6 +17,8 @@ export const sourceLabel: Record<ItemSourceKind, string> = {
 /** What to tell someone who comes back from Discord with `?login=<code>`. */
 export const loginMessage: Record<LoginOutcomeCode, string> = {
   cancelled: 'Sign-in was cancelled. You can try again whenever you like.',
+  'http.internal':
+    'We could not complete your sign-in right now. Please try again shortly. If this keeps happening, contact the site administrator.',
   'identity.invalid-login-state':
     'That sign-in link expired or was opened in a different browser. Please try again.',
   'identity.not-a-member': 'Only members of this community’s Discord server can sign in.',

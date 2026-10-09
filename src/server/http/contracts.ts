@@ -33,6 +33,7 @@ export interface MyDataExportDto {
 /** Sign-in failures are reported to the web app as `/?login=<code>`. */
 export type LoginOutcomeCode =
   | 'cancelled'
+  | 'http.internal'
   | 'identity.invalid-login-state'
   | 'identity.not-a-member'
   | 'identity.login-rejected'

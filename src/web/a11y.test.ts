@@ -131,6 +131,7 @@ describe('every page passes automated accessibility checks', () => {
   test.each([
     ['the welcome page, signed out', '/', false],
     ['a sign-in failure message', '/?login=identity.not-a-member', false],
+    ['an unexpected sign-in failure', '/?login=http.internal', false],
     ['the lists index', '/', true],
     ['an open list with rating and leaderboard', '/lists/best-sci-fi', true],
     ['an open list with public scores', '/lists/best-sci-fi', true, false, true],
