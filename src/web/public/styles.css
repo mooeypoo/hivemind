@@ -566,6 +566,8 @@ legend {
 }
 
 .entry__image--text {
+  /* No poster: a short tile, so text-only lists don't waste the screen. */
+  aspect-ratio: 3 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -628,4 +630,34 @@ legend {
     scroll-behavior: auto !important;
     transition: none !important;
   }
+}
+
+/* Score picker */
+
+.score {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
+  margin-top: 0.6rem;
+}
+
+.score__label {
+  font-size: 0.85rem;
+}
+
+.score__select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.score__status {
+  min-height: 1.2em;
+  font-size: 0.8rem;
+  color: var(--muted);
 }

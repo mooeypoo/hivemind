@@ -69,4 +69,10 @@ export const nominateBody = z.union([
 /** About 200 rows of 2 × 200 characters, with room for quoting. */
 export const importPresetBody = z.strictObject({ csv: z.string().min(1).max(100_000) });
 
+/** Sets a score, or clears it with `null`. Ranges are the domain's to check. */
+export const changeScoreBody = z.strictObject({
+  entryId: z.string().min(1).max(300),
+  score: z.number().nullable(),
+});
+
 export const searchQuery = z.object({ q: z.string().max(200).default('') });

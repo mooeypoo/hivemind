@@ -9,6 +9,7 @@ export type { Config } from '@netlify/functions';
 export { authCallback, authLogin, authLogout } from './http/endpoints/auth.ts';
 export { deleteMyData, exportMyData, getMe } from './http/endpoints/me.ts';
 export { availableSources, importPreset } from './http/endpoints/catalog.ts';
+export { changeScore, getMyBallot } from './http/endpoints/voting.ts';
 export {
   archiveList,
   createList,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { anonymous, type Actor, type MemberId, type RoleId } from '../../../shared/kernel/index.ts';
 import { FixedClock, SequentialIds } from '../../../shared/kernel/testing/index.ts';
+import type { EntryId } from '../domain/entry.ts';
 import { DEFAULT_SCALE, type ListConfig, type Schedule } from '../domain/list.ts';
 import { FakeCatalog } from '../infrastructure/testing/fake-catalog.ts';
 import {
@@ -18,6 +19,7 @@ import { makeNominate } from './nominate.ts';
 import { makeListsPersonalData } from './personal-data.ts';
 import { makeScheduleList } from './schedule-list.ts';
 import { makeSearchForList } from './search-for-list.ts';
+import { makeEntryExists, makeRulesForVoting } from './voting-rules.ts';
 
 const actor = (id: string, opts: { admin?: boolean; roles?: string[] } = {}): Actor => ({
   kind: 'member',
@@ -332,5 +334,33 @@ describe('personal data', () => {
       ['The Matrix', 'Member bob'],
     ]);
     expect(await personalData().exportFor('ada' as MemberId)).toEqual({ nominations: [] });
+  });
+});
+
+describe('services for voting', () => {
+  test('report the scale, required roles and whether the list is open', async () => {
+    const list = await openList({ scale: { min: 0, max: 5 }, requiredRoleIds: ['r1' as RoleId] });
+    const rules = makeRulesForVoting(deps);
+    expect(await rules('best-sci-fi')).toEqual({
+      ok: true,
+      value: { listId: list.id, isOpen: true, scale: { min: 0, max: 5 }, requiredRoleIds: ['r1'] },
+    });
+    clock.set(at(20));
+    const closed = await rules(list.id);
+    expect(closed.ok && closed.value.isOpen).toBe(false);
+  });
+
+  test('treat drafts as not found', async () => {
+    await create();
+    const result = await makeRulesForVoting(deps)('best-sci-fi');
+    expect(!result.ok && result.error.code).toBe('lists.not-found');
+  });
+
+  test('say whether an entry exists in a list', async () => {
+    const list = await openList();
+    await nominate(ada, '78');
+    const exists = makeEntryExists(deps);
+    expect(await exists(list.id, 'tmdb-movie.78' as EntryId)).toBe(true);
+    expect(await exists(list.id, 'tmdb-movie.603' as EntryId)).toBe(false);
   });
 });

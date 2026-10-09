@@ -147,3 +147,17 @@ export interface SearchResultsDto {
 
 /** `POST /api/lists/:list/entries` body: an item from search, or a title for a free-text list. */
 export type NominateRequest = { readonly externalId: string } | { readonly title: string };
+
+// ---- Voting ----
+
+/** `GET` and `PUT /api/lists/:list/ballot`: the caller's own scores, by entry id. Private. */
+export interface BallotDto {
+  readonly listId: string;
+  readonly scores: Readonly<Record<string, number>>;
+}
+
+/** `PUT /api/lists/:list/ballot` body. `score: null` clears the score. */
+export interface ChangeScoreRequest {
+  readonly entryId: string;
+  readonly score: number | null;
+}

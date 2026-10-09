@@ -9,6 +9,7 @@ import { makeNominate } from './application/nominate.ts';
 import { makeListsPersonalData } from './application/personal-data.ts';
 import { makeScheduleList } from './application/schedule-list.ts';
 import { makeSearchForList } from './application/search-for-list.ts';
+import { makeEntryExists, makeRulesForVoting } from './application/voting-rules.ts';
 import {
   createBlobsEntryRepository,
   createBlobsLedgerRepository,
@@ -49,6 +50,9 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     searchForList: makeSearchForList(shared),
     nominate: makeNominate(shared),
     personalData: makeListsPersonalData(repositories),
+    // Services for downstream contexts (voting, ranking).
+    rulesForVoting: makeRulesForVoting(shared),
+    entryExists: makeEntryExists(repositories),
   };
 };
 

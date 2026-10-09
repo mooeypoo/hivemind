@@ -34,6 +34,7 @@ const initials = computed(() =>
         <span v-if="entry.isMine" class="tag">Your nomination</span>
         <span v-else-if="entry.nominatedBy !== null">Nominated by {{ entry.nominatedBy }}</span>
       </p>
+      <slot />
     </div>
   </li>
 </template>

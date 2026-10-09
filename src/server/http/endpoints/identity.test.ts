@@ -228,6 +228,7 @@ describe('GET /api/me/export', () => {
         avatarUrl: 'https://cdn.discordapp.com/embed/avatars/5.png',
       },
       lists: { nominations: [] },
+      voting: { ballots: [] },
     });
   });
 
