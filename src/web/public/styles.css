@@ -706,8 +706,22 @@ legend {
 }
 
 .result__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
   flex: 1;
   min-width: 0;
+}
+
+.result__text strong {
+  line-height: 1.2;
+}
+
+.result__subtitle {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.2;
 }
 
 .entries {

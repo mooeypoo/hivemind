@@ -192,7 +192,9 @@ const submitTitle = async () => {
             />
             <span class="result__text">
               <strong>{{ item.title }}</strong>
-              <span v-if="item.subtitle !== null" class="meta"> {{ item.subtitle }}</span>
+              <span v-if="item.subtitle !== null" class="result__subtitle">{{
+                item.subtitle
+              }}</span>
             </span>
             <span v-if="inList.has(`${item.source}:${item.externalId}`)" class="tag"
               >Already in the list</span
