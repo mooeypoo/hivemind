@@ -29,7 +29,7 @@ const config: ListConfig = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
-  requiredRoleId: null,
+  requiredRoleIds: [],
 };
 const schedule: Schedule = {
   opensAt: t('10T00:00:00'),
@@ -121,8 +121,23 @@ describe('config', () => {
       'title must be 1 to 120 characters',
       'slug must be lowercase letters, digits and single hyphens, up to 60 characters',
       'scale must be whole numbers from 0 to 100 with min below max',
-      'maxNominationsPerMember must be a whole number from 1 to 50',
+      'maxNominationsPerMember must be a whole number from 1 to 50, or unlimited',
       'ranking.minVotes must be a whole number from 0 to 1000',
+    ]);
+  });
+
+  test('nominations can be unlimited', () => {
+    expect(problems({ maxNominationsPerMember: null })).toEqual([]);
+  });
+
+  test('allows up to 25 distinct required roles', () => {
+    const roles = (n: number) => Array.from({ length: n }, (_, i) => `r${String(i)}` as RoleId);
+    expect(problems({ requiredRoleIds: roles(25) })).toEqual([]);
+    expect(problems({ requiredRoleIds: roles(26) })).toEqual([
+      'requiredRoleIds must list at most 25 distinct roles',
+    ]);
+    expect(problems({ requiredRoleIds: ['r1' as RoleId, 'r1' as RoleId] })).toEqual([
+      'requiredRoleIds must list at most 25 distinct roles',
     ]);
   });
 
@@ -190,14 +205,18 @@ describe('nominations window', () => {
 });
 
 describe('participation', () => {
-  test('is open to every member unless the list requires a role', () => {
+  test('is open to every member when no roles are required', () => {
     expect(mayParticipate(draft, [])).toBe(true);
+  });
+
+  test('otherwise needs any one of the required roles', () => {
     const gated = newList(
       'l3' as ListId,
-      { ...config, requiredRoleId: 'r1' as RoleId },
+      { ...config, requiredRoleIds: ['r1' as RoleId, 'r2' as RoleId] },
       t('01T00:00:00'),
     );
     expect(mayParticipate(gated, [])).toBe(false);
-    expect(mayParticipate(gated, ['r1' as RoleId])).toBe(true);
+    expect(mayParticipate(gated, ['r9' as RoleId])).toBe(false);
+    expect(mayParticipate(gated, ['r2' as RoleId])).toBe(true);
   });
 });

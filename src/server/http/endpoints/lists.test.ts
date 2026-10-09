@@ -268,6 +268,33 @@ describe('preset lists', () => {
   });
 });
 
+describe('list settings', () => {
+  test('accepts unlimited nominations and several required roles', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Club picks',
+      slug: 'club',
+      itemSource: { kind: 'freeform' },
+      maxNominationsPerMember: null,
+      requiredRoleIds: ['900000000000000077', '900000000000000078'],
+    });
+    expect(created.body).toMatchObject({
+      maxNominationsPerMember: null,
+      requiredRoleIds: ['900000000000000077', '900000000000000078'],
+    });
+  });
+
+  test('role IDs must be Discord IDs, not role names', async () => {
+    const result = await call<ErrorDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Club picks',
+      slug: 'club',
+      itemSource: { kind: 'freeform' },
+      requiredRoleIds: ['Moderators'],
+    });
+    expect(result.status).toBe(422);
+    expect(result.body.error.details).toEqual(['requiredRoleIds.0: must be a Discord role ID']);
+  });
+});
+
 describe('validation and access', () => {
   test('a malformed body lists every problem', async () => {
     const result = await call<ErrorDto>(createList, 'POST', '/api/lists', admin, {

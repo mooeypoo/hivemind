@@ -38,10 +38,12 @@ interface Form {
   scaleMin: number;
   scaleMax: number;
   maxNominationsPerMember: number;
+  unlimitedNominations: boolean;
   resultsVisibility: 'live' | 'after-close';
   minVotes: number;
   showNominators: boolean;
-  requiredRoleId: string;
+  /** Role IDs as typed: separated by commas, spaces or new lines. */
+  requiredRoleIds: string;
   /** `datetime-local` values, in the Admin's time zone. */
   opensAt: string;
   nominationsCloseAt: string;
@@ -60,16 +62,23 @@ const form = reactive<Form>({
   scaleMin: 1,
   scaleMax: 10,
   maxNominationsPerMember: 3,
+  unlimitedNominations: false,
   resultsVisibility: 'live',
   minVotes: 5,
   showNominators: true,
-  requiredRoleId: '',
+  requiredRoleIds: '',
   opensAt: '',
   nominationsCloseAt: '',
   closesAt: '',
 });
 
 const existing = ref<ListDto | null>(null);
+
+const roleTokens = computed(() =>
+  form.requiredRoleIds.split(/[\s,]+/).filter((token) => token !== ''),
+);
+/** Anything typed that isn't a role ID, most likely a role's name. */
+const notRoleIds = computed(() => roleTokens.value.filter((token) => !/^\d{5,25}$/.test(token)));
 const sources = ref<readonly ItemSourceKind[]>([]);
 const error = ref<ApiError | null>(null);
 const status = ref('');
@@ -95,11 +104,12 @@ const fillFrom = (list: ListDto) => {
     entryMode: list.entryMode,
     scaleMin: list.scale.min,
     scaleMax: list.scale.max,
-    maxNominationsPerMember: list.maxNominationsPerMember,
+    maxNominationsPerMember: list.maxNominationsPerMember ?? 3,
+    unlimitedNominations: list.maxNominationsPerMember === null,
     resultsVisibility: list.resultsVisibility,
     minVotes: list.ranking.minVotes,
     showNominators: list.showNominators,
-    requiredRoleId: list.requiredRoleId ?? '',
+    requiredRoleIds: list.requiredRoleIds.join(', '),
     opensAt: list.schedule === null ? '' : toLocalInput(list.schedule.opensAt),
     nominationsCloseAt:
       list.schedule?.nominationsCloseAt == null
@@ -165,11 +175,11 @@ const config = (): CreateListRequest => ({
       : { kind: form.sourceKind },
   entryMode: form.sourceKind === 'preset' ? form.entryMode : 'nominations',
   scale: { min: form.scaleMin, max: form.scaleMax },
-  maxNominationsPerMember: form.maxNominationsPerMember,
+  maxNominationsPerMember: form.unlimitedNominations ? null : form.maxNominationsPerMember,
   resultsVisibility: form.resultsVisibility,
   ranking: { strategy: 'bayesian', minVotes: form.minVotes },
   showNominators: form.showNominators,
-  requiredRoleId: form.requiredRoleId.trim() === '' ? null : form.requiredRoleId.trim(),
+  requiredRoleIds: roleTokens.value,
 });
 
 const run = async <T,>(
@@ -200,11 +210,13 @@ const afterSave = async (list: ListDto) => {
 };
 
 const create = async () => {
+  if (notRoleIds.value.length > 0) return;
   const list = await run(() => api.post<ListDto>('/api/lists', config()), 'Draft created.');
   if (list !== null) await afterSave(list);
 };
 
 const save = async () => {
+  if (notRoleIds.value.length > 0) return;
   if (existing.value === null) return;
   const body = locked.value
     ? {
@@ -223,6 +235,7 @@ const save = async () => {
 };
 
 const schedule = async () => {
+  if (notRoleIds.value.length > 0) return;
   if (existing.value === null) return;
   const id = existing.value.id;
   const saved = await run(() => api.put<ListDto>(`/api/lists/${id}`, config()), '');
@@ -396,11 +409,16 @@ const importCsv = async () => {
             type="number"
             min="1"
             max="50"
-            required
+            :required="!form.unlimitedNominations"
+            :disabled="locked || form.unlimitedNominations"
           />
+          <label class="choice">
+            <input v-model="form.unlimitedNominations" type="checkbox" />
+            Unlimited
+          </label>
         </template>
 
-        <label for="min-votes">Votes before an entry’s rank is settled</label>
+        <label for="min-votes">Votes before a rank is confirmed</label>
         <input
           id="min-votes"
           v-model.number="form.minVotes"
@@ -408,7 +426,12 @@ const importCsv = async () => {
           min="0"
           max="1000"
           required
+          aria-describedby="min-votes-hint"
         />
+        <p id="min-votes-hint" class="meta">
+          Members can vote the whole time the list is open. Entries with fewer votes than this still
+          appear on the leaderboard, marked provisional, so one early 10 can’t top the list.
+        </p>
 
         <p class="meta">When can members see the results?</p>
         <div class="choices" role="radiogroup" aria-label="Results visibility">
@@ -432,16 +455,29 @@ const importCsv = async () => {
           Show who nominated each entry
         </label>
 
-        <label for="role">Required Discord role ID (optional)</label>
+        <label for="roles">Only members with these Discord roles (optional)</label>
         <input
-          id="role"
-          v-model="form.requiredRoleId"
+          id="roles"
+          v-model="form.requiredRoleIds"
           type="text"
-          inputmode="numeric"
-          pattern="\d{5,25}"
-          aria-describedby="role-hint"
+          autocomplete="off"
+          aria-describedby="roles-hint roles-problem"
+          :aria-invalid="notRoleIds.length > 0"
         />
-        <p id="role-hint" class="meta">Leave empty to let every member take part.</p>
+        <p id="roles-hint" class="meta">
+          Leave empty to let every member take part. Otherwise paste role IDs, separated by commas;
+          anyone with at least one of them can take part.
+        </p>
+        <p
+          v-if="notRoleIds.length > 0"
+          id="roles-problem"
+          class="notice notice--error"
+          role="alert"
+        >
+          “{{ notRoleIds[0] }}” isn’t a role ID. Role IDs are long numbers, not names. In Discord,
+          turn on Developer Mode (User Settings → Advanced), then open Server Settings → Roles,
+          right-click the role and choose Copy Role ID.
+        </p>
       </fieldset>
 
       <fieldset v-if="existing !== null" class="card stack" :disabled="finished">

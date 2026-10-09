@@ -12,7 +12,7 @@ import type { NominationLedger } from '../domain/ledger.ts';
 import type { List, ListConfig, ListId, Phase, Schedule } from '../domain/list.ts';
 
 /*
- * Store: `lists`. Keys:
+ * Store: `lists`. Lists are written as v2 and read from v1 or v2. Keys:
  *   list/{listId}                  the List aggregate
  *   slug/{slug}                    unique slug → listId
  *   entry/{listId}/{entryId}       entries; the id derives from the item, so creation dedupes
@@ -26,13 +26,26 @@ interface ScheduleRecord {
   readonly closesAt: string;
 }
 
-interface ListRecordV1 {
-  readonly v: 1;
+type ConfigRecord = Omit<ListConfig, 'requiredRoleIds'> & {
+  readonly requiredRoleIds: readonly string[];
+};
+
+/** v2: several required roles and an optional nomination cap. */
+interface ListRecordV2 {
+  readonly v: 2;
   readonly id: string;
-  readonly config: Omit<ListConfig, 'requiredRoleId'> & { readonly requiredRoleId: string | null };
+  readonly config: ConfigRecord;
   readonly schedule: ScheduleRecord | null;
   readonly phase: Phase;
   readonly createdAt: string;
+}
+
+/** v1: a single optional required role. Still read; never written. */
+interface ListRecordV1 extends Omit<ListRecordV2, 'v' | 'config'> {
+  readonly v: 1;
+  readonly config: Omit<ConfigRecord, 'requiredRoleIds'> & {
+    readonly requiredRoleId: string | null;
+  };
 }
 
 interface EntryRecordV1 {
@@ -75,8 +88,8 @@ const scheduleFromRecord = (record: ScheduleRecord | null): Schedule | null =>
         closesAt: new Date(record.closesAt),
       };
 
-const listToRecord = (list: List): ListRecordV1 => ({
-  v: 1,
+const listToRecord = (list: List): ListRecordV2 => ({
+  v: 2,
   id: list.id,
   config: list.config,
   schedule: scheduleToRecord(list.schedule),
@@ -84,12 +97,24 @@ const listToRecord = (list: List): ListRecordV1 => ({
   createdAt: list.createdAt.toISOString(),
 });
 
-const listFromRecord = (data: unknown): List => {
+const upgradeList = (data: unknown): ListRecordV2 => {
+  const version = (data as { v?: unknown } | null)?.v;
+  if (version === 2) return data as ListRecordV2;
   assertV1(data, 'list');
-  const record = data as ListRecordV1;
+  const { config, ...rest } = data as ListRecordV1;
+  const { requiredRoleId, ...configRest } = config;
+  return {
+    ...rest,
+    v: 2,
+    config: { ...configRest, requiredRoleIds: requiredRoleId === null ? [] : [requiredRoleId] },
+  };
+};
+
+const listFromRecord = (data: unknown): List => {
+  const record = upgradeList(data);
   return {
     id: record.id as ListId,
-    config: { ...record.config, requiredRoleId: record.config.requiredRoleId as RoleId | null },
+    config: { ...record.config, requiredRoleIds: record.config.requiredRoleIds as RoleId[] },
     schedule: scheduleFromRecord(record.schedule),
     phase: record.phase,
     createdAt: new Date(record.createdAt),

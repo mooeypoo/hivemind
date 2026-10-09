@@ -22,7 +22,7 @@ export const listDto = (view: ListView): ListDto => ({
   resultsVisibility: view.resultsVisibility,
   ranking: view.ranking,
   showNominators: view.showNominators,
-  requiredRoleId: view.requiredRoleId,
+  requiredRoleIds: view.requiredRoleIds,
   lifecycle: view.lifecycle,
   schedule: scheduleDto(view.schedule),
   viewer: view.viewer,

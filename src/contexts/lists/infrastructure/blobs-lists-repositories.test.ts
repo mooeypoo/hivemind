@@ -35,7 +35,7 @@ const draft = newList(
     resultsVisibility: 'after-close',
     ranking: { strategy: 'bayesian', minVotes: 2 },
     showNominators: false,
-    requiredRoleId: null,
+    requiredRoleIds: [],
   },
   new Date('2026-03-01T00:00:00Z'),
 );
@@ -62,6 +62,27 @@ describe('Blobs lists repositories', () => {
     expect(await repo.save(published.value, stored?.version ?? null)).toBe(false);
     expect((await repo.get(listId))?.value).toEqual(published.value);
     expect(await repo.all()).toEqual([published.value]);
+  });
+
+  test('reads lists stored in the earlier v1 shape', async () => {
+    const store = blobs.store('lists-legacy');
+    const record = (requiredRoleId: string | null) => ({
+      v: 1,
+      id: 'old',
+      config: {
+        ...draft.config,
+        requiredRoleIds: undefined,
+        requiredRoleId,
+      },
+      schedule: null,
+      phase: 'draft',
+      createdAt: '2026-03-01T00:00:00.000Z',
+    });
+    await store.setJSON('list/old', record('123456'));
+    const repo = createBlobsListRepository(store);
+    expect((await repo.get('old' as ListId))?.value.config.requiredRoleIds).toEqual(['123456']);
+    await store.setJSON('list/old', record(null));
+    expect((await repo.get('old' as ListId))?.value.config.requiredRoleIds).toEqual([]);
   });
 
   test('a slug can be claimed by one list at a time', async () => {

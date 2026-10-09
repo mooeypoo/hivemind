@@ -4,6 +4,7 @@ import {
   lifecycleOf,
   mayParticipate,
   nominationsOpen,
+  underNominationCap,
   type Lifecycle,
   type List,
   type ListConfig,
@@ -51,9 +52,7 @@ export const toListView = (
     viewer: {
       canParticipate,
       canNominate:
-        canParticipate &&
-        nominationsOpen(list, now) &&
-        nominationsUsed < list.config.maxNominationsPerMember,
+        canParticipate && nominationsOpen(list, now) && underNominationCap(list, nominationsUsed),
       nominationsUsed,
     },
   };

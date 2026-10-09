@@ -40,12 +40,13 @@ export interface ListConfig {
   readonly itemSource: ItemSourceRef;
   readonly entryMode: EntryMode;
   readonly scale: Scale;
-  readonly maxNominationsPerMember: number;
+  /** Null: unlimited. */
+  readonly maxNominationsPerMember: number | null;
   readonly resultsVisibility: ResultsVisibility;
   readonly ranking: RankingConfig;
   readonly showNominators: boolean;
-  /** When set, only members holding this role may nominate (and, later, vote). */
-  readonly requiredRoleId: RoleId | null;
+  /** When non-empty, only members holding at least one of these roles may nominate and vote. */
+  readonly requiredRoleIds: readonly RoleId[];
 }
 
 export interface Schedule {
@@ -78,10 +79,11 @@ export const LIST_DEFAULTS = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
-  requiredRoleId: null,
+  requiredRoleIds: [],
 } as const satisfies Partial<ListConfig>;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MAX_REQUIRED_ROLES = 25;
 const isWhole = (value: number, min: number, max: number): boolean =>
   Number.isInteger(value) && value >= min && value <= max;
 const lengthWithin = (value: string, min: number, max: number): boolean =>
@@ -99,8 +101,13 @@ export const validateConfig = (config: ListConfig): Result<ListConfig, DomainErr
   if (!isWhole(min, 0, 100) || !isWhole(max, 0, 100) || min >= max) {
     problems.push('scale must be whole numbers from 0 to 100 with min below max');
   }
-  if (config.entryMode === 'nominations' && !isWhole(config.maxNominationsPerMember, 1, 50)) {
-    problems.push('maxNominationsPerMember must be a whole number from 1 to 50');
+  const cap = config.maxNominationsPerMember;
+  if (config.entryMode === 'nominations' && cap !== null && !isWhole(cap, 1, 50)) {
+    problems.push('maxNominationsPerMember must be a whole number from 1 to 50, or unlimited');
+  }
+  const roles = config.requiredRoleIds;
+  if (roles.length > MAX_REQUIRED_ROLES || new Set(roles).size !== roles.length) {
+    problems.push(`requiredRoleIds must list at most ${String(MAX_REQUIRED_ROLES)} distinct roles`);
   }
   if (!isWhole(config.ranking.minVotes, 0, 1000)) {
     problems.push('ranking.minVotes must be a whole number from 0 to 1000');
@@ -194,5 +201,11 @@ export const nominationsOpen = (list: List, now: Date): boolean =>
   lifecycleOf(list, now) === 'open' &&
   (list.schedule?.nominationsCloseAt == null || now < list.schedule.nominationsCloseAt);
 
+/** Everyone, unless the list requires roles; then any one of them. */
 export const mayParticipate = (list: List, roleIds: readonly RoleId[]): boolean =>
-  list.config.requiredRoleId === null || roleIds.includes(list.config.requiredRoleId);
+  list.config.requiredRoleIds.length === 0 ||
+  list.config.requiredRoleIds.some((role) => roleIds.includes(role));
+
+/** Whether a member who has used this many nominations may make another. */
+export const underNominationCap = (list: List, used: number): boolean =>
+  list.config.maxNominationsPerMember === null || used < list.config.maxNominationsPerMember;

@@ -41,7 +41,7 @@ const config: ListConfig = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 3 },
   showNominators: true,
-  requiredRoleId: null,
+  requiredRoleIds: [],
 };
 const at = (day: number) => new Date(Date.UTC(2026, 2, day));
 const schedule: Schedule = { opensAt: at(10), nominationsCloseAt: at(15), closesAt: at(20) };
@@ -217,6 +217,19 @@ describe('nominating', () => {
     expect(detail.ok && detail.value.entries).toHaveLength(2);
   });
 
+  test('with unlimited nominations, a member can keep nominating', async () => {
+    await openList({ maxNominationsPerMember: null });
+    for (const id of ['78', '603', '62', '1891']) {
+      expect((await nominate(ada, id)).ok).toBe(true);
+    }
+    const detail = await makeGetList(deps)(ada, { list: 'best-sci-fi' });
+    expect(detail.ok && detail.value.viewer).toEqual({
+      canParticipate: true,
+      canNominate: true,
+      nominationsUsed: 4,
+    });
+  });
+
   test('an item must exist in the source', async () => {
     await openList();
     const result = await nominate(ada, '999999');
@@ -224,7 +237,7 @@ describe('nominating', () => {
   });
 
   test('a list with a required role is closed to members without it', async () => {
-    await openList({ requiredRoleId: 'r-film' as RoleId });
+    await openList({ requiredRoleIds: ['r-film' as RoleId] });
     const denied = await nominate(ada, '78');
     expect(!denied.ok && denied.error.code).toBe('lists.role-required');
     expect((await nominate(actor('cy', { roles: ['r-film'] }), '78')).ok).toBe(true);

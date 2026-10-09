@@ -79,6 +79,39 @@ describe('ListEditor', () => {
     expect(editor.text()).toContain('Row 3: duplicates row 2.');
   });
 
+  test('sends unlimited nominations and several role IDs', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'POST /api/lists': () => Response.json(openTmdbList({ lifecycle: 'draft' }), { status: 201 }),
+    });
+    const editor = await mountAt('/admin/lists/new');
+    await editor.get('#title').setValue('Club picks');
+    await editor
+      .findAll('input[type=checkbox]')
+      .find((box) => box.element.closest('label')?.textContent.includes('Unlimited'))
+      ?.setValue(true);
+    expect((editor.get('#cap').element as HTMLInputElement).disabled).toBe(true);
+    await editor.get('#roles').setValue('900000000000000077, 900000000000000078');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      maxNominationsPerMember: null,
+      requiredRoleIds: ['900000000000000077', '900000000000000078'],
+    });
+  });
+
+  test('explains how to find a role ID when a role name is typed, and does not submit', async () => {
+    const calls = stubApi({ 'GET /api/catalog/sources': sources });
+    const editor = await mountAt('/admin/lists/new');
+    await editor.get('#title').setValue('Club picks');
+    await editor.get('#roles').setValue('Moderators');
+    expect(editor.text()).toContain('“Moderators” isn’t a role ID');
+    expect(editor.text()).toContain('Copy Role ID');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
   test('a scheduled list locks everything but the description and closing time', async () => {
     stubApi({
       'GET /api/catalog/sources': sources,

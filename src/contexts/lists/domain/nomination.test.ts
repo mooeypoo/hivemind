@@ -28,6 +28,16 @@ describe('nomination cap', () => {
     expect(!three.ok && three.error.code).toBe('lists.nomination-cap-reached');
   });
 
+  test('never blocks when nominations are unlimited', () => {
+    let current = ledger;
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      const next = reserve(current, e(id), null);
+      if (!next.ok) throw new Error('blocked');
+      current = next.value;
+    }
+    expect(current.entryIds).toHaveLength(6);
+  });
+
   test('releases a reservation, e.g. when the item was already nominated', () => {
     const one = reserve(ledger, e('a'), 1);
     expect(one.ok && release(one.value, e('a')).entryIds).toEqual([]);

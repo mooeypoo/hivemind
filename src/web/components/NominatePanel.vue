@@ -15,7 +15,11 @@ const props = defineProps<{ list: ListDetailDto }>();
 const emit = defineEmits<{ nominated: [entry: EntryDto] }>();
 
 const isFreeText = computed(() => props.list.itemSource.kind === 'freeform');
-const left = computed(() => props.list.maxNominationsPerMember - props.list.viewer.nominationsUsed);
+/** Nominations left, or null when they are unlimited. */
+const left = computed(() => {
+  const cap = props.list.maxNominationsPerMember;
+  return cap === null ? null : cap - props.list.viewer.nominationsUsed;
+});
 const inList = computed(
   () => new Set(props.list.entries.map((entry) => `${entry.item.source}:${entry.item.externalId}`)),
 );
@@ -27,7 +31,7 @@ const blocked = computed((): string | null => {
   if (lifecycle === 'scheduled' && schedule !== null) {
     return `Nominations open ${formatDateTime(schedule.opensAt)}.`;
   }
-  if (left.value <= 0) {
+  if (left.value !== null && left.value <= 0) {
     return `You’ve used all ${String(props.list.maxNominationsPerMember)} of your nominations.`;
   }
   if (!viewer.canNominate) return 'Nominations are closed for this list.';
@@ -110,7 +114,13 @@ const submitTitle = async () => {
     <p v-if="blocked !== null" class="notice">{{ blocked }}</p>
 
     <template v-else>
-      <p class="meta">{{ left }} of {{ list.maxNominationsPerMember }} nominations left.</p>
+      <p v-if="left === null" class="meta">
+        Nominate as many as you like.
+        <template v-if="list.viewer.nominationsUsed > 0">
+          You’ve nominated {{ list.viewer.nominationsUsed }} so far.
+        </template>
+      </p>
+      <p v-else class="meta">{{ left }} of {{ list.maxNominationsPerMember }} nominations left.</p>
 
       <form v-if="isFreeText" class="stack" @submit.prevent="submitTitle">
         <label for="nominate-title">Title</label>

@@ -28,11 +28,12 @@ const listConfigFields = {
   itemSource,
   entryMode: z.enum(['nominations', 'seeded']),
   scale: z.strictObject({ min: z.number().int(), max: z.number().int() }),
-  maxNominationsPerMember: z.number().int(),
+  /** Null: unlimited. */
+  maxNominationsPerMember: z.number().int().nullable(),
   resultsVisibility: z.enum(['live', 'after-close']),
   ranking: z.strictObject({ strategy: z.literal('bayesian'), minVotes: z.number().int() }),
   showNominators: z.boolean(),
-  requiredRoleId: roleId.nullable(),
+  requiredRoleIds: z.array(roleId).max(100),
 };
 
 export const createListBody = z.strictObject({
@@ -46,7 +47,7 @@ export const createListBody = z.strictObject({
   resultsVisibility: listConfigFields.resultsVisibility.default(LIST_DEFAULTS.resultsVisibility),
   ranking: listConfigFields.ranking.default(LIST_DEFAULTS.ranking),
   showNominators: listConfigFields.showNominators.default(LIST_DEFAULTS.showNominators),
-  requiredRoleId: listConfigFields.requiredRoleId.default(LIST_DEFAULTS.requiredRoleId),
+  requiredRoleIds: listConfigFields.requiredRoleIds.default([]),
 });
 
 export const editListBody = z

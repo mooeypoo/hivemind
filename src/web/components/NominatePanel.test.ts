@@ -118,6 +118,20 @@ describe('NominatePanel', () => {
     expect(panel.get('[role=alert]').text()).toContain('already in this list');
   });
 
+  test('with unlimited nominations, says so instead of counting down', () => {
+    const panel = mount(NominatePanel, {
+      props: {
+        list: openTmdbList({
+          maxNominationsPerMember: null,
+          viewer: { canParticipate: true, canNominate: true, nominationsUsed: 7 },
+        }),
+      },
+    });
+    expect(panel.text()).toContain('Nominate as many as you like.');
+    expect(panel.text()).toContain('You’ve nominated 7 so far.');
+    expect(panel.find('input[type=search]').exists()).toBe(true);
+  });
+
   test.each([
     [
       'the cap is reached',

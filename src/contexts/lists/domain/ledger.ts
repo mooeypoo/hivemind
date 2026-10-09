@@ -25,9 +25,10 @@ export const emptyLedger = (memberId: MemberId, listId: ListId): NominationLedge
 export const reserve = (
   ledger: NominationLedger,
   entryId: EntryId,
-  cap: number,
+  /** Null: unlimited. */
+  cap: number | null,
 ): Result<NominationLedger, DomainError> =>
-  ledger.entryIds.length >= cap
+  cap !== null && ledger.entryIds.length >= cap
     ? err(listsErrors.nominationCapReached)
     : ok({ ...ledger, entryIds: [...ledger.entryIds, entryId] });
 

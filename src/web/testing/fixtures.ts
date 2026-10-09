@@ -13,7 +13,7 @@ export const openTmdbList = (overrides: Partial<ListDetailDto> = {}): ListDetail
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
-  requiredRoleId: null,
+  requiredRoleIds: [],
   lifecycle: 'open',
   schedule: {
     opensAt: '2026-01-01T00:00:00.000Z',

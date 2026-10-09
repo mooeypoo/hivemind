@@ -108,12 +108,12 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 
 - Lifecycle: `draft → scheduled → open → closed → archived`. `draft` and `archived` are set explicitly. The other three are derived from the schedule and the Clock.
 - Schedule: `opensAt`, an optional `nominationsCloseAt`, and `closesAt`, with `opensAt < nominationsCloseAt ≤ closesAt`.
-- Config: `title`, `slug` (unique), `description`, `itemSource`, `entryMode` (`nominations` or `seeded`; seeded needs a preset), `scale` (default 1–10), `maxNominationsPerMember`, `resultsVisibility` (`live` or `after-close`), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and an optional `requiredRoleId`. Defaults for omitted fields are `LIST_DEFAULTS`.
+- Config: `title`, `slug` (unique), `description`, `itemSource`, `entryMode` (`nominations` or `seeded`; seeded needs a preset), `scale` (default 1–10), `maxNominationsPerMember` (null means unlimited), `resultsVisibility` (`live` or `after-close`), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and `requiredRoleIds` (empty means every member; otherwise a member needs any one of them, up to 25 roles). Defaults for omitted fields are `LIST_DEFAULTS`.
 - Only Admins create and edit lists. All of the config is editable in `draft`. Once a list is `scheduled` or `open`, only `description` and an extension of `closesAt` may change.
 - Scheduling publishes a draft; a list closes in the future. Archiving is allowed only once a list is closed.
 - Nominations are allowed while the list is open and before `nominationsCloseAt`, and never on a seeded list. A given item (`source` and `externalId`) can be nominated only once per list: the entry id derives from them and entries are created with `onlyIfNew`. Each member has a nomination cap, enforced by their nomination ledger; a duplicate gives the nomination back.
 - An entry snapshots the catalog item and the nominator's display name. `showNominators` decides whether members see that name.
-- Every list endpoint needs a signed-in member. Drafts exist only for Admins; everyone else gets not-found. `requiredRoleId` limits who may take part (nominate, and later vote), not who may view.
+- Every list endpoint needs a signed-in member. Drafts exist only for Admins; everyone else gets not-found. `requiredRoleIds` limit who may take part (nominate, and later vote), not who may view. Admins enter role IDs; the editor recognises a typed role name and explains how to copy the ID.
 
 **Voting**
 
@@ -121,7 +121,7 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 
 **Ranking**
 
-- Ranking is a pure function. The default is a Bayesian average, `(v/(v+m))·R + (m/(v+m))·C`, and entries with `v < m` are flagged `provisional`.
+- Ranking is a pure function. The default is a Bayesian average, `(v/(v+m))·R + (m/(v+m))·C`, and entries with `v < m` are flagged `provisional`. Provisional entries stay in their computed place on the leaderboard, tagged with how many more votes they need. `minVotes` never limits voting, which is open the whole time the list is.
 - The leaderboard is cached per list and rebuilt when its TTL expires or when a new entry is nominated. Scores alone do not invalidate it.
 - When `resultsVisibility = 'after-close'`, no aggregate numbers leave the server before `closesAt`.
 

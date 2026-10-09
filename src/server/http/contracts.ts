@@ -84,11 +84,13 @@ export interface ListConfigDto {
   /** `seeded`: every preset item is an entry from the start, and there are no nominations. */
   readonly entryMode: 'nominations' | 'seeded';
   readonly scale: { readonly min: number; readonly max: number };
-  readonly maxNominationsPerMember: number;
+  /** Null: unlimited. */
+  readonly maxNominationsPerMember: number | null;
   readonly resultsVisibility: 'live' | 'after-close';
   readonly ranking: { readonly strategy: 'bayesian'; readonly minVotes: number };
   readonly showNominators: boolean;
-  readonly requiredRoleId: string | null;
+  /** Empty: every member may take part. Otherwise, holders of any of these Discord role IDs. */
+  readonly requiredRoleIds: readonly string[];
 }
 
 /** ISO 8601 timestamps. */
