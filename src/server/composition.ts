@@ -46,6 +46,8 @@ export const createApp = (config: AppConfig, platform: Platform): App => {
     },
     admins: config.admins,
     sessionSecret: config.sessionSecret,
+    inviteCode: config.community.inviteCode,
+    communityName: config.community.name,
     contributors: [lists.personalData, voting.personalData],
   });
 

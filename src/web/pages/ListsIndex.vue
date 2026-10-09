@@ -7,9 +7,13 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import ListCard from '../components/ListCard.vue';
 import { isLoginOutcome, loginMessage } from '../lib/labels.ts';
 import { session } from '../state/session.ts';
+import { site } from '../state/site.ts';
+import CommunityBadge from '../components/CommunityBadge.vue';
+import { usePageTitle } from '../lib/page-title.ts';
 
 const siteName = import.meta.env.VITE_SITE_NAME;
 const route = useRoute();
+usePageTitle(() => (session.me === null ? null : 'Lists'));
 
 const loginNotice = computed(() => {
   const code = route.query.login;
@@ -36,8 +40,24 @@ onMounted(async () => {
       Make ranked lists together: nominate your favourites, rate everyone’s picks, and see what the
       community loves most.
     </p>
+    <p v-if="site.info?.community != null" class="hero__community">
+      For members of <CommunityBadge :community="site.info.community" />
+    </p>
     <p>Sign in with the Discord account you use in this community.</p>
-    <a class="button button--primary button--large" :href="loginUrl('/')">Sign in with Discord</a>
+    <div class="actions actions--center">
+      <a class="button button--primary button--large" :href="loginUrl('/')">Sign in with Discord</a>
+      <a
+        v-if="site.info?.community?.inviteUrl != null"
+        class="button button--large"
+        :href="site.info.community.inviteUrl"
+        rel="noopener"
+      >
+        Join the server
+      </a>
+    </div>
+    <p class="meta">
+      <RouterLink :to="{ name: 'privacy' }">What we store, and what we don’t</RouterLink>
+    </p>
   </section>
 
   <template v-else>

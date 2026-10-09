@@ -52,6 +52,16 @@ A common way to start: set only `ADMIN_MEMBER_IDS` to your own user ID. Add `ADM
 
 All of these IDs are long numbers, such as `1234567890123456789`. Admins listed in `ADMIN_MEMBER_IDS` still have to be members of the server to sign in.
 
+### Naming roles for moderators
+
+Role IDs are hard to remember. Once you're signed in as an Admin, open **Roles** (`/admin/roles`) and give each role you'll use a name, such as "Film Club" = `1234567890123456789`. Moderators then tick roles by name when they limit who can take part in a list. Someone still needs to copy each ID once (see above), and the page explains how.
+
+## Optional: show your server's name and icon
+
+Create an invite that never expires: in Discord, choose **Invite People** on your server, then **Edit invite link** → _Expire after: Never_. Put the code or the whole link in `DISCORD_INVITE_CODE`. The site then shows the server's name and icon, and a **Join the server** link on the sign-in page. It's read from Discord's public invite information, with no bot and no token. If the invite belongs to a different server than `DISCORD_GUILD_ID`, it's ignored.
+
+Without an invite, you can set `COMMUNITY_NAME` to show just a name.
+
 ## 4. Generate a session secret
 
 ```sh

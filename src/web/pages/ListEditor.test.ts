@@ -14,6 +14,7 @@ const mountAt = async (path: string) => {
       { path: '/admin/lists/new', name: 'new-list', component: ListEditor },
       { path: '/admin/lists/:slug', name: 'edit-list', component: ListEditor },
       { path: '/lists/:slug', name: 'list', component: Blank },
+      { path: '/admin/roles', name: 'roles', component: Blank },
     ],
   });
   await router.push(path);
@@ -24,6 +25,8 @@ const mountAt = async (path: string) => {
 };
 
 const sources = () => Response.json({ sources: ['tmdb-movie', 'freeform', 'preset'] });
+const roles = () =>
+  Response.json({ labels: [{ roleId: '900000000000000077', name: 'Film Club' }], version: 'v1' });
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -34,7 +37,7 @@ afterEach(() => {
 
 describe('ListEditor', () => {
   test('offers the sources this site has', async () => {
-    stubApi({ 'GET /api/catalog/sources': sources });
+    stubApi({ 'GET /api/catalog/sources': sources, 'GET /api/roles': roles });
     const editor = await mountAt('/admin/lists/new');
     expect(editor.findAll('input[name=source]').map((input) => input.attributes('value'))).toEqual([
       'tmdb-movie',
@@ -44,7 +47,7 @@ describe('ListEditor', () => {
   });
 
   test('the address follows the title until you edit it', async () => {
-    stubApi({ 'GET /api/catalog/sources': sources });
+    stubApi({ 'GET /api/catalog/sources': sources, 'GET /api/roles': roles });
     const editor = await mountAt('/admin/lists/new');
     await editor.get('#title').setValue('Best Sci-Fi Movies');
     expect((editor.get('#slug').element as HTMLInputElement).value).toBe('best-sci-fi-movies');
@@ -56,6 +59,7 @@ describe('ListEditor', () => {
   test('shows CSV problems row by row', async () => {
     stubApi({
       'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
       'POST /api/catalog/presets': () =>
         Response.json(
           {
@@ -79,42 +83,52 @@ describe('ListEditor', () => {
     expect(editor.text()).toContain('Row 3: duplicates row 2.');
   });
 
-  test('sends unlimited nominations and several role IDs', async () => {
+  test('sends unlimited nominations and the ticked roles', async () => {
     const calls = stubApi({
       'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
       'POST /api/lists': () => Response.json(openTmdbList({ lifecycle: 'draft' }), { status: 201 }),
     });
     const editor = await mountAt('/admin/lists/new');
     await editor.get('#title').setValue('Club picks');
-    await editor
-      .findAll('input[type=checkbox]')
-      .find((box) => box.element.closest('label')?.textContent.includes('Unlimited'))
-      ?.setValue(true);
+    const checkbox = (label: string) =>
+      editor
+        .findAll('input[type=checkbox]')
+        .find((box) => box.element.closest('label')?.textContent.includes(label));
+    await checkbox('Unlimited')?.setValue(true);
     expect((editor.get('#cap').element as HTMLInputElement).disabled).toBe(true);
-    await editor.get('#roles').setValue('900000000000000077, 900000000000000078');
+    await checkbox('Film Club')?.setValue(true);
     await editor.get('form').trigger('submit');
     await flushPromises();
     expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
       maxNominationsPerMember: null,
-      requiredRoleIds: ['900000000000000077', '900000000000000078'],
+      requiredRoleIds: ['900000000000000077'],
     });
   });
 
-  test('explains how to find a role ID when a role name is typed, and does not submit', async () => {
-    const calls = stubApi({ 'GET /api/catalog/sources': sources });
-    const editor = await mountAt('/admin/lists/new');
-    await editor.get('#title').setValue('Club picks');
-    await editor.get('#roles').setValue('Moderators');
-    expect(editor.text()).toContain('“Moderators” isn’t a role ID');
-    expect(editor.text()).toContain('Copy Role ID');
-    await editor.get('form').trigger('submit');
-    await flushPromises();
-    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  test('keeps a required role that has no name yet, and links to the Roles page', async () => {
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(
+          openTmdbList({ lifecycle: 'draft', requiredRoleIds: ['900000000000000099'] }),
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    const unnamed = editor
+      .findAll('input[type=checkbox]')
+      .find((box) =>
+        box.element.closest('label')?.textContent.includes('Unnamed role (900000000000000099)'),
+      );
+    expect((unnamed?.element as HTMLInputElement | undefined)?.checked).toBe(true);
+    expect(editor.text()).toContain('Name it on the Roles page');
   });
 
   test('a scheduled list locks everything but the description and closing time', async () => {
     stubApi({
       'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
       'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList({ lifecycle: 'scheduled' })),
     });
     const editor = await mountAt('/admin/lists/best-sci-fi');

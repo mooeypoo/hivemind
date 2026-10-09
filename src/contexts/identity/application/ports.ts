@@ -1,5 +1,7 @@
 import type { DomainError, MemberId, Result } from '../../../shared/kernel/index.ts';
+import type { CachedCommunity, Community } from '../domain/community.ts';
 import type { Member } from '../domain/member.ts';
+import type { RoleLabel } from '../domain/role-labels.ts';
 import type { Membership } from '../domain/membership.ts';
 import type { Session } from '../domain/session.ts';
 
@@ -45,4 +47,20 @@ export interface PersonalDataContributor {
   exportFor(memberId: MemberId): Promise<unknown>;
   /** An error stops the erasure; the member record is kept so they can try again. */
   eraseFor(memberId: MemberId): Promise<Result<void, DomainError>>;
+}
+
+/** Looks up the community's name and icon (from a Discord invite). */
+export interface CommunityLookup {
+  lookup(): Promise<Result<Community, DomainError>>;
+}
+
+export interface CommunityCache {
+  get(): Promise<CachedCommunity | null>;
+  put(cached: CachedCommunity): Promise<void>;
+}
+
+export interface RoleLabelRepository {
+  get(): Promise<{ readonly labels: readonly RoleLabel[]; readonly version: string } | null>;
+  /** Replaces the whole table if `expectedVersion` still matches (null: none saved yet). */
+  save(labels: readonly RoleLabel[], expectedVersion: string | null): Promise<boolean>;
 }

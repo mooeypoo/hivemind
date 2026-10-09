@@ -75,4 +75,11 @@ export const changeScoreBody = z.strictObject({
   score: z.number().nullable(),
 });
 
+export const saveRoleLabelsBody = z.strictObject({
+  labels: z
+    .array(z.strictObject({ roleId: z.string().max(100), name: z.string().max(200) }))
+    .max(200),
+  version: z.string().max(200).nullable(),
+});
+
 export const searchQuery = z.object({ q: z.string().max(200).default('') });

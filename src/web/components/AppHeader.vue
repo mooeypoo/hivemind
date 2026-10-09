@@ -2,11 +2,21 @@
 import { ref } from 'vue';
 import { api, loginUrl, navigation, type ApiError } from '../services/api.ts';
 import { session, signOut } from '../state/session.ts';
+import { site } from '../state/site.ts';
+import CommunityBadge from './CommunityBadge.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 const siteName = import.meta.env.VITE_SITE_NAME;
 const confirmingDelete = ref(false);
+const menu = ref<HTMLDetailsElement | null>(null);
+
+/** Escape closes the account menu and returns focus to its button. */
+const closeMenu = () => {
+  if (menu.value?.open !== true) return;
+  menu.value.open = false;
+  menu.value.querySelector('summary')?.focus();
+};
 const deleteError = ref<ApiError | null>(null);
 
 const deleteMyData = async () => {
@@ -23,10 +33,17 @@ const deleteMyData = async () => {
 
 <template>
   <header class="site-header">
-    <RouterLink to="/" class="site-header__name">{{ siteName }}</RouterLink>
+    <RouterLink to="/" class="site-header__name">
+      <CommunityBadge
+        v-if="site.info?.community != null && site.info.community.iconUrl !== null"
+        :community="site.info.community"
+        :show-name="false"
+      />
+      {{ siteName }}
+    </RouterLink>
     <nav v-if="session.loaded" class="site-header__nav" aria-label="Account">
       <template v-if="session.me !== null">
-        <details class="menu">
+        <details ref="menu" class="menu" @keydown.escape="closeMenu">
           <summary class="menu__trigger">
             <img :src="session.me.avatarUrl" alt="" class="avatar" width="32" height="32" />
             <span>{{ session.me.displayName }}</span>

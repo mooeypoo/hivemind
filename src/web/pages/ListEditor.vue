@@ -7,6 +7,8 @@ import type {
   ListDetailDto,
   ListDto,
   PresetImportedDto,
+  RoleLabelDto,
+  RoleLabelsDto,
   SourcesDto,
 } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
@@ -43,7 +45,8 @@ interface Form {
   minVotes: number;
   showNominators: boolean;
   /** Role IDs as typed: separated by commas, spaces or new lines. */
-  requiredRoleIds: string;
+  /** Ticked role IDs; none means every member may take part. */
+  requiredRoleIds: string[];
   /** `datetime-local` values, in the Admin's time zone. */
   opensAt: string;
   nominationsCloseAt: string;
@@ -66,7 +69,7 @@ const form = reactive<Form>({
   resultsVisibility: 'live',
   minVotes: 5,
   showNominators: true,
-  requiredRoleIds: '',
+  requiredRoleIds: [],
   opensAt: '',
   nominationsCloseAt: '',
   closesAt: '',
@@ -74,11 +77,15 @@ const form = reactive<Form>({
 
 const existing = ref<ListDto | null>(null);
 
-const roleTokens = computed(() =>
-  form.requiredRoleIds.split(/[\s,]+/).filter((token) => token !== ''),
-);
-/** Anything typed that isn't a role ID, most likely a role's name. */
-const notRoleIds = computed(() => roleTokens.value.filter((token) => !/^\d{5,25}$/.test(token)));
+const roleLabels = ref<readonly RoleLabelDto[]>([]);
+/** Named roles, plus any role a list already requires that has no name yet, so nothing is lost. */
+const roleChoices = computed(() => {
+  const named = new Set(roleLabels.value.map((label) => label.roleId));
+  const unnamed = form.requiredRoleIds
+    .filter((roleId) => !named.has(roleId))
+    .map((roleId) => ({ roleId, name: `Unnamed role (${roleId})` }));
+  return [...roleLabels.value, ...unnamed];
+});
 const sources = ref<readonly ItemSourceKind[]>([]);
 const error = ref<ApiError | null>(null);
 const status = ref('');
@@ -109,7 +116,7 @@ const fillFrom = (list: ListDto) => {
     resultsVisibility: list.resultsVisibility,
     minVotes: list.ranking.minVotes,
     showNominators: list.showNominators,
-    requiredRoleIds: list.requiredRoleIds.join(', '),
+    requiredRoleIds: [...list.requiredRoleIds],
     opensAt: list.schedule === null ? '' : toLocalInput(list.schedule.opensAt),
     nominationsCloseAt:
       list.schedule?.nominationsCloseAt == null
@@ -121,8 +128,12 @@ const fillFrom = (list: ListDto) => {
 
 const load = async () => {
   error.value = null;
-  const sourcesResult = await api.get<SourcesDto>('/api/catalog/sources');
+  const [sourcesResult, rolesResult] = await Promise.all([
+    api.get<SourcesDto>('/api/catalog/sources'),
+    api.get<RoleLabelsDto>('/api/roles'),
+  ]);
   if (sourcesResult.ok) sources.value = sourcesResult.data.sources;
+  if (rolesResult.ok) roleLabels.value = rolesResult.data.labels;
 
   if (routeSlug.value !== null) {
     const result = await api.get<ListDetailDto>(
@@ -179,7 +190,7 @@ const config = (): CreateListRequest => ({
   resultsVisibility: form.resultsVisibility,
   ranking: { strategy: 'bayesian', minVotes: form.minVotes },
   showNominators: form.showNominators,
-  requiredRoleIds: roleTokens.value,
+  requiredRoleIds: form.requiredRoleIds,
 });
 
 const run = async <T,>(
@@ -210,13 +221,11 @@ const afterSave = async (list: ListDto) => {
 };
 
 const create = async () => {
-  if (notRoleIds.value.length > 0) return;
   const list = await run(() => api.post<ListDto>('/api/lists', config()), 'Draft created.');
   if (list !== null) await afterSave(list);
 };
 
 const save = async () => {
-  if (notRoleIds.value.length > 0) return;
   if (existing.value === null) return;
   const body = locked.value
     ? {
@@ -235,7 +244,6 @@ const save = async () => {
 };
 
 const schedule = async () => {
-  if (notRoleIds.value.length > 0) return;
   if (existing.value === null) return;
   const id = existing.value.id;
   const saved = await run(() => api.put<ListDto>(`/api/lists/${id}`, config()), '');
@@ -455,29 +463,24 @@ const importCsv = async () => {
           Show who nominated each entry
         </label>
 
-        <label for="roles">Only members with these Discord roles (optional)</label>
-        <input
-          id="roles"
-          v-model="form.requiredRoleIds"
-          type="text"
-          autocomplete="off"
-          aria-describedby="roles-hint roles-problem"
-          :aria-invalid="notRoleIds.length > 0"
-        />
-        <p id="roles-hint" class="meta">
-          Leave empty to let every member take part. Otherwise paste role IDs, separated by commas;
-          anyone with at least one of them can take part.
-        </p>
-        <p
-          v-if="notRoleIds.length > 0"
-          id="roles-problem"
-          class="notice notice--error"
-          role="alert"
-        >
-          “{{ notRoleIds[0] }}” isn’t a role ID. Role IDs are long numbers, not names. In Discord,
-          turn on Developer Mode (User Settings → Advanced), then open Server Settings → Roles,
-          right-click the role and choose Copy Role ID.
-        </p>
+        <fieldset class="stack">
+          <legend class="legend--small">Who can take part</legend>
+          <p id="roles-hint" class="meta">
+            Leave every role unticked to let all members take part. Otherwise, members need at least
+            one of the ticked roles.
+          </p>
+          <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
+            <label v-for="role in roleChoices" :key="role.roleId" class="choice">
+              <input v-model="form.requiredRoleIds" type="checkbox" :value="role.roleId" />
+              {{ role.name }}
+            </label>
+          </div>
+          <p class="meta">
+            Role not listed?
+            <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
+            back.
+          </p>
+        </fieldset>
       </fieldset>
 
       <fieldset v-if="existing !== null" class="card stack" :disabled="finished">

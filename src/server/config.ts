@@ -14,6 +14,8 @@ export interface AppConfig {
   readonly sessionSecret: string;
   /** Null when no list uses the `tmdb-movie` source. */
   readonly tmdbReadToken: string | null;
+  /** How the site shows which Discord community it belongs to. Both optional. */
+  readonly community: { readonly inviteCode: string | null; readonly name: string | null };
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -41,6 +43,9 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     .filter((id) => id !== '');
   const sessionSecret = required('SESSION_SECRET');
   const tmdbReadToken = env.TMDB_READ_TOKEN?.trim() ?? '';
+  const inviteRaw = env.DISCORD_INVITE_CODE?.trim() ?? '';
+  const inviteCode = inviteRaw === '' ? null : inviteCodeFrom(inviteRaw);
+  const communityName = env.COMMUNITY_NAME?.trim() ?? '';
 
   if (siteUrl !== '' && !isOrigin(siteUrl)) {
     problems.push(
@@ -64,6 +69,13 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     problems.push(`SESSION_SECRET must be at least ${String(MIN_SECRET_LENGTH)} characters`);
   }
 
+  if (inviteRaw !== '' && inviteCode === null) {
+    problems.push(
+      'DISCORD_INVITE_CODE must be an invite code or link, like https://discord.gg/abc123',
+    );
+  }
+  if (communityName.length > 100) problems.push('COMMUNITY_NAME must be at most 100 characters');
+
   if (problems.length > 0) return err(problems);
   return ok({
     siteUrl,
@@ -71,6 +83,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     admins: { roleId: adminRoleId === '' ? null : adminRoleId, memberIds: adminMemberIds },
     sessionSecret,
     tmdbReadToken: tmdbReadToken === '' ? null : tmdbReadToken,
+    community: { inviteCode, name: communityName === '' ? null : communityName },
   });
 };
 
@@ -89,4 +102,16 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const isSecureOrLocal = (origin: string): boolean => {
   const url = new URL(origin);
   return url.protocol === 'https:' || LOCAL_HOSTS.has(url.hostname);
+};
+
+const INVITE_CODE = /^[A-Za-z0-9-]{2,64}$/;
+
+/** Accepts `abc123`, `discord.gg/abc123` or `https://discord.com/invite/abc123`. */
+const inviteCodeFrom = (raw: string): string | null => {
+  const match =
+    /^(?:https?:\/\/)?(?:www\.)?(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)?([^/?#\s]+)\/?$/.exec(
+      raw,
+    );
+  const code = match?.[1] ?? '';
+  return INVITE_CODE.test(code) ? code : null;
 };

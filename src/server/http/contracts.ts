@@ -186,3 +186,38 @@ export type LeaderboardDto =
       readonly minVotes: number;
       readonly rows: readonly LeaderboardRowDto[];
     };
+
+// ---- Site and roles ----
+
+export interface CommunityDto {
+  readonly name: string;
+  readonly iconUrl: string | null;
+  /** Join link, when the deployment configured an invite. */
+  readonly inviteUrl: string | null;
+}
+
+/** `GET /api/site` (public): what the footer and welcome page show. */
+export interface SiteDto {
+  /** Null when the deployment set neither an invite code nor a community name. */
+  readonly community: CommunityDto | null;
+  /** Whether movie lists (TMDB) are offered, for the attribution line. */
+  readonly offersMovieData: boolean;
+}
+
+export interface RoleLabelDto {
+  readonly roleId: string;
+  readonly name: string;
+}
+
+/** `GET` and `PUT /api/roles`: Admin-maintained names for Discord role IDs. */
+export interface RoleLabelsDto {
+  readonly labels: readonly RoleLabelDto[];
+  /** Send back when saving; a save based on an older version is refused. */
+  readonly version: string | null;
+}
+
+/** `PUT /api/roles` body. */
+export interface SaveRoleLabelsRequest {
+  readonly labels: readonly RoleLabelDto[];
+  readonly version: string | null;
+}

@@ -25,7 +25,8 @@ watch(
     <h2 class="dialog__title">{{ title }}</h2>
     <div class="dialog__body"><slot /></div>
     <div class="actions">
-      <button type="button" class="button" @click="emit('cancel')">Cancel</button>
+      <!-- Focus starts on the safe choice; the native modal dialog traps focus and restores it on close. -->
+      <button type="button" class="button" autofocus @click="emit('cancel')">Cancel</button>
       <button
         type="button"
         class="button"

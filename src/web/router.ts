@@ -33,6 +33,13 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
         component: () => import('./pages/ListEditor.vue'),
         meta: { member: true, admin: true },
       },
+      { path: '/privacy', name: 'privacy', component: () => import('./pages/PrivacyPage.vue') },
+      {
+        path: '/admin/roles',
+        name: 'roles',
+        component: () => import('./pages/RolesPage.vue'),
+        meta: { member: true, admin: true },
+      },
       { path: '/:rest(.*)*', name: 'not-found', component: () => import('./pages/NotFound.vue') },
     ],
     scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },

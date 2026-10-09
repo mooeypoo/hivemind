@@ -6,6 +6,11 @@ import { defineConfig } from 'vite';
 const siteName = process.env.VITE_SITE_NAME?.trim();
 process.env.VITE_SITE_NAME = siteName === undefined || siteName === '' ? 'Votable Lists' : siteName;
 
+// Where the source code lives (footer link). Forks set their own.
+const sourceUrl = process.env.VITE_SOURCE_URL?.trim();
+process.env.VITE_SOURCE_URL =
+  sourceUrl === undefined || sourceUrl === '' ? 'https://github.com/mooeypoo/hivemind' : sourceUrl;
+
 export default defineConfig({
   root: fileURLToPath(new URL('./src/web', import.meta.url)),
   plugins: [vue()],

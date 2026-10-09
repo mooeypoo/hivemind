@@ -11,6 +11,8 @@
   --text: #1d1b18;
   --muted: #5d5850;
   --border: #d9d5cc;
+  /* Boundaries of inputs and buttons: at least 3:1 against the page (WCAG 1.4.11). */
+  --control-border: #857f73;
   --accent: #4b3fd1;
   --accent-text: #ffffff;
   --accent-soft: #e8e6fb;
@@ -30,6 +32,7 @@
     --text: #f0eef6;
     --muted: #b3afc0;
     --border: #3a3846;
+    --control-border: #7f7b93;
     --accent: #9d93ff;
     --accent-text: #15141a;
     --accent-soft: #2e2a52;
@@ -227,7 +230,7 @@ img {
   gap: 0.4rem;
   min-height: 44px;
   padding: 0.5rem 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
@@ -287,7 +290,7 @@ textarea {
   width: 100%;
   min-height: 44px;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
@@ -649,7 +652,7 @@ legend {
   width: 100%;
   min-height: 44px;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
@@ -726,4 +729,113 @@ legend {
   .ranking__numbers {
     text-align: right;
   }
+}
+
+.legend--small {
+  font-size: 1rem;
+}
+
+/* Footer and community */
+
+.site-footer {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem var(--space) 2.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.site-footer p {
+  margin-bottom: 0.4rem;
+}
+
+.community {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  vertical-align: middle;
+}
+
+.community__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.community__name {
+  font-weight: 600;
+}
+
+.site-header__name {
+  gap: 0.5rem;
+}
+
+.hero__community {
+  font-size: 1.1rem;
+}
+
+.actions--center {
+  justify-content: center;
+}
+
+/* Prose pages */
+
+.prose {
+  max-width: 42rem;
+}
+
+.prose h2 {
+  margin-top: 1.75rem;
+}
+
+.prose ul {
+  padding-left: 1.25rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+}
+
+/* Roles table */
+
+.roles-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.roles-table th {
+  text-align: left;
+  padding: 0.25rem 0.5rem 0.25rem 0;
+}
+
+.roles-table td {
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  vertical-align: middle;
+}
+
+/* On narrow screens each role is a small stacked card, so the full role ID stays visible. */
+@media (max-width: 39.99rem) {
+  .roles-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .roles-table tr {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .roles-table td {
+    display: block;
+    padding: 0;
+  }
+}
+
+.hero .actions + .meta {
+  margin-top: 1rem;
 }

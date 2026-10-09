@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import type { BallotDto, ListDetailDto } from '../../server/http/contracts.ts';
+import type { BallotDto, ListDetailDto, RoleLabelsDto } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
 import EventCountdown from '../components/EventCountdown.vue';
 import EntryCard from '../components/EntryCard.vue';
@@ -14,6 +14,7 @@ import TmdbAttribution from '../components/TmdbAttribution.vue';
 import { sourceLabel } from '../lib/labels.ts';
 import { nextEvent } from '../lib/next-event.ts';
 import { session } from '../state/session.ts';
+import { usePageTitle } from '../lib/page-title.ts';
 
 const route = useRoute();
 const list = ref<ListDetailDto | null>(null);
@@ -36,6 +37,7 @@ const load = async () => {
   if (ballot.ok) scores.value = ballot.data.scores;
 };
 watch(() => route.params.slug, load, { immediate: true });
+usePageTitle(() => list.value?.title ?? null);
 
 const next = computed(() => (list.value === null ? null : nextEvent(list.value, new Date())));
 const showNominate = computed(
@@ -54,6 +56,29 @@ const listClosed = computed(
 const ratedCount = computed(
   () => list.value?.entries.filter((entry) => scores.value[entry.id] !== undefined).length ?? 0,
 );
+/** "the Film Club or Moderators role", from the Admins' role names where there are some. */
+const roleNames = ref<Readonly<Record<string, string>>>({});
+watch(
+  () => list.value?.requiredRoleIds.length ?? 0,
+  async (count) => {
+    if (count === 0) return;
+    const result = await api.get<RoleLabelsDto>('/api/roles');
+    if (result.ok) {
+      roleNames.value = Object.fromEntries(
+        result.data.labels.map((label) => [label.roleId, label.name]),
+      );
+    }
+  },
+);
+const requiredRolesText = computed(() => {
+  const ids = list.value?.requiredRoleIds ?? [];
+  const names = ids.map((id) => roleNames.value[id]).filter((name) => name !== undefined);
+  if (names.length !== ids.length || names.length === 0) return 'a particular role';
+  const joined =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} or ${String(names.at(-1))}`;
+  return `the ${String(joined)} role`;
+});
+
 const onScored = (ballot: BallotDto) => {
   scores.value = ballot.scores;
 };
@@ -98,7 +123,7 @@ const onScored = (ballot: BallotDto) => {
         you can see them.
       </p>
       <p v-else-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="meta">
-        This list is open only to members with a particular role, so you can’t rate it.
+        This list is open only to members with {{ requiredRolesText }}, so you can’t rate it.
       </p>
       <p v-if="list.entries.length === 0" class="empty">Nothing nominated yet.</p>
       <ul v-else class="entries">

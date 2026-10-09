@@ -17,6 +17,7 @@ export const testConfig: AppConfig = {
   admins: { roleId: ADMIN_ROLE_ID, memberIds: [SITE_ADMIN_ID] },
   sessionSecret: 'test-session-secret-at-least-32-chars',
   tmdbReadToken: 'tmdb-test-token',
+  community: { inviteCode: null, name: 'Test Community' },
 };
 
 /** Discord as the HTTP layer sees it: who is signing in, and whether they are in the server. */

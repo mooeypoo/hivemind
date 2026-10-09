@@ -93,6 +93,30 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('community', () => {
+    test.each([
+      ['abc123', 'abc123'],
+      ['https://discord.gg/abc123', 'abc123'],
+      ['discord.gg/abc123/', 'abc123'],
+      ['https://discord.com/invite/abc-123', 'abc-123'],
+    ])('reads the invite code from %j', (raw, code) => {
+      const result = loadConfig({ ...valid, DISCORD_INVITE_CODE: raw });
+      expect(result.ok && result.value.community.inviteCode).toBe(code);
+    });
+
+    test('rejects something that is not an invite', () => {
+      const result = loadConfig({ ...valid, DISCORD_INVITE_CODE: 'https://example.com/join/abc' });
+      expect(!result.ok && result.error).toEqual([
+        'DISCORD_INVITE_CODE must be an invite code or link, like https://discord.gg/abc123',
+      ]);
+    });
+
+    test('both settings are optional', () => {
+      const result = loadConfig(valid);
+      expect(result.ok && result.value.community).toEqual({ inviteCode: null, name: null });
+    });
+  });
+
   test('rejects a short session secret', () => {
     const result = loadConfig({ ...valid, SESSION_SECRET: 'short' });
     expect(!result.ok && result.error).toEqual(['SESSION_SECRET must be at least 32 characters']);
