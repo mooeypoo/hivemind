@@ -1,6 +1,8 @@
 # Discord setup
 
-Votable Lists signs people in with Discord. Only members of one Discord server can sign in, and holders of one role in that server are Admins. Each deployment registers its own Discord application. This takes about ten minutes, and you don't need a bot.
+hivemind signs people in with Discord. Only members of one Discord server can sign in, and holders of one role in that server are Admins. Each deployment registers its own Discord application. This takes about ten minutes, and you don't need a bot.
+
+Each deployment can have its own site display name, set with `VITE_SITE_NAME` in its environment. The default is hivemind.
 
 You will end up with these values:
 

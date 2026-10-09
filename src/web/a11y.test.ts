@@ -325,7 +325,7 @@ describe('site-wide content', () => {
       'Who owns what',
       'Questions',
     ]);
-    expect(document.title).toBe('Privacy · Votable Lists');
+    expect(document.title).toBe('Privacy · hivemind');
     wrapper.unmount();
   });
 
@@ -343,7 +343,7 @@ describe('site-wide content', () => {
 
   test('each page has its own title', async () => {
     const wrapper = await renderAt('/lists/best-sci-fi', true);
-    expect(document.title).toBe('Best Sci-Fi Movies · Votable Lists');
+    expect(document.title).toBe('Best Sci-Fi Movies · hivemind');
     wrapper.unmount();
   });
 });

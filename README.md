@@ -1,8 +1,8 @@
-# Votable Lists
+# hivemind
 
-Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate items into them, and rate those items. Each list ranks itself.
+hivemind is a platform for members of a Discord community to create ranked lists, nominate items, and rate them. Each deployment has its own site name, configured with `VITE_SITE_NAME` in its environment; if unset, the site is called hivemind.
 
-One deployment serves one Discord community. To run it for your own community, fork the repository and deploy your fork. Nothing community-specific lives in the code.
+Each list ranks itself. One deployment serves one Discord community. To run hivemind for your own community, fork the repository and deploy your fork. Nothing community-specific lives in the code.
 
 ## Deploy your own
 
