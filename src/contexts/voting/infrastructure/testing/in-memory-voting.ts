@@ -56,6 +56,8 @@ export class FakeListReader implements ListReader {
       isOpen: true,
       scale: { min: 1, max: 10 },
       requiredRoleIds: [],
+      scoresPublic: false,
+      namesWithScores: false,
       ...rules,
       entries: new Set(entries),
     });

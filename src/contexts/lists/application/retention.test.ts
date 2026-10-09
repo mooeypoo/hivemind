@@ -43,6 +43,7 @@ const listOf = (id: string, archived: boolean): List => {
       ranking: { strategy: 'bayesian', minVotes: 0 },
       showNominators: true,
       requiredRoleIds: [],
+      scoreVisibility: 'private',
     },
     new Date('2026-01-01T00:00:00Z'),
   );

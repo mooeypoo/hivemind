@@ -44,6 +44,7 @@ interface Form {
   maxNominationsPerMember: number;
   unlimitedNominations: boolean;
   resultsVisibility: 'live' | 'after-close';
+  scoreVisibility: 'private' | 'public';
   minVotes: number;
   showNominators: boolean;
   /** Role IDs as typed: separated by commas, spaces or new lines. */
@@ -73,6 +74,7 @@ const form = reactive<Form>({
   maxNominationsPerMember: 3,
   unlimitedNominations: false,
   resultsVisibility: 'live',
+  scoreVisibility: 'private',
   minVotes: 5,
   showNominators: true,
   requiredRoleIds: [],
@@ -124,6 +126,7 @@ const fillFrom = (list: ListDto) => {
     maxNominationsPerMember: list.maxNominationsPerMember ?? 3,
     unlimitedNominations: list.maxNominationsPerMember === null,
     resultsVisibility: list.resultsVisibility,
+    scoreVisibility: list.scoreVisibility,
     minVotes: list.ranking.minVotes,
     showNominators: list.showNominators,
     requiredRoleIds: [...list.requiredRoleIds],
@@ -202,6 +205,7 @@ const config = (): CreateListRequest => ({
   scale: { min: form.scaleMin, max: form.scaleMax },
   maxNominationsPerMember: form.unlimitedNominations ? null : form.maxNominationsPerMember,
   resultsVisibility: form.resultsVisibility,
+  scoreVisibility: form.scoreVisibility,
   ranking: { strategy: 'bayesian', minVotes: form.minVotes },
   showNominators: form.showNominators,
   requiredRoleIds: form.requiredRoleIds,
@@ -284,7 +288,7 @@ const schedule = async () => {
   if (list !== null) await afterSave(list);
 };
 
-const confirming = ref<'close' | 'archive' | null>(null);
+const confirming = ref<'close' | 'archive' | 'private-scores' | null>(null);
 
 const archive = async () => {
   if (existing.value === null) return;
@@ -315,6 +319,22 @@ const changeVisibility = async (visibility: 'public' | 'hidden') => {
       : 'Public: all members can see it.',
   );
   if (list !== null) existing.value = list;
+};
+
+const makeScoresPrivate = async () => {
+  if (existing.value === null) return;
+  const list = await run(
+    () =>
+      api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}/score-visibility`, {
+        scoreVisibility: 'private',
+      }),
+    'Scores are private now.',
+  );
+  confirming.value = null;
+  if (list !== null) {
+    existing.value = list;
+    form.scoreVisibility = 'private';
+  }
 };
 
 const readCsvFile = async (event: Event) => {
@@ -448,6 +468,33 @@ const importCsv = async () => {
 
       <fieldset class="card stack" :disabled="locked">
         <legend>Rating</legend>
+        <fieldset class="stack">
+          <legend class="legend--small">Scores</legend>
+          <div class="choices" role="radiogroup" aria-label="Score visibility">
+            <label class="choice">
+              <input
+                v-model="form.scoreVisibility"
+                type="radio"
+                name="score-visibility"
+                value="private"
+              />
+              Private: each member sees only their own score
+            </label>
+            <label class="choice">
+              <input
+                v-model="form.scoreVisibility"
+                type="radio"
+                name="score-visibility"
+                value="public"
+              />
+              Public: everyone can see who gave what score
+            </label>
+          </div>
+          <p class="meta">
+            Choose before publishing. Public scores appear when results do; after publishing, a
+            public list can only become private.
+          </p>
+        </fieldset>
         <div class="row">
           <div class="stack">
             <label for="scale-min">Lowest score</label>
@@ -654,6 +701,17 @@ const importCsv = async () => {
       aria-labelledby="status-heading"
     >
       <h2 id="status-heading">Status</h2>
+      <div v-if="existing.scoreVisibility === 'public'" class="stack">
+        <p class="meta">Scores on this list are public and may include names with scores.</p>
+        <button
+          type="button"
+          class="button"
+          :disabled="busy"
+          @click="confirming = 'private-scores'"
+        >
+          Make scores private
+        </button>
+      </div>
       <fieldset class="stack">
         <legend class="legend--small">Who can see this list</legend>
         <div class="choices">
@@ -720,6 +778,15 @@ const importCsv = async () => {
         Members won’t be able to nominate or change their scores. Scores become final and the
         results are shown, including results that were hidden until the end.
       </p>
+    </ConfirmDialog>
+    <ConfirmDialog
+      :open="confirming === 'private-scores'"
+      title="Make scores private?"
+      confirm-label="Make scores private"
+      @confirm="makeScoresPrivate"
+      @cancel="confirming = null"
+    >
+      <p>Members will no longer see who gave what score. This setting can’t be changed back.</p>
     </ConfirmDialog>
     <ConfirmDialog
       v-if="existing !== null"

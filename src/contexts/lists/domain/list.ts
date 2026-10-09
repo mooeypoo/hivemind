@@ -47,7 +47,14 @@ export interface ListConfig {
   readonly showNominators: boolean;
   /** When non-empty, only members holding at least one of these roles may nominate and vote. */
   readonly requiredRoleIds: readonly RoleId[];
+  /**
+   * `private`: each member sees only their own scores. `public`: members see who gave what,
+   * when results are visible. Chosen before publishing; afterwards it can only become private.
+   */
+  readonly scoreVisibility: ScoreVisibility;
 }
+
+export type ScoreVisibility = 'private' | 'public';
 
 export interface Schedule {
   /** From here, members can see the list, nominate and rate. */
@@ -88,6 +95,7 @@ export const LIST_DEFAULTS = {
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
   requiredRoleIds: [],
+  scoreVisibility: 'private',
 } as const satisfies Partial<ListConfig>;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -240,6 +248,19 @@ export const mayParticipate = (list: List, roleIds: readonly RoleId[]): boolean 
 /** Whether a member who has used this many nominations may make another. */
 export const underNominationCap = (list: List, used: number): boolean =>
   list.config.maxNominationsPerMember === null || used < list.config.maxNominationsPerMember;
+
+/**
+ * Scores can be made public only before publishing, so nobody's vote cast in private is ever
+ * revealed. Making them private is always allowed.
+ */
+export const changeScoreVisibility = (
+  list: List,
+  scoreVisibility: ScoreVisibility,
+  now: Date,
+): Result<List, DomainError> =>
+  scoreVisibility === 'public' && lifecycleOf(list, now) !== 'draft'
+    ? err(listsErrors.scoresPrivateOnly)
+    : ok({ ...list, config: { ...list.config, scoreVisibility } });
 
 /** Hidden lists exist only for Admins. */
 export const setVisibility = (list: List, visibility: Visibility): List => ({

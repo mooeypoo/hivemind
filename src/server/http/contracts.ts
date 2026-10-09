@@ -91,6 +91,11 @@ export interface ListConfigDto {
   readonly showNominators: boolean;
   /** Empty: every member may take part. Otherwise, holders of any of these Discord role IDs. */
   readonly requiredRoleIds: readonly string[];
+  /**
+   * `public`: members see who gave what score, when results are visible. Set before publishing;
+   * afterwards it can only become private.
+   */
+  readonly scoreVisibility: 'private' | 'public';
 }
 
 /** ISO 8601 timestamps. */
@@ -178,6 +183,16 @@ export interface ChangeScoreRequest {
   readonly entryId: string;
   readonly score: number | null;
 }
+
+/** `GET /api/lists/:list/scores`; names are returned only for visible public scores. */
+export type PublicScoresDto =
+  | { readonly visible: false }
+  | {
+      readonly visible: true;
+      readonly entries: Readonly<
+        Record<string, readonly { readonly displayName: string; readonly score: number }[]>
+      >;
+    };
 
 // ---- Ranking ----
 

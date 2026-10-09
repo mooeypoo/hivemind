@@ -34,6 +34,7 @@ const listConfigFields = {
   ranking: z.strictObject({ strategy: z.literal('bayesian'), minVotes: z.number().int() }),
   showNominators: z.boolean(),
   requiredRoleIds: z.array(roleId).max(100),
+  scoreVisibility: z.enum(['private', 'public']),
 };
 
 export const createListBody = z.strictObject({
@@ -48,6 +49,7 @@ export const createListBody = z.strictObject({
   ranking: listConfigFields.ranking.default(LIST_DEFAULTS.ranking),
   showNominators: listConfigFields.showNominators.default(LIST_DEFAULTS.showNominators),
   requiredRoleIds: listConfigFields.requiredRoleIds.default([]),
+  scoreVisibility: listConfigFields.scoreVisibility.default(LIST_DEFAULTS.scoreVisibility),
 });
 
 export const editListBody = z
@@ -63,6 +65,10 @@ export const scheduleBody = z.strictObject({
 });
 
 export const visibilityBody = z.strictObject({ visibility: z.enum(['public', 'hidden']) });
+
+export const scoreVisibilityBody = z.strictObject({
+  scoreVisibility: z.enum(['private', 'public']),
+});
 
 export const nominateBody = z.union([
   z.strictObject({ externalId: z.string().min(1).max(200) }),
@@ -95,7 +101,11 @@ const isoString = z.iso.datetime({ offset: true });
 
 const backupListPart = z.object({
   list: z.object({
-    config: z.object(listConfigFields),
+    // Backups made before score visibility existed had private scores.
+    config: z.object({
+      ...listConfigFields,
+      scoreVisibility: listConfigFields.scoreVisibility.default('private'),
+    }),
     schedule: z
       .object({
         opensAt: isoString,

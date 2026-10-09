@@ -19,6 +19,7 @@ const ballot = (listId: string, memberId: string, scores: Record<string, number>
   listId: listId as BallotListId,
   memberId: memberId as MemberId,
   scores,
+  voterName: null,
 });
 
 describe('Blobs ballot repository', () => {
@@ -35,6 +36,7 @@ describe('Blobs ballot repository', () => {
       listId: 'l1',
       memberId: 'm1',
       scores: { e1: 6 },
+      voterName: null,
     });
   });
 

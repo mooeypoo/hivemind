@@ -117,8 +117,9 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 
 - Lifecycle: `draft → scheduled → open → closed → archived`. `draft` and `archived` are set explicitly. The other three are derived from the schedule and the Clock; a list without an end date stays `open` until an Admin closes voting.
 - Schedule: `opensAt` (members can see the list, nominate and rate), an optional `nominationsCloseAt` (no new nominations; rating continues) and an optional `closesAt` (voting ends and scores are final; null means open-ended), with `opensAt < nominationsCloseAt ≤ closesAt` for whichever are set. A set `closesAt` must be in the future.
-- Config: `title`, `slug` (unique), `description`, `itemSource`, `entryMode` (`nominations` or `seeded`; seeded needs a preset), `scale` (default 1–10), `maxNominationsPerMember` (null means unlimited), `resultsVisibility` (`live` or `after-close`), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and `requiredRoleIds` (empty means every member; otherwise a member needs any one of them, up to 25 roles). Defaults for omitted fields are `LIST_DEFAULTS`.
+- Config: `title`, `slug` (unique), `description`, `itemSource`, `entryMode` (`nominations` or `seeded`; seeded needs a preset), `scale` (default 1–10), `maxNominationsPerMember` (null means unlimited), `resultsVisibility` (`live` or `after-close`), `scoreVisibility` (`private` or `public`, default private), `ranking` (`{ strategy: 'bayesian', minVotes }`), `showNominators`, and `requiredRoleIds` (empty means every member; otherwise a member needs any one of them, up to 25 roles). Defaults for omitted fields are `LIST_DEFAULTS`.
 - Only Admins create and edit lists. All of the config is editable in `draft`. Once a list is `scheduled` or `open`, only `description` and `closesAt` may change, and `closesAt` only to lengthen voting: later, removed (open-ended), or set in the future on an open-ended list.
+- Public score visibility must be selected before publishing. After publishing it can only change from public to private, never back. Public scores appear only when the list's results are visible.
 - **Close voting now** (Admins, open lists only) sets `closesAt` to now: scores become final and results waiting for the close are revealed.
 - **Archive** (Admins) works on any published list, at any time: voting and nominations end, the list becomes read-only with its final results. It can't be undone.
 - **Visibility** is `public` (all signed-in members) or `hidden` (only Admins; members get not-found everywhere, including voting and ranking). Admins change it at any time, even on archived lists; nothing is lost while hidden.
@@ -130,6 +131,7 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 **Voting**
 
 - Each member has one ballot per list. A score is an integer within the list's scale and must refer to an existing entry. Scores can be set or cleared only while the list is open, by members holding any of the list's `requiredRoleIds`.
+- A ballot stores the voter's display name only when its list chose public scores. `getPublicScores` requires a signed-in member and returns names with scores only when public scores and results are visible; it sorts scores high to low. Private lists return no public scores.
 - Voting reads lists only through its `ListReader` port (`rulesForVoting`, `entryExists` on the lists module). No use case or route returns another member's ballot.
 
 **Ranking**
@@ -160,35 +162,37 @@ Each context has its own store. A context never reads another context's store.
 
 Each route is one file in `netlify/functions` (`export default handle(endpoint)` plus `config.path` and `config.method`). Its endpoint lives in `src/server/http/endpoints/` and does three things: parse, call one use case, map the result. Wire types live in `contracts.ts`. API responses send `Cache-Control: no-store`.
 
-| Route                          | Method | Notes                                                                                    |
-| ------------------------------ | ------ | ---------------------------------------------------------------------------------------- |
-| `/api/auth/login`              | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord               |
-| `/api/auth/callback`           | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure     |
-| `/api/auth/logout`             | POST   | Clears the session cookie                                                                |
-| `/api/auth/demo`               | POST   | Demo mode only: `{ persona }` signs in as a pretend account and creates the sample lists |
-| `/api/me`                      | GET    | `MeDto`; 401 when signed out                                                             |
-| `/api/me/export`               | GET    | `MyDataExportDto` as a download                                                          |
-| `/api/me`                      | DELETE | Erases the member's data in every context and clears the session cookie                  |
-| `/api/catalog/sources`         | GET    | Admin: the item sources this site offers                                                 |
-| `/api/catalog/presets`         | POST   | Admin: import a CSV preset; errors by row                                                |
-| `/api/lists`                   | GET    | Lists the caller may see                                                                 |
-| `/api/lists`                   | POST   | Admin: create a draft                                                                    |
-| `/api/lists/:list`             | GET    | Detail with entries. `:list` is an id or a slug                                          |
-| `/api/lists/:list`             | PUT    | Admin: edit, within the lifecycle rules                                                  |
-| `/api/lists/:list/schedule`    | POST   | Admin: set the schedule and publish (seeds a seeded list)                                |
-| `/api/lists/:list/archive`     | POST   | Admin: archive a published list, at any time                                             |
-| `/api/lists/:list/close`       | POST   | Admin: close voting now on an open list                                                  |
-| `/api/lists/:list/visibility`  | PUT    | Admin: `{ visibility: 'public' \| 'hidden' }`, at any time                               |
-| `/api/lists/:list/search?q=`   | GET    | Search the list's item source while nominations are open                                 |
-| `/api/lists/:list/entries`     | POST   | Nominate `{ externalId }`, or `{ title }` for free text                                  |
-| `/api/lists/:list/ballot`      | GET    | The caller's own scores                                                                  |
-| `/api/lists/:list/ballot`      | PUT    | `{ entryId, score }` sets a score; `score: null` clears it                               |
-| `/api/lists/:list/leaderboard` | GET    | The leaderboard, or `{ hidden: true, revealsAt }` until an after-close list closes       |
-| `/api/site`                    | GET    | Public: the community (name, icon, invite) and whether movie data is offered             |
-| `/api/roles`                   | GET    | Role names, for members                                                                  |
-| `/api/roles`                   | PUT    | Admin: replace the role names; `{ labels, version }`, a stale version is refused         |
-| `/api/admin/backup`            | GET    | Admin: download a backup of every list, or `?list=<id or slug>` for one                  |
-| `/api/admin/backup`            | POST   | Admin: import a backup file (up to 5 MB); returns what was restored                      |
+| Route                               | Method | Notes                                                                                        |
+| ----------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| `/api/auth/login`                   | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord                   |
+| `/api/auth/callback`                | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure         |
+| `/api/auth/logout`                  | POST   | Clears the session cookie                                                                    |
+| `/api/auth/demo`                    | POST   | Demo mode only: `{ persona }` signs in as a pretend account and creates the sample lists     |
+| `/api/me`                           | GET    | `MeDto`; 401 when signed out                                                                 |
+| `/api/me/export`                    | GET    | `MyDataExportDto` as a download                                                              |
+| `/api/me`                           | DELETE | Erases the member's data in every context and clears the session cookie                      |
+| `/api/catalog/sources`              | GET    | Admin: the item sources this site offers                                                     |
+| `/api/catalog/presets`              | POST   | Admin: import a CSV preset; errors by row                                                    |
+| `/api/lists`                        | GET    | Lists the caller may see                                                                     |
+| `/api/lists`                        | POST   | Admin: create a draft                                                                        |
+| `/api/lists/:list`                  | GET    | Detail with entries. `:list` is an id or a slug                                              |
+| `/api/lists/:list`                  | PUT    | Admin: edit, within the lifecycle rules                                                      |
+| `/api/lists/:list/schedule`         | POST   | Admin: set the schedule and publish (seeds a seeded list)                                    |
+| `/api/lists/:list/archive`          | POST   | Admin: archive a published list, at any time                                                 |
+| `/api/lists/:list/close`            | POST   | Admin: close voting now on an open list                                                      |
+| `/api/lists/:list/visibility`       | PUT    | Admin: `{ visibility: 'public' \| 'hidden' }`, at any time                                   |
+| `/api/lists/:list/score-visibility` | PUT    | Admin: `{ scoreVisibility }`; choose either in draft, only public → private after publishing |
+| `/api/lists/:list/search?q=`        | GET    | Search the list's item source while nominations are open                                     |
+| `/api/lists/:list/entries`          | POST   | Nominate `{ externalId }`, or `{ title }` for free text                                      |
+| `/api/lists/:list/ballot`           | GET    | The caller's own scores                                                                      |
+| `/api/lists/:list/ballot`           | PUT    | `{ entryId, score }` sets a score; `score: null` clears it                                   |
+| `/api/lists/:list/scores`           | GET    | `{ visible: false }` or public names and scores, when results are visible                    |
+| `/api/lists/:list/leaderboard`      | GET    | The leaderboard, or `{ hidden: true, revealsAt }` until an after-close list closes           |
+| `/api/site`                         | GET    | Public: the community (name, icon, invite) and whether movie data is offered                 |
+| `/api/roles`                        | GET    | Role names, for members                                                                      |
+| `/api/roles`                        | PUT    | Admin: replace the role names; `{ labels, version }`, a stale version is refused             |
+| `/api/admin/backup`                 | GET    | Admin: download a backup of every list, or `?list=<id or slug>` for one                      |
+| `/api/admin/backup`                 | POST   | Admin: import a backup file (up to 5 MB); returns what was restored                          |
 
 Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
 
@@ -201,6 +205,7 @@ Request bodies are JSON, at most 256 KB, validated by zod with unknown keys reje
 - **Mobile-first and accessible:** semantic landmarks and a skip link, a label for every input, errors announced with `role="alert"`, visible focus, WCAG AA contrast, light and dark themes from `prefers-color-scheme`, 44 px touch targets, and no horizontal scrolling at 320 px.
 - Authorization stays in use cases. The UI hides what a member can't do (it reads `viewer` and `isAdmin`), but the server decides.
 - **Accessibility is tested.** `src/web/a11y.test.ts` mounts the whole app on every route in realistic states and runs axe (WCAG 2.1 A/AA and best practice); a new route or state gets a case there. `test/web/contrast.test.ts` checks every colour token pair in both themes (4.5:1 for text, 3:1 for control borders and focus). Each page sets its title with `usePageTitle`, and focus moves to the page on navigation.
+- The header's site menu links to Lists, About and Privacy. `/about` describes list participation, score visibility, the community and credits.
 - Logic worth testing goes in `lib/` as pure functions. Components are tested with `@vue/test-utils` in happy-dom (`// @vitest-environment happy-dom`).
 - Netlify serves `index.html` for any path that isn't a file or a function, so deep links work.
 
@@ -211,7 +216,7 @@ Request bodies are JSON, at most 256 KB, validated by zod with unknown keys reje
 - **Mutations.** Only `POST`, `PUT` or `DELETE`, and the `Origin` header must match `SITE_URL` in production. Outside production each deploy has its own address, so it must match the request's own origin (`app.siteOrigin(request)`): still a same-origin check.
 - **Authorization** lives in use cases, which receive an `Actor`. It never lives in handlers or in the UI.
 - **Validation.** zod at the boundary. The domain re-checks its own invariants regardless.
-- **Ballots are private.** The API returns the caller's own ballot plus aggregates, and never anyone else's scores.
+- **Ballots are private unless a list chose public scores before publishing; a published list can never switch from private to public.** Public scores are shown only after the list's results are visible, and only through the dedicated scores endpoint. The caller's ballot endpoint never returns anyone else's scores.
 - **Data minimization.** Store only the Discord ID, display name and avatar URL. `GET /api/me/export` and `DELETE /api/me` export and erase a member's data.
 - **Secrets** live only in Netlify environment variables. Nothing secret goes in `VITE_*`.
 - **Headers** in `netlify.toml`: a strict CSP whose `img-src` allows only the image hosts of the integrations in use (the Discord avatar CDN `cdn.discordapp.com`, and the TMDB image host for `tmdb-movie`). A new adapter that serves images adds its host here, HSTS, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and `Permissions-Policy`.

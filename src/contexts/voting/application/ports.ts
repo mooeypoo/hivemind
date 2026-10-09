@@ -6,6 +6,10 @@ export interface ListVotingRules {
   readonly isOpen: boolean;
   readonly scale: Scale;
   readonly requiredRoleIds: readonly RoleId[];
+  /** Public scores may be shown now (the list's scores are public and its results visible). */
+  readonly scoresPublic: boolean;
+  /** The list's scores are public at all: keep voters' names with their scores. */
+  readonly namesWithScores: boolean;
 }
 
 /** What voting asks lists (upstream). Implemented over the lists module in infrastructure. */

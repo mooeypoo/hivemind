@@ -17,6 +17,7 @@ interface SealedBallotsV1 {
   readonly ballots: readonly {
     readonly memberId: string;
     readonly scores: Readonly<Record<string, number>>;
+    readonly voterName?: string | null;
   }[];
 }
 
@@ -29,7 +30,7 @@ export const makeExportBallots =
     if (ballots.length === 0) return null;
     const payload: SealedBallotsV1 = {
       v: 1,
-      ballots: ballots.map(({ memberId, scores }) => ({ memberId, scores })),
+      ballots: ballots.map(({ memberId, scores, voterName }) => ({ memberId, scores, voterName })),
     };
     return deps.sealer.seal(payload);
   };
@@ -57,7 +58,11 @@ export const makeRestoreBallots =
     const membersLeftOut: string[] = [];
     for (const saved of opened.ballots as unknown[]) {
       // The file came from outside: check each ballot's shape before using it.
-      const candidate = saved as { memberId?: unknown; scores?: unknown } | null;
+      const candidate = saved as {
+        memberId?: unknown;
+        scores?: unknown;
+        voterName?: unknown;
+      } | null;
       if (
         typeof candidate?.memberId !== 'string' ||
         typeof candidate.scores !== 'object' ||
@@ -72,6 +77,7 @@ export const makeRestoreBallots =
       const ballot: Ballot = {
         listId: listId as BallotListId,
         memberId: candidate.memberId as MemberId,
+        voterName: typeof candidate.voterName === 'string' ? candidate.voterName : null,
         scores: Object.fromEntries(
           Object.entries(candidate.scores).filter((pair): pair is [string, number] =>
             Number.isInteger(pair[1]),

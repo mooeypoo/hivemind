@@ -20,6 +20,11 @@ export const listsErrors = {
     'lists.not-published',
     'Only a published list can be archived.',
   ),
+  scoresPrivateOnly: domainError(
+    'invalid',
+    'lists.scores-private-only',
+    'Scores can only be made public before the list is published.',
+  ),
   notOpen: domainError(
     'invalid',
     'lists.not-open',

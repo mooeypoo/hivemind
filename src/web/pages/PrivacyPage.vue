@@ -29,8 +29,10 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         who nominated what (if the list shows nominators).
       </li>
       <li>
-        <strong>Your scores.</strong> They are private: nobody else, Admins included, can see your
-        scores. The leaderboard only uses totals and averages, never who gave which score.
+        <strong>Your scores.</strong> They are private unless a list says its scores are public.
+        Public lists say so before you vote; other members can then see the score you gave each
+        entry when results are visible. The leaderboard otherwise uses totals and averages. Making a
+        list private hides its public scores, and deleting your data removes your scores and name.
       </li>
       <li v-if="site.info?.offersMovieData !== false">
         <strong>Details of nominated movies</strong> (title, year, poster address) from TMDB. These
@@ -81,7 +83,8 @@ const siteName = import.meta.env.VITE_SITE_NAME;
     <p>
       The site’s Admins can download backups of the lists, to restore them if something goes wrong.
       A backup holds the lists, their entries, and nominators’ names and Discord IDs. Your scores
-      are sealed inside it: nobody who has the file, Admins included, can see how you voted.
+      (including any name attached to a public score) are sealed inside it: nobody who has the file,
+      Admins included, can see how you voted.
     </p>
     <p>
       When you delete your data, the site keeps a one-way fingerprint of your ID for two years, and

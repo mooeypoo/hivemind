@@ -22,6 +22,7 @@ export const seedFirstList = async (app: App): Promise<'created' | 'exists'> => 
     ranking: { strategy: 'bayesian', minVotes: 5 },
     showNominators: true,
     requiredRoleIds: [],
+    scoreVisibility: 'private',
   });
   if (!created.ok) throw new Error(`Could not create the list: ${created.error.message}`);
   return 'created';

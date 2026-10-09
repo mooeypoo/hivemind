@@ -22,12 +22,18 @@ export interface Ballot {
   readonly listId: BallotListId;
   readonly memberId: MemberId;
   readonly scores: Readonly<Record<string, number>>;
+  /**
+   * The voter's display name, kept only on lists with public scores (so others can see who gave
+   * what). Null on private lists: nothing more is stored than needed.
+   */
+  readonly voterName: string | null;
 }
 
 export const emptyBallot = (listId: BallotListId, memberId: MemberId): Ballot => ({
   listId,
   memberId,
   scores: {},
+  voterName: null,
 });
 
 export const scoreOutOfRange = (scale: Scale): DomainError =>

@@ -12,7 +12,7 @@ export type { Config } from '@netlify/functions';
 export { authCallback, authLogin, authLogout, demoSignIn } from './http/endpoints/auth.ts';
 export { deleteMyData, exportMyData, getMe } from './http/endpoints/me.ts';
 export { availableSources, importPreset } from './http/endpoints/catalog.ts';
-export { changeScore, getMyBallot } from './http/endpoints/voting.ts';
+export { changeScore, getMyBallot, getPublicScores } from './http/endpoints/voting.ts';
 export { getLeaderboard } from './http/endpoints/ranking.ts';
 export { exportBackup, importBackup } from './http/endpoints/backup.ts';
 export { getRoleLabels, getSite, saveRoleLabels } from './http/endpoints/site.ts';
@@ -27,6 +27,7 @@ export {
   scheduleList,
   searchForList,
   setVisibility,
+  setScoreVisibility,
 } from './http/endpoints/lists.ts';
 
 /**

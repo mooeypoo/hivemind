@@ -31,6 +31,7 @@ import {
   nominate,
   scheduleList,
   searchForList,
+  setScoreVisibility,
   setVisibility,
 } from './lists.ts';
 import { deleteMyData, exportMyData } from './me.ts';
@@ -294,6 +295,76 @@ describe('list settings', () => {
     });
     expect(result.status).toBe(422);
     expect(result.body.error.details).toEqual(['requiredRoleIds.0: must be a Discord role ID']);
+  });
+
+  test('public scores are selected on a draft and can only be disabled after publishing', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Rated games',
+      slug: 'rated-games',
+      itemSource: { kind: 'freeform' },
+    });
+    const enabled = await call<ListDto>(
+      setScoreVisibility,
+      'PUT',
+      `/api/lists/${created.body.id}/score-visibility`,
+      admin,
+      { scoreVisibility: 'public' },
+    );
+    expect(enabled.body.scoreVisibility).toBe('public');
+    expect(
+      (
+        await call(
+          setScoreVisibility,
+          'PUT',
+          `/api/lists/${created.body.id}/score-visibility`,
+          ada,
+          {
+            scoreVisibility: 'private',
+          },
+        )
+      ).status,
+    ).toBe(403);
+
+    const published = await call<ListDto>(
+      scheduleList,
+      'POST',
+      `/api/lists/${created.body.id}/schedule`,
+      admin,
+      { opensAt: OPENS, nominationsCloseAt: null, closesAt: CLOSES },
+    );
+    expect(published.body.scoreVisibility).toBe('public');
+    expect(
+      (
+        await call<ErrorDto>(
+          setScoreVisibility,
+          'PUT',
+          `/api/lists/${created.body.id}/score-visibility`,
+          admin,
+          { scoreVisibility: 'public' },
+        )
+      ).body.error.code,
+    ).toBe('lists.scores-private-only');
+    const madePrivate = await call<ListDto>(
+      setScoreVisibility,
+      'PUT',
+      `/api/lists/${created.body.id}/score-visibility`,
+      admin,
+      { scoreVisibility: 'private' },
+    );
+    expect(madePrivate.body.scoreVisibility).toBe('private');
+    expect(
+      (
+        await call(
+          setScoreVisibility,
+          'PUT',
+          `/api/lists/${created.body.id}/score-visibility`,
+          admin,
+          {
+            scoreVisibility: 'public',
+          },
+        )
+      ).status,
+    ).toBe(422);
   });
 });
 

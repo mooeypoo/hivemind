@@ -40,7 +40,9 @@ export const makeChangeScore =
 
     return withConflictRetry(async () => {
       const current = await deps.ballots.get(rules.listId, member.memberId);
-      const ballot = current?.ballot ?? emptyBallot(rules.listId, member.memberId);
+      const existing = current?.ballot ?? emptyBallot(rules.listId, member.memberId);
+      // Names are kept only where scores are public.
+      const ballot = { ...existing, voterName: rules.namesWithScores ? member.displayName : null };
       const changed =
         input.score === null
           ? ok(clearScore(ballot, entryId))

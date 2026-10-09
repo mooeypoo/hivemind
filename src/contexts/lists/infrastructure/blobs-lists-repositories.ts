@@ -27,8 +27,9 @@ interface ScheduleRecord {
   readonly closesAt: string | null;
 }
 
-type ConfigRecord = Omit<ListConfig, 'requiredRoleIds'> & {
+type ConfigRecord = Omit<ListConfig, 'requiredRoleIds' | 'scoreVisibility'> & {
   readonly requiredRoleIds: readonly string[];
+  readonly scoreVisibility?: ListConfig['scoreVisibility'];
 };
 
 /** v2: several required roles and an optional nomination cap. */
@@ -123,7 +124,12 @@ const listFromRecord = (data: unknown): List => {
   const record = upgradeList(data);
   return {
     id: record.id as ListId,
-    config: { ...record.config, requiredRoleIds: record.config.requiredRoleIds as RoleId[] },
+    config: {
+      ...record.config,
+      requiredRoleIds: record.config.requiredRoleIds as RoleId[],
+      // Added after v2 shipped: lists stored before it had private scores.
+      scoreVisibility: record.config.scoreVisibility ?? 'private',
+    },
     schedule: scheduleFromRecord(record.schedule),
     phase: record.phase,
     createdAt: new Date(record.createdAt),

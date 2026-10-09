@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { LeaderboardDto } from '../../server/http/contracts.ts';
+import type { LeaderboardDto, PublicScoresDto } from '../../server/http/contracts.ts';
 import { stubApi } from '../testing/fixtures.ts';
 import LeaderboardPanel from './LeaderboardPanel.vue';
 
@@ -13,9 +13,15 @@ const item = (title: string) => ({
   imageUrl: null,
 });
 
-const mountWith = async (board: LeaderboardDto, myScores: Record<string, number> = {}) => {
+const mountWith = async (
+  board: LeaderboardDto,
+  myScores: Record<string, number> = {},
+  publicScores?: PublicScoresDto,
+) => {
   stubApi({ 'GET /api/lists/games/leaderboard': () => Response.json(board) });
-  const panel = mount(LeaderboardPanel, { props: { list: 'games', myScores } });
+  const panel = mount(LeaderboardPanel, {
+    props: { list: 'games', myScores, ...(publicScores === undefined ? {} : { publicScores }) },
+  });
   await flushPromises();
   return panel;
 };
@@ -109,5 +115,31 @@ describe('LeaderboardPanel', () => {
       ],
     });
     expect(panel.text()).toContain('No votes yet.');
+  });
+
+  test('shows a voter disclosure under each ranked entry when scores are public', async () => {
+    const panel = await mountWith(
+      {
+        hidden: false,
+        computedAt: new Date().toISOString(),
+        minVotes: 1,
+        rows: [
+          {
+            rank: 1,
+            entryId: 'a',
+            item: item('Root'),
+            score: 9,
+            votes: 1,
+            provisional: false,
+            votesNeeded: 0,
+          },
+        ],
+      },
+      {},
+      { visible: true, entries: { a: [{ displayName: 'Ada', score: 9 }] } },
+    );
+    expect(panel.find('.ranking__title').text()).toContain('Who voted (1)');
+    panel.find('.public-scores summary').element.dispatchEvent(new Event('click'));
+    expect(panel.text()).toContain('Ada: 9');
   });
 });

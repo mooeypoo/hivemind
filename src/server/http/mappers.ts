@@ -23,6 +23,7 @@ export const listDto = (view: ListView): ListDto => ({
   ranking: view.ranking,
   showNominators: view.showNominators,
   requiredRoleIds: view.requiredRoleIds,
+  scoreVisibility: view.scoreVisibility,
   lifecycle: view.lifecycle,
   visibility: view.visibility,
   schedule: scheduleDto(view.schedule),

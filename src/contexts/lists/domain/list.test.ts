@@ -2,9 +2,11 @@ import { describe, expect, test } from 'vitest';
 import type { RoleId } from '../../../shared/kernel/index.ts';
 import {
   archive,
+  changeScoreVisibility,
   closeVoting,
   DEFAULT_SCALE,
   editList,
+  LIST_DEFAULTS,
   lifecycleOf,
   mayParticipate,
   newList,
@@ -31,6 +33,7 @@ const config: ListConfig = {
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
   requiredRoleIds: [],
+  scoreVisibility: 'private',
 };
 const schedule: Schedule = {
   opensAt: t('10T00:00:00'),
@@ -290,5 +293,38 @@ describe('closing voting', () => {
 describe('visibility', () => {
   test('a new list is public', () => {
     expect(draft.visibility).toBe('public');
+  });
+});
+
+describe('score visibility', () => {
+  test('scores are private unless a list chooses otherwise', () => {
+    expect(LIST_DEFAULTS.scoreVisibility).toBe('private');
+  });
+
+  test('a draft can make its scores public or private', () => {
+    const made = changeScoreVisibility(draft, 'public', t('01T00:00:00'));
+    expect(made.ok && made.value.config.scoreVisibility).toBe('public');
+  });
+
+  test.each([
+    ['scheduled', '05T00:00:00'],
+    ['open', '12T00:00:00'],
+    ['closed', '21T00:00:00'],
+  ])('a %s list can make public scores private, never private scores public', (_, at) => {
+    const publicDraft = changeScoreVisibility(draft, 'public', t('01T00:00:00'));
+    if (!publicDraft.ok) throw new Error('fixture');
+    const live = publish(publicDraft.value, schedule, t('01T00:00:00'));
+    if (!live.ok) throw new Error('fixture');
+    const toPrivate = changeScoreVisibility(live.value, 'private', t(at));
+    expect(toPrivate.ok && toPrivate.value.config.scoreVisibility).toBe('private');
+    const backToPublic = toPrivate.ok
+      ? changeScoreVisibility(toPrivate.value, 'public', t(at))
+      : toPrivate;
+    expect(!backToPublic.ok && backToPublic.error.code).toBe('lists.scores-private-only');
+  });
+
+  test('editing a published list cannot make its scores public', () => {
+    const result = editList(published(), { scoreVisibility: 'public' }, t('12T00:00:00'));
+    expect(!result.ok && result.error.details).toEqual(['scoreVisibility']);
   });
 });

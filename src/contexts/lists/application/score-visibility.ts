@@ -1,0 +1,32 @@
+import {
+  err,
+  ok,
+  requireAdmin,
+  withConflictRetry,
+  type Actor,
+  type Clock,
+  type DomainError,
+  type Result,
+} from '../../../shared/kernel/index.ts';
+import { listsErrors } from '../domain/errors.ts';
+import { changeScoreVisibility, type ScoreVisibility } from '../domain/list.ts';
+import { findList } from './find-list.ts';
+import type { ListRepository, SlugIndex } from './ports.ts';
+import { toListView, type ListView } from './views.ts';
+
+/** Admins choose public or private scores: either way in a draft, only to private after. */
+export const makeSetScoreVisibility =
+  (deps: { readonly lists: ListRepository; readonly slugs: SlugIndex; readonly clock: Clock }) =>
+  (actor: Actor, input: { readonly list: string; readonly scoreVisibility: ScoreVisibility }) =>
+    withConflictRetry(async (): Promise<Result<ListView, DomainError>> => {
+      const admin = requireAdmin(actor);
+      if (!admin.ok) return admin;
+      const found = await findList(deps, admin.value, input.list);
+      if (!found.ok) return found;
+      const now = deps.clock.now();
+      const changed = changeScoreVisibility(found.value.value, input.scoreVisibility, now);
+      if (!changed.ok) return changed;
+      if (!(await deps.lists.save(changed.value, found.value.version)))
+        return err(listsErrors.conflict);
+      return ok(toListView(changed.value, admin.value, now, 0));
+    });

@@ -11,6 +11,7 @@ export const openTmdbList = (overrides: Partial<ListDetailDto> = {}): ListDetail
   scale: { min: 1, max: 10 },
   maxNominationsPerMember: 3,
   resultsVisibility: 'live',
+  scoreVisibility: 'private',
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
   requiredRoleIds: [],

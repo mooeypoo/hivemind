@@ -1,7 +1,7 @@
 import type { App } from '../../composition.ts';
 import { actorOf } from '../auth.ts';
 import { listParam, readJson } from '../body.ts';
-import type { BallotDto } from '../contracts.ts';
+import type { BallotDto, PublicScoresDto } from '../contracts.ts';
 import { rejectForeignOrigin } from '../origin.ts';
 import { domainErrorResponse, json } from '../respond.ts';
 import { changeScoreBody } from '../schemas.ts';
@@ -29,4 +29,14 @@ export const changeScore = async (request: Request, app: App): Promise<Response>
   if (!result.ok) return domainErrorResponse(result.error);
   const ballot: BallotDto = result.value;
   return json(ballot);
+};
+
+/** `GET /api/lists/:list/scores` */
+export const getPublicScores = async (request: Request, app: App): Promise<Response> => {
+  const result = await app.voting.getPublicScores(await actorOf(request, app), {
+    list: listParam(request),
+  });
+  if (!result.ok) return domainErrorResponse(result.error);
+  const body: PublicScoresDto = result.value;
+  return json(body);
 };

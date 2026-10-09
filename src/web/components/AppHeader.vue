@@ -10,12 +10,13 @@ import ErrorNotice from './ErrorNotice.vue';
 const siteName = import.meta.env.VITE_SITE_NAME;
 const confirmingDelete = ref(false);
 const menu = ref<HTMLDetailsElement | null>(null);
+const siteMenu = ref<HTMLDetailsElement | null>(null);
 
-/** Escape closes the account menu and returns focus to its button. */
-const closeMenu = () => {
-  if (menu.value?.open !== true) return;
-  menu.value.open = false;
-  menu.value.querySelector('summary')?.focus();
+/** Escape closes an open menu and returns focus to its button. */
+const closeMenu = (element: HTMLDetailsElement | null) => {
+  if (element?.open !== true) return;
+  element.open = false;
+  element.querySelector('summary')?.focus();
 };
 const deleteError = ref<ApiError | null>(null);
 
@@ -41,9 +42,17 @@ const deleteMyData = async () => {
       />
       {{ siteName }}
     </RouterLink>
-    <nav v-if="session.loaded" class="site-header__nav" aria-label="Account">
-      <template v-if="session.me !== null">
-        <details ref="menu" class="menu" @keydown.escape="closeMenu">
+    <nav class="site-header__nav" aria-label="Site and account">
+      <details ref="siteMenu" class="menu site-menu" @keydown.escape="closeMenu(siteMenu)">
+        <summary class="menu__trigger">Menu</summary>
+        <div class="menu__panel">
+          <RouterLink class="menu__item" :to="{ name: 'lists' }">Lists</RouterLink>
+          <RouterLink class="menu__item" :to="{ name: 'about' }">About</RouterLink>
+          <RouterLink class="menu__item" :to="{ name: 'privacy' }">Privacy</RouterLink>
+        </div>
+      </details>
+      <template v-if="session.loaded && session.me !== null">
+        <details ref="menu" class="menu" @keydown.escape="closeMenu(menu)">
           <summary class="menu__trigger">
             <img :src="session.me.avatarUrl" alt="" class="avatar" width="32" height="32" />
             <span>{{ session.me.displayName }}</span>
@@ -65,7 +74,9 @@ const deleteMyData = async () => {
           </div>
         </details>
       </template>
-      <a v-else class="button button--primary" :href="loginUrl()">Sign in with Discord</a>
+      <a v-else-if="session.loaded" class="button button--primary" :href="loginUrl()"
+        >Sign in with Discord</a
+      >
     </nav>
   </header>
 

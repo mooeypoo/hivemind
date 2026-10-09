@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import type { BallotDto, ListDetailDto, RoleLabelsDto } from '../../server/http/contracts.ts';
+import type {
+  BallotDto,
+  ListDetailDto,
+  PublicScoresDto,
+  RoleLabelsDto,
+} from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
 import EventCountdown from '../components/EventCountdown.vue';
 import EntryCard from '../components/EntryCard.vue';
@@ -11,6 +16,7 @@ import NominatePanel from '../components/NominatePanel.vue';
 import ScorePicker from '../components/ScorePicker.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import TmdbAttribution from '../components/TmdbAttribution.vue';
+import PublicScoreDisclosure from '../components/PublicScoreDisclosure.vue';
 import { sourceLabel } from '../lib/labels.ts';
 import { nextEvent } from '../lib/next-event.ts';
 import { session } from '../state/session.ts';
@@ -21,12 +27,14 @@ const list = ref<ListDetailDto | null>(null);
 const error = ref<ApiError | null>(null);
 /** The caller's own scores, by entry id. Nobody else's are ever loaded. */
 const scores = ref<Readonly<Record<string, number>>>({});
+const publicScores = ref<PublicScoresDto>({ visible: false });
 
 const load = async () => {
   const slug = encodeURIComponent(String(route.params.slug));
-  const [detail, ballot] = await Promise.all([
+  const [detail, ballot, attribution] = await Promise.all([
     api.get<ListDetailDto>(`/api/lists/${slug}`),
     api.get<BallotDto>(`/api/lists/${slug}/ballot`),
+    api.get<PublicScoresDto>(`/api/lists/${slug}/scores`),
   ]);
   if (detail.ok) {
     list.value = detail.data;
@@ -35,6 +43,7 @@ const load = async () => {
     error.value = detail.error;
   }
   if (ballot.ok) scores.value = ballot.data.scores;
+  if (attribution.ok) publicScores.value = attribution.data;
 };
 watch(() => route.params.slug, load, { immediate: true });
 usePageTitle(() => list.value?.title ?? null);
@@ -81,6 +90,10 @@ const requiredRolesText = computed(() => {
 
 const onScored = (ballot: BallotDto) => {
   scores.value = ballot.scores;
+  const slug = encodeURIComponent(String(route.params.slug));
+  void api.get<PublicScoresDto>(`/api/lists/${slug}/scores`).then((result) => {
+    if (result.ok) publicScores.value = result.data;
+  });
 };
 </script>
 
@@ -115,7 +128,12 @@ const onScored = (ballot: BallotDto) => {
       Voting stays open until an Admin closes it.
     </p>
 
-    <LeaderboardPanel v-if="listClosed" :list="list.slug" :my-scores="scores" />
+    <LeaderboardPanel
+      v-if="listClosed"
+      :list="list.slug"
+      :my-scores="scores"
+      :public-scores="publicScores"
+    />
 
     <NominatePanel v-if="showNominate" :list="list" @nominated="load" />
 
@@ -124,9 +142,17 @@ const onScored = (ballot: BallotDto) => {
         {{ list.entryMode === 'seeded' && canVote ? 'Rate these' : 'Entries' }}
         <span class="meta">({{ list.entries.length }})</span>
       </h2>
+      <p v-if="list.scoreVisibility === 'public'" class="notice">
+        Scores on this list are public: other members can see the score you give each entry.
+      </p>
       <p v-if="canVote && list.entries.length > 0" class="meta">
-        You’ve rated {{ ratedCount }} of {{ list.entries.length }}. Your scores are private: only
-        you can see them.
+        <template v-if="list.scoreVisibility === 'public'">
+          You’ve rated {{ ratedCount }} of {{ list.entries.length }}.
+        </template>
+        <template v-else>
+          You’ve rated {{ ratedCount }} of {{ list.entries.length }}. Your scores are private: only
+          you can see them.
+        </template>
       </p>
       <p v-else-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="meta">
         This list is open only to members with {{ requiredRolesText }}, so you can’t rate it.
@@ -134,6 +160,10 @@ const onScored = (ballot: BallotDto) => {
       <p v-if="list.entries.length === 0" class="empty">Nothing nominated yet.</p>
       <ul v-else class="entries">
         <EntryCard v-for="entry in list.entries" :key="entry.id" :entry="entry">
+          <PublicScoreDisclosure
+            v-if="publicScores.visible"
+            :scores="publicScores.entries[entry.id] ?? []"
+          />
           <ScorePicker
             v-if="canVote"
             :list-id="list.id"
@@ -155,6 +185,7 @@ const onScored = (ballot: BallotDto) => {
       :key="list.entries.length"
       :list="list.slug"
       :my-scores="scores"
+      :public-scores="publicScores"
     />
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />

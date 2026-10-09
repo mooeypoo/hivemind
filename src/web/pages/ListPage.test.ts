@@ -19,6 +19,15 @@ const mountWith = async (list: ListDetailDto, scores: Record<string, number> = {
   stubApi({
     'GET /api/lists/games': () => Response.json(list),
     'GET /api/lists/games/ballot': () => Response.json({ listId: list.id, scores }),
+    'GET /api/lists/games/scores': () =>
+      Response.json(
+        list.scoreVisibility === 'public'
+          ? {
+              visible: true,
+              entries: { a: [{ displayName: 'Ada', score: 9 }] },
+            }
+          : { visible: false },
+      ),
     'GET /api/lists/games/leaderboard': () => Response.json({ hidden: true, revealsAt: null }),
   });
   const router = createRouter({
@@ -53,6 +62,16 @@ describe('ListPage rating', () => {
     expect(page.findAll('select')).toHaveLength(2);
     expect(page.text()).toContain('You’ve rated 1 of 2');
     expect(page.text()).toContain('Your scores are private');
+  });
+
+  test('a public list warns before rating and shows attribution when results are visible', async () => {
+    const page = await mountWith(games({ scoreVisibility: 'public' }));
+    expect(page.text()).toContain(
+      'Scores on this list are public: other members can see the score you give each entry.',
+    );
+    expect(page.text()).not.toContain('Your scores are private');
+    expect(page.text()).toContain('Who voted (1)');
+    expect(page.text()).toContain('Ada: 9');
   });
 
   test('a seeded list invites you to rate', async () => {

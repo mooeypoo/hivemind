@@ -16,6 +16,8 @@ interface BallotRecordV1 {
   readonly listId: string;
   readonly memberId: string;
   readonly scores: Readonly<Record<string, number>>;
+  /** Optional: only on lists with public scores. */
+  readonly voterName?: string | null;
 }
 
 const key = (listId: string, memberId: string): string => `ballot/${listId}/${memberId}`;
@@ -25,6 +27,7 @@ const toRecord = (ballot: Ballot): BallotRecordV1 => ({
   listId: ballot.listId,
   memberId: ballot.memberId,
   scores: ballot.scores,
+  voterName: ballot.voterName,
 });
 
 const fromRecord = (data: unknown): Ballot => {
@@ -36,6 +39,7 @@ const fromRecord = (data: unknown): Ballot => {
     listId: record.listId as BallotListId,
     memberId: record.memberId as MemberId,
     scores: record.scores ?? {},
+    voterName: record.voterName ?? null,
   };
 };
 

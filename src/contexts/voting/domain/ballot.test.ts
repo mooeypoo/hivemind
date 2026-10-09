@@ -14,7 +14,7 @@ const scale = { min: 1, max: 10 };
 
 describe('Ballot', () => {
   test('starts empty, one per member per list', () => {
-    expect(ballot).toEqual({ listId: 'l1', memberId: 'm1', scores: {} });
+    expect(ballot).toEqual({ listId: 'l1', memberId: 'm1', scores: {}, voterName: null });
   });
 
   test.each([1, 5, 10])('accepts a whole score within the scale: %i', (score) => {

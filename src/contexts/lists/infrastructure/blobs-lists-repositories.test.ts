@@ -36,6 +36,7 @@ const draft = newList(
     ranking: { strategy: 'bayesian', minVotes: 2 },
     showNominators: false,
     requiredRoleIds: [],
+    scoreVisibility: 'private',
   },
   new Date('2026-03-01T00:00:00Z'),
 );

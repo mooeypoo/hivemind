@@ -17,6 +17,10 @@ export interface VotingRules {
   readonly isOpen: boolean;
   readonly scale: Scale;
   readonly requiredRoleIds: readonly RoleId[];
+  /** The list's scores are public, and results (so public scores) may be shown right now. */
+  readonly scoresPublic: boolean;
+  /** The list's scores are public at all: voters' names are kept with their scores. */
+  readonly namesWithScores: boolean;
 }
 
 /**
@@ -34,9 +38,17 @@ export const makeRulesForVoting =
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
     if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
+    const lifecycle = lifecycleOf(list, deps.clock.now());
+    const publicScores = list.config.scoreVisibility === 'public';
+    const resultsVisible =
+      list.config.resultsVisibility === 'live' ||
+      lifecycle === 'closed' ||
+      lifecycle === 'archived';
     return ok({
       listId: list.id,
-      isOpen: lifecycleOf(list, deps.clock.now()) === 'open',
+      isOpen: lifecycle === 'open',
+      scoresPublic: publicScores && resultsVisible,
+      namesWithScores: publicScores,
       scale: list.config.scale,
       requiredRoleIds: list.config.requiredRoleIds,
     });

@@ -34,6 +34,7 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
         meta: { member: true, admin: true },
       },
       { path: '/privacy', name: 'privacy', component: () => import('./pages/PrivacyPage.vue') },
+      { path: '/about', name: 'about', component: () => import('./pages/AboutPage.vue') },
       {
         path: '/admin/roles',
         name: 'roles',

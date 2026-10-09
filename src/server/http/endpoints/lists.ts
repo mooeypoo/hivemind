@@ -12,6 +12,7 @@ import {
   nominateBody,
   scheduleBody,
   searchQuery,
+  scoreVisibilityBody,
   visibilityBody,
 } from '../schemas.ts';
 
@@ -133,6 +134,21 @@ export const setVisibility = async (request: Request, app: App): Promise<Respons
     await app.lists.setVisibility(await actorOf(request, app), {
       list: listParam(request),
       visibility: body.data.visibility,
+    }),
+    (view): ListDto => listDto(view),
+  );
+};
+
+/** `PUT /api/lists/:list/score-visibility` */
+export const setScoreVisibility = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, scoreVisibilityBody);
+  if (!body.ok) return body.response;
+  return respond(
+    await app.lists.setScoreVisibility(await actorOf(request, app), {
+      list: listParam(request),
+      scoreVisibility: body.data.scoreVisibility,
     }),
     (view): ListDto => listDto(view),
   );

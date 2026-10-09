@@ -34,6 +34,7 @@ export const ensureDemoData = async (app: App): Promise<void> => {
     ranking: { strategy: 'bayesian', minVotes: 3 },
     showNominators: true,
     requiredRoleIds: [],
+    scoreVisibility: 'public',
   });
   if (!games.ok) return; // Another demo sign-in created the samples at the same moment.
   await app.lists.scheduleList(admin, {
@@ -89,6 +90,7 @@ export const ensureDemoData = async (app: App): Promise<void> => {
       ranking: { strategy: 'bayesian', minVotes: 2 },
       showNominators: false,
       requiredRoleIds: [],
+      scoreVisibility: 'private',
     });
     if (albums.ok)
       await app.lists.scheduleList(admin, { list: albums.value.id, schedule: schedule(null) });
@@ -108,6 +110,7 @@ export const ensureDemoData = async (app: App): Promise<void> => {
       ranking: { strategy: 'bayesian', minVotes: 3 },
       showNominators: true,
       requiredRoleIds: [],
+      scoreVisibility: 'private',
     });
     if (movies.ok)
       await app.lists.scheduleList(admin, { list: movies.value.id, schedule: schedule(null) });

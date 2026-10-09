@@ -42,7 +42,7 @@ const me = {
 };
 
 /** Mounts the whole app (header, page, footer) at `path`, as a signed-in Admin or signed out. */
-const renderAt = async (path: string, signedIn: boolean, demo = false) => {
+const renderAt = async (path: string, signedIn: boolean, demo = false, publicScores = false) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
   site.info = { ...siteInfo, demo };
@@ -52,13 +52,17 @@ const renderAt = async (path: string, signedIn: boolean, demo = false) => {
     'GET /api/me': () => (signedIn ? Response.json(me) : Response.json({}, { status: 401 })),
     'GET /api/lists': () =>
       Response.json({ lists: [list(), list({ id: 'l2', slug: 'draft', lifecycle: 'draft' })] }),
-    'GET /api/lists/best-sci-fi': () => Response.json(list()),
+    'GET /api/lists/best-sci-fi': () =>
+      Response.json(list({ scoreVisibility: publicScores ? 'public' : 'private' })),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
     'GET /api/lists/draft': () =>
       Response.json(list({ lifecycle: 'draft', slug: 'draft', schedule: null })),
     'GET /api/lists/best-sci-fi/ballot': () =>
       Response.json({ listId: 'list-1', scores: { a: 8 } }),
+    'GET /api/lists/best-sci-fi/scores': () =>
+      Response.json(publicScores ? { visible: true, entries: { a: [] } } : { visible: false }),
     'GET /api/lists/closed/ballot': () => Response.json({ listId: 'list-1', scores: { a: 8 } }),
+    'GET /api/lists/closed/scores': () => Response.json({ visible: false }),
     'GET /api/lists/best-sci-fi/leaderboard': () =>
       Response.json({
         hidden: false,
@@ -118,6 +122,7 @@ describe('every page passes automated accessibility checks', () => {
     ['a sign-in failure message', '/?login=identity.not-a-member', false],
     ['the lists index', '/', true],
     ['an open list with rating and leaderboard', '/lists/best-sci-fi', true],
+    ['an open list with public scores', '/lists/best-sci-fi', true, false, true],
     ['a closed list with hidden results', '/lists/closed', true],
     ['the new-list editor', '/admin/lists/new', true],
     ['the editor of a published list', '/admin/lists/best-sci-fi', true],
@@ -125,11 +130,12 @@ describe('every page passes automated accessibility checks', () => {
     ['the roles page', '/admin/roles', true],
     ['the backups page', '/admin/backups', true],
     ['the privacy page', '/privacy', false],
+    ['the About page', '/about', false],
     ['not found', '/nope', false],
     ['the welcome page in demo mode', '/', false, true],
     ['a list page in demo mode', '/lists/best-sci-fi', true, true],
-  ])('%s', async (_, path, signedIn, demo = false) => {
-    const wrapper = await renderAt(path, signedIn, demo);
+  ])('%s', async (_, path, signedIn, demo = false, publicScores = false) => {
+    const wrapper = await renderAt(path, signedIn, demo, publicScores);
     await expectAccessible(document.body);
     wrapper.unmount();
   });
@@ -155,10 +161,19 @@ describe('demo mode', () => {
 describe('admin menu', () => {
   test('Admins get links to Roles and Backups', async () => {
     const wrapper = await renderAt('/', true);
-    const items = [...document.querySelectorAll('.menu__item')].map((item) =>
+    const items = [...document.querySelectorAll('.menu:not(.site-menu) .menu__item')].map((item) =>
       item.textContent.trim(),
     );
     expect(items.slice(0, 2)).toEqual(['Roles', 'Backups']);
+    wrapper.unmount();
+  });
+
+  test('the site menu links to Lists, About and Privacy', async () => {
+    const wrapper = await renderAt('/', false);
+    const menu = document.querySelector('details.site-menu');
+    expect(menu).not.toBeNull();
+    const items = menu === null ? [] : [...menu.querySelectorAll('a')];
+    expect(items.map((link) => link.innerText.trim())).toEqual(['Lists', 'About', 'Privacy']);
     wrapper.unmount();
   });
 });
@@ -171,6 +186,46 @@ describe('archiving', () => {
     expect(archive).toContain('This can’t be undone.');
     expect(archive).toContain('can never be edited, reopened or un-archived');
     expect(archive).toContain('Type best-sci-fi to confirm');
+    wrapper.unmount();
+  });
+});
+
+describe('score visibility editor', () => {
+  test('drafts offer the choice and published lists lock it', async () => {
+    const draft = await renderAt('/admin/lists/new', true);
+    const privateChoice = document.querySelector<HTMLInputElement>(
+      'input[name="score-visibility"][value="private"]',
+    );
+    const publicChoice = document.querySelector<HTMLInputElement>(
+      'input[name="score-visibility"][value="public"]',
+    );
+    expect(privateChoice?.checked).toBe(true);
+    expect(publicChoice?.disabled).toBe(false);
+    publicChoice?.click();
+    expect(publicChoice?.checked).toBe(true);
+    draft.unmount();
+
+    const published = await renderAt('/admin/lists/best-sci-fi', true);
+    const ratingFieldset = [
+      ...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset'),
+    ].find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Rating');
+    expect(ratingFieldset?.disabled).toBe(true);
+    published.unmount();
+  });
+
+  test('a published public list confirms the one-way switch to private', async () => {
+    const wrapper = await renderAt('/admin/lists/best-sci-fi', true, false, true);
+    const button = [...document.querySelectorAll('button')].find(
+      (item) => item.innerText.trim() === 'Make scores private',
+    );
+    expect(button).not.toBeUndefined();
+    button?.click();
+    await flushPromises();
+    expect(
+      document.querySelector('dialog[aria-label="Make scores private?"]')?.textContent,
+    ).toContain(
+      'Members will no longer see who gave what score. This setting can’t be changed back.',
+    );
     wrapper.unmount();
   });
 });
@@ -234,6 +289,18 @@ describe('site-wide content', () => {
       'Questions',
     ]);
     expect(document.title).toBe('Privacy · Votable Lists');
+    wrapper.unmount();
+  });
+
+  test('the About page explains scores and shows community credits', async () => {
+    const wrapper = await renderAt('/about', false);
+    expect(document.querySelector('main')?.textContent).toContain(
+      'Scores are private unless a list says they are public.',
+    );
+    expect(document.querySelector('main')?.textContent).toContain('Film Club');
+    expect(
+      document.querySelector('main')?.querySelector('a[href="https://moriel.tech"]'),
+    ).not.toBeNull();
     wrapper.unmount();
   });
 

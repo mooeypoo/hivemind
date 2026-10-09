@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import type { LeaderboardDto } from '../../server/http/contracts.ts';
+import type { LeaderboardDto, PublicScoresDto } from '../../server/http/contracts.ts';
 import { durationText, formatDateTime } from '../lib/datetime.ts';
 import { api, type ApiError } from '../services/api.ts';
 import ErrorNotice from './ErrorNotice.vue';
+import PublicScoreDisclosure from './PublicScoreDisclosure.vue';
 
 const props = defineProps<{
   list: string;
   /** The caller's own scores, shown beside the community's. */
   myScores: Readonly<Record<string, number>>;
+  publicScores?: PublicScoresDto;
 }>();
 
 const board = ref<LeaderboardDto | null>(null);
@@ -87,6 +89,10 @@ const updated = computed(() => {
                 Provisional · needs {{ row.votesNeeded }} more
                 {{ row.votesNeeded === 1 ? 'vote' : 'votes' }}
               </span>
+              <PublicScoreDisclosure
+                v-if="props.publicScores?.visible === true"
+                :scores="props.publicScores.entries[row.entryId] ?? []"
+              />
             </span>
             <span class="ranking__numbers">
               <template v-if="row.score !== null">

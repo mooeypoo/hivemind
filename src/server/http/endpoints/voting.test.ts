@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { App } from '../../composition.ts';
-import type { BallotDto, EntryDto, ErrorDto, ListDto, MyDataExportDto } from '../contracts.ts';
+import type {
+  BallotDto,
+  EntryDto,
+  ErrorDto,
+  ListDto,
+  MyDataExportDto,
+  PublicScoresDto,
+} from '../contracts.ts';
 import { SESSION_COOKIE } from '../cookies.ts';
 import {
   request,
@@ -10,9 +17,9 @@ import {
   startHarness,
   type Harness,
 } from '../testing/harness.ts';
-import { createList, getList, nominate, scheduleList } from './lists.ts';
+import { createList, getList, nominate, scheduleList, setScoreVisibility } from './lists.ts';
 import { deleteMyData, exportMyData } from './me.ts';
-import { changeScore, getMyBallot } from './voting.ts';
+import { changeScore, getMyBallot, getPublicScores } from './voting.ts';
 
 type Endpoint = (request: Request, app: App) => Promise<Response>;
 
@@ -130,6 +137,72 @@ describe('ballots are private', () => {
     const detail = await call(getList, 'GET', '/api/lists/games', bob);
     expect(JSON.stringify(detail.body)).not.toContain('"scores"');
     expect(JSON.stringify(detail.body)).not.toMatch(/"score"\s*:/);
+  });
+
+  test('public scores show names and scores only after results are visible', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Public games',
+      slug: 'public-games',
+      itemSource: { kind: 'freeform' },
+      scoreVisibility: 'public',
+      resultsVisibility: 'after-close',
+    });
+    await call(scheduleList, 'POST', `/api/lists/${created.body.id}/schedule`, admin, {
+      opensAt: '2026-01-01T00:00:00.000Z',
+      nominationsCloseAt: null,
+      closesAt: '2026-01-20T00:00:00.000Z',
+    });
+    const publicEntry = await call<EntryDto>(
+      nominate,
+      'POST',
+      '/api/lists/public-games/entries',
+      ada,
+      { title: 'Public entry' },
+    );
+    await call(changeScore, 'PUT', '/api/lists/public-games/ballot', ada, {
+      entryId: publicEntry.body.id,
+      score: 4,
+    });
+    const hidden = await call<PublicScoresDto>(
+      getPublicScores,
+      'GET',
+      '/api/lists/public-games/scores',
+      bob,
+    );
+    expect(hidden.body).toEqual({ visible: false });
+
+    h.clock.set(new Date('2026-01-20T00:00:00.000Z'));
+    ada = await signInAs(h, { id: '900000000000000010', username: 'ada' });
+    bob = await signInAs(h, { id: '900000000000000011', username: 'bob' });
+    const visible = await call<PublicScoresDto>(
+      getPublicScores,
+      'GET',
+      '/api/lists/public-games/scores',
+      bob,
+    );
+    expect(visible.body).toEqual({
+      visible: true,
+      entries: { [publicEntry.body.id]: [{ displayName: 'ada', score: 4 }] },
+    });
+    expect(
+      (await call<PublicScoresDto>(getPublicScores, 'GET', '/api/lists/games/scores', bob)).body,
+    ).toEqual({ visible: false });
+  });
+
+  test('public scores require a member and score-visibility changes require Origin', async () => {
+    expect((await call(getPublicScores, 'GET', '/api/lists/games/scores', null)).status).toBe(401);
+    expect(
+      (
+        await call(
+          setScoreVisibility,
+          'PUT',
+          '/api/lists/games/score-visibility',
+          admin,
+          { scoreVisibility: 'private' },
+          null,
+        )
+      ).status,
+    ).toBe(403);
   });
 });
 

@@ -10,6 +10,7 @@ import { makeGetMyBallot } from './get-my-ballot.ts';
 import { makeVotingPersonalData } from './personal-data.ts';
 import { makeScoresForList } from './scores-for-list.ts';
 import { makeExportBallots, makeRestoreBallots } from './ballot-backup.ts';
+import { makeGetPublicScores } from './get-public-scores.ts';
 
 const member = (id: string, roles: string[] = []): Actor => ({
   kind: 'member',
@@ -174,7 +175,7 @@ describe('ballot backups', () => {
     );
     expect(restored).toEqual({ restored: 1, membersLeftOut: ['bob'], unreadable: false });
     expect(await ballots.forList('l9' as BallotListId)).toEqual([
-      { listId: 'l9', memberId: 'ada', scores: { e1: 7 } },
+      { listId: 'l9', memberId: 'ada', scores: { e1: 7 }, voterName: null },
     ]);
   });
 
@@ -186,5 +187,66 @@ describe('ballot backups', () => {
       Promise.resolve(true),
     );
     expect(restored).toEqual({ restored: 0, membersLeftOut: [], unreadable: true });
+  });
+});
+
+describe('public scores', () => {
+  const publicScores = (who: Actor, list = 'l1') =>
+    makeGetPublicScores({ lists, ballots })(who, { list });
+
+  test('on a private list, names are not stored and nobody sees anyone else’s scores', async () => {
+    await score(ada, 'e1', 7);
+    expect((await ballots.forList('l1' as BallotListId))[0]?.voterName).toBeNull();
+    expect(await publicScores(bob)).toEqual({ ok: true, value: { visible: false } });
+  });
+
+  test('on a public list, everyone sees who gave what, highest first', async () => {
+    lists.add('pub', { scoresPublic: true, namesWithScores: true });
+    await score(ada, 'e1', 7, 'pub');
+    await score(bob, 'e1', 9, 'pub');
+    await score(bob, 'e2', 2, 'pub');
+    expect(await publicScores(member('cy'), 'pub')).toEqual({
+      ok: true,
+      value: {
+        visible: true,
+        entries: {
+          e1: [
+            { displayName: 'bob', score: 9 },
+            { displayName: 'ada', score: 7 },
+          ],
+          e2: [{ displayName: 'bob', score: 2 }],
+        },
+      },
+    });
+  });
+
+  test('public scores wait while results are hidden, and need a signed-in member', async () => {
+    lists.add('later', { scoresPublic: false, namesWithScores: true });
+    await score(ada, 'e1', 7, 'later');
+    expect((await ballots.forList('later' as BallotListId))[0]?.voterName).toBe('ada');
+    expect(await publicScores(bob, 'later')).toEqual({ ok: true, value: { visible: false } });
+    expect((await publicScores(anonymous, 'later')).ok).toBe(false);
+  });
+
+  test('deleting your data removes your public scores', async () => {
+    lists.add('pub', { scoresPublic: true, namesWithScores: true });
+    await score(ada, 'e1', 7, 'pub');
+    await makeVotingPersonalData({ ballots }).eraseFor('ada' as MemberId);
+    expect(await publicScores(bob, 'pub')).toEqual({
+      ok: true,
+      value: { visible: true, entries: {} },
+    });
+  });
+
+  test('names survive a sealed backup round trip', async () => {
+    lists.add('pub', { scoresPublic: true, namesWithScores: true });
+    await score(ada, 'e1', 7, 'pub');
+    const sealer = {
+      seal: (data: unknown) => JSON.stringify(data),
+      open: (sealed: string) => JSON.parse(sealed) as unknown,
+    };
+    const sealed = (await makeExportBallots({ ballots, sealer })('pub')) ?? '';
+    await makeRestoreBallots({ ballots, sealer })('copy', sealed, () => Promise.resolve(true));
+    expect((await ballots.forList('copy' as BallotListId))[0]?.voterName).toBe('ada');
   });
 });

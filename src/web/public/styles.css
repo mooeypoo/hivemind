@@ -415,6 +415,12 @@ legend {
   position: relative;
 }
 
+.site-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .menu__trigger {
   display: flex;
   align-items: center;
@@ -426,6 +432,16 @@ legend {
 
 .menu__trigger::-webkit-details-marker {
   display: none;
+}
+
+.site-menu > .menu__trigger {
+  justify-content: center;
+  min-width: 4.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-weight: 600;
 }
 
 .menu__panel {
@@ -463,6 +479,24 @@ legend {
 
 .menu__item--danger {
   color: var(--danger);
+}
+
+.public-scores {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.public-scores summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.public-scores ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
 }
 
 /* Dialog */

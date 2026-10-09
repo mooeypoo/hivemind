@@ -13,6 +13,7 @@ import {
 import { makeArchiveList } from './archive-list.ts';
 import { makeExportForBackup, makeRestoreFromBackup } from './backup.ts';
 import { makeCloseVoting, makeSetVisibility } from './close-voting.ts';
+import { makeSetScoreVisibility } from './score-visibility.ts';
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
 import { makeGetList } from './get-list.ts';
@@ -47,6 +48,7 @@ const config: ListConfig = {
   ranking: { strategy: 'bayesian', minVotes: 3 },
   showNominators: true,
   requiredRoleIds: [],
+  scoreVisibility: 'private',
 };
 const at = (day: number) => new Date(Date.UTC(2026, 2, day));
 const schedule: Schedule = { opensAt: at(10), nominationsCloseAt: at(15), closesAt: at(20) };
@@ -348,7 +350,14 @@ describe('services for voting', () => {
     const rules = makeRulesForVoting(deps);
     expect(await rules('best-sci-fi', { isAdmin: false })).toEqual({
       ok: true,
-      value: { listId: list.id, isOpen: true, scale: { min: 0, max: 5 }, requiredRoleIds: ['r1'] },
+      value: {
+        listId: list.id,
+        isOpen: true,
+        scale: { min: 0, max: 5 },
+        requiredRoleIds: ['r1'],
+        scoresPublic: false,
+        namesWithScores: false,
+      },
     });
     clock.set(at(20));
     const closed = await rules(list.id, { isAdmin: false });
@@ -538,5 +547,54 @@ describe('backups', () => {
     };
     const result = await restore(broken);
     expect(!result.ok && result.error.code).toBe('lists.invalid-backup');
+  });
+});
+
+describe('public scores', () => {
+  const rules = () => makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false });
+
+  test('only Admins choose, and published lists can only go private', async () => {
+    const created = await create();
+    if (!created.ok) throw new Error('fixture');
+    expect(
+      (await makeSetScoreVisibility(deps)(ada, { list: 'best-sci-fi', scoreVisibility: 'public' }))
+        .ok,
+    ).toBe(false);
+    const made = await makeSetScoreVisibility(deps)(admin, {
+      list: 'best-sci-fi',
+      scoreVisibility: 'public',
+    });
+    expect(made.ok && made.value.scoreVisibility).toBe('public');
+    await scheduleIt(created.value.id);
+    clock.set(at(12));
+    const toPrivate = await makeSetScoreVisibility(deps)(admin, {
+      list: 'best-sci-fi',
+      scoreVisibility: 'private',
+    });
+    expect(toPrivate.ok && toPrivate.value.scoreVisibility).toBe('private');
+    const back = await makeSetScoreVisibility(deps)(admin, {
+      list: 'best-sci-fi',
+      scoreVisibility: 'public',
+    });
+    expect(!back.ok && back.error.code).toBe('lists.scores-private-only');
+  });
+
+  test('public scores show with live results, and only at the close when results wait', async () => {
+    await openList({ scoreVisibility: 'public' });
+    let r = await rules();
+    expect(r.ok && [r.value.scoresPublic, r.value.namesWithScores]).toEqual([true, true]);
+
+    await makeSetScoreVisibility(deps)(admin, { list: 'best-sci-fi', scoreVisibility: 'private' });
+    r = await rules();
+    expect(r.ok && [r.value.scoresPublic, r.value.namesWithScores]).toEqual([false, false]);
+  });
+
+  test('with results after close, public scores wait for the close', async () => {
+    await openList({ scoreVisibility: 'public', resultsVisibility: 'after-close' });
+    let r = await rules();
+    expect(r.ok && [r.value.scoresPublic, r.value.namesWithScores]).toEqual([false, true]);
+    clock.set(at(20));
+    r = await rules();
+    expect(r.ok && r.value.scoresPublic).toBe(true);
   });
 });

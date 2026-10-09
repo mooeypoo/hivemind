@@ -1,6 +1,7 @@
 import type { Store } from '@netlify/blobs';
 import { makeChangeScore } from './application/change-score.ts';
 import { makeGetMyBallot } from './application/get-my-ballot.ts';
+import { makeGetPublicScores } from './application/get-public-scores.ts';
 import { makeVotingPersonalData } from './application/personal-data.ts';
 import { makeScoresForList } from './application/scores-for-list.ts';
 import {
@@ -27,6 +28,7 @@ export const createVotingModule = (deps: VotingModuleDeps) => {
   return {
     changeScore: makeChangeScore({ lists, ballots }),
     getMyBallot: makeGetMyBallot({ lists, ballots }),
+    getPublicScores: makeGetPublicScores({ lists, ballots }),
     personalData: makeVotingPersonalData({ ballots }),
     // Service for ranking (downstream): anonymous scores only.
     scoresForList: makeScoresForList({ ballots }),
