@@ -60,6 +60,7 @@ const nominate = async (body: { externalId: string } | { title: string }) => {
 const query = ref('');
 const results = ref<readonly CatalogItemDto[]>([]);
 const searched = ref(false);
+const searching = ref(false);
 let debounce: ReturnType<typeof setTimeout> | undefined;
 
 const search = async () => {
@@ -67,17 +68,21 @@ const search = async () => {
   if (q === '') {
     results.value = [];
     searched.value = false;
+    searching.value = false;
     return;
   }
+  searching.value = true;
   const result = await api.get<SearchResultsDto>(
     `/api/lists/${props.list.id}/search?q=${encodeURIComponent(q)}`,
   );
   if (q !== query.value.trim()) return; // a newer search is on its way
-  searched.value = true;
+  searching.value = false;
   if (result.ok) {
+    searched.value = true;
     results.value = result.data.items;
     error.value = null;
   } else {
+    searched.value = false;
     error.value = result.error;
   }
 };
@@ -155,8 +160,11 @@ const submitTitle = async () => {
         />
         <p id="nominate-search-hint" class="meta">Type at least a few letters of the title.</p>
 
-        <p v-if="searched && results.length === 0" class="meta">No matches.</p>
-        <ul v-else class="results" aria-label="Search results">
+        <p v-if="searching" class="search-status meta" role="status">Searching the catalog…</p>
+        <p v-else-if="searched && results.length === 0" class="meta">
+          No matches. Try another title.
+        </p>
+        <ul v-else-if="results.length > 0" class="results" aria-label="Search results">
           <li v-for="item in results" :key="item.externalId" class="result">
             <img
               v-if="item.imageUrl !== null"

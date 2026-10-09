@@ -358,7 +358,10 @@ const importCsv = async () => {
 <template>
   <div class="editor">
     <header class="page-header">
-      <h1>{{ existing === null ? 'New list' : `Edit “${existing.title}”` }}</h1>
+      <div>
+        <p class="eyebrow">List setup</p>
+        <h1>{{ existing === null ? 'New list' : `Edit “${existing.title}”` }}</h1>
+      </div>
       <StatusBadge
         v-if="existing !== null"
         :lifecycle="existing.lifecycle"
@@ -382,8 +385,18 @@ const importCsv = async () => {
       >, as TMDB’s terms require. Titles become “details removed”; scores and ranks stay.
     </p>
 
+    <nav class="editor-index" aria-label="List settings">
+      <a href="#editor-basics">Basics</a>
+      <a href="#editor-items">Items</a>
+      <a href="#editor-rating">Rating</a>
+      <a v-if="existing !== null" href="#editor-schedule">Schedule</a>
+      <a v-if="existing !== null && existing.lifecycle !== 'draft'" href="#status-heading">
+        Status
+      </a>
+    </nav>
+
     <form class="stack" @submit.prevent="existing === null ? create() : save()">
-      <fieldset class="card stack" :disabled="finished">
+      <fieldset id="editor-basics" class="card stack" :disabled="finished">
         <legend>Basics</legend>
         <label for="title">Title</label>
         <input
@@ -416,7 +429,7 @@ const importCsv = async () => {
         <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
       </fieldset>
 
-      <fieldset class="card stack" :disabled="locked">
+      <fieldset id="editor-items" class="card stack" :disabled="locked">
         <legend>Items</legend>
         <p class="meta">Where do the things in this list come from?</p>
         <div class="choices" role="radiogroup" aria-label="Item source">
@@ -466,7 +479,7 @@ const importCsv = async () => {
         </template>
       </fieldset>
 
-      <fieldset class="card stack" :disabled="locked">
+      <fieldset id="editor-rating" class="card stack" :disabled="locked">
         <legend>Rating</legend>
         <fieldset class="stack">
           <legend class="legend--small">Scores</legend>
@@ -594,7 +607,12 @@ const importCsv = async () => {
         </fieldset>
       </fieldset>
 
-      <fieldset v-if="existing !== null" class="card stack" :disabled="finished">
+      <fieldset
+        v-if="existing !== null"
+        id="editor-schedule"
+        class="card stack"
+        :disabled="finished"
+      >
         <legend>Schedule</legend>
         <p class="meta">Times are in your time zone.</p>
 
@@ -662,7 +680,7 @@ const importCsv = async () => {
         You’ll choose when it opens, and whether voting ends, after creating the draft.
       </p>
       <p v-else-if="!locked && publishBlocker !== null" class="meta">{{ publishBlocker }}</p>
-      <div class="actions">
+      <div class="actions editor-actions">
         <button
           v-if="existing === null"
           type="submit"

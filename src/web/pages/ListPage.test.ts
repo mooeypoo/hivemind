@@ -60,7 +60,7 @@ describe('ListPage rating', () => {
   test('an open list shows a score picker per entry and how many you have rated', async () => {
     const page = await mountWith(games({}), { a: 4 });
     expect(page.findAll('select')).toHaveLength(2);
-    expect(page.text()).toContain('You’ve rated 1 of 2');
+    expect(page.text()).toContain('1 of 2 rated');
     expect(page.text()).toContain('Your scores are private');
   });
 

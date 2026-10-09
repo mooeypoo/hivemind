@@ -176,6 +176,18 @@ describe('admin menu', () => {
     expect(items.map((link) => link.innerText.trim())).toEqual(['Lists', 'About', 'Privacy']);
     wrapper.unmount();
   });
+
+  test('the site menu closes after following a navigation link', async () => {
+    const wrapper = await renderAt('/', false);
+    const menu = document.querySelector<HTMLDetailsElement>('details.site-menu');
+    await wrapper.get('details.site-menu summary').trigger('click');
+    expect(menu?.open).toBe(true);
+    await wrapper.get('details.site-menu a[href="/about"]').trigger('click');
+    await flushPromises();
+    expect(menu?.open).toBe(false);
+    expect(document.querySelector('main h1')?.textContent).toContain('About');
+    wrapper.unmount();
+  });
 });
 
 describe('archiving', () => {
