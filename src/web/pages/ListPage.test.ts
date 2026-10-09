@@ -59,7 +59,7 @@ afterEach(() => {
 describe('ListPage rating', () => {
   test('an open list shows a score picker per entry and how many you have rated', async () => {
     const page = await mountWith(games({}), { a: 4 });
-    expect(page.findAll('select')).toHaveLength(2);
+    expect(page.findAll('input[type="range"]')).toHaveLength(2);
     expect(page.text()).toContain('1 of 2 rated');
     expect(page.text()).toContain('Your scores are private');
   });
@@ -83,18 +83,18 @@ describe('ListPage rating', () => {
     const page = await mountWith(
       games({ viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 } }),
     );
-    expect(page.findAll('select')).toHaveLength(0);
+    expect(page.findAll('input[type="range"]')).toHaveLength(0);
     expect(page.text()).toContain('so you can’t rate it');
   });
 
   test('a scheduled list has no pickers yet', async () => {
     const page = await mountWith(games({ lifecycle: 'scheduled' }));
-    expect(page.findAll('select')).toHaveLength(0);
+    expect(page.findAll('input[type="range"]')).toHaveLength(0);
   });
 
   test('a closed list shows your final scores, read-only', async () => {
     const page = await mountWith(games({ lifecycle: 'closed' }), { b: 2 });
-    expect(page.findAll('select')).toHaveLength(0);
+    expect(page.findAll('input[type="range"]')).toHaveLength(0);
     expect(page.text()).toContain('Your score: 2');
   });
 });

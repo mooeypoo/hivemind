@@ -41,6 +41,11 @@ const blocked = computed((): string | null => {
 const error = ref<ApiError | null>(null);
 const busy = ref(false);
 const announcement = ref('');
+const query = ref('');
+const results = ref<readonly CatalogItemDto[]>([]);
+const searched = ref(false);
+const searching = ref(false);
+let debounce: ReturnType<typeof setTimeout> | undefined;
 
 const nominate = async (body: { externalId: string } | { title: string }) => {
   busy.value = true;
@@ -52,17 +57,18 @@ const nominate = async (body: { externalId: string } | { title: string }) => {
     return false;
   }
   announcement.value = `Nominated ${result.data.item.title}.`;
+  if ('externalId' in body) {
+    clearTimeout(debounce);
+    query.value = '';
+    results.value = [];
+    searched.value = false;
+    searching.value = false;
+  }
   emit('nominated', result.data);
   return true;
 };
 
 // Search (TMDB and preset pools)
-const query = ref('');
-const results = ref<readonly CatalogItemDto[]>([]);
-const searched = ref(false);
-const searching = ref(false);
-let debounce: ReturnType<typeof setTimeout> | undefined;
-
 const search = async () => {
   const q = query.value.trim();
   if (q === '') {
@@ -119,6 +125,14 @@ const submitTitle = async () => {
     <p v-if="blocked !== null" class="notice">{{ blocked }}</p>
 
     <template v-else>
+      <p
+        v-if="announcement !== ''"
+        class="notice notice--success nomination-feedback"
+        role="status"
+      >
+        {{ announcement }}
+      </p>
+
       <p v-if="left === null" class="meta">
         Nominate as many as you like.
         <template v-if="list.viewer.nominationsUsed > 0">
@@ -157,6 +171,7 @@ const submitTitle = async () => {
           maxlength="100"
           autocomplete="off"
           aria-describedby="nominate-search-hint"
+          @input="announcement = ''"
         />
         <p id="nominate-search-hint" class="meta">Type at least a few letters of the title.</p>
 
@@ -197,6 +212,5 @@ const submitTitle = async () => {
     </template>
 
     <ErrorNotice :error="error" />
-    <p class="visually-hidden" aria-live="polite">{{ announcement }}</p>
   </section>
 </template>
