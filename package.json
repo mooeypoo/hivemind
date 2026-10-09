@@ -2,6 +2,12 @@
   "name": "votable-lists",
   "version": "0.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "Moriel Schottlender (https://moriel.tech)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mooeypoo/hivemind.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=22 <23"
