@@ -63,6 +63,9 @@ afterEach(() => {
 describe('ListPage rating', () => {
   test('an open list shows a score picker per entry and how many you have rated', async () => {
     const page = await mountWith(games({}), { a: 4 });
+    expect(page.get('#entries-heading').text()).toContain('All community nominations');
+    expect(page.text()).toContain('including entries nominated by other members');
+    expect(page.text()).toContain('You can rate any entry while voting is open.');
     expect(page.findAll('input[type="range"]')).toHaveLength(2);
     expect(page.text()).toContain('1 of 2 rated');
     expect(page.text()).toContain('Your scores are private');

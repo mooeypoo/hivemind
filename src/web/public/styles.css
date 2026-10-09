@@ -895,6 +895,11 @@ legend {
   margin: 0.75rem 0;
 }
 
+.list-context {
+  max-width: 48rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;

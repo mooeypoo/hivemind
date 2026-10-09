@@ -179,9 +179,22 @@ const onScored = (ballot: BallotDto) => {
     <div class="list-workspace">
       <section class="list-entries" aria-labelledby="entries-heading">
         <h2 id="entries-heading">
-          {{ list.entryMode === 'seeded' && canVote ? 'Rate these' : 'Entries' }}
+          {{
+            list.entryMode === 'seeded'
+              ? canVote
+                ? 'Rate these'
+                : 'List items'
+              : 'All community nominations'
+          }}
           <span class="meta">({{ list.entries.length }})</span>
         </h2>
+        <p v-if="list.entryMode === 'nominations'" class="meta list-context">
+          This is the full list, including entries nominated by other members.<template
+            v-if="canVote"
+          >
+            You can rate any entry while voting is open.</template
+          >
+        </p>
         <p v-if="list.scoreVisibility === 'public'" class="notice public-score-notice">
           Scores on this list are public: other members can see the score you give each entry.
         </p>
