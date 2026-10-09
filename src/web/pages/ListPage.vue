@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import type {
   BallotDto,
+  LeaderboardDto,
+  LeaderboardRowDto,
   ListDetailDto,
   PublicScoresDto,
   RoleLabelsDto,
@@ -28,8 +30,25 @@ const error = ref<ApiError | null>(null);
 /** The caller's own scores, by entry id. Nobody else's are ever loaded. */
 const scores = ref<Readonly<Record<string, number>>>({});
 const publicScores = ref<PublicScoresDto>({ visible: false });
+const leaderboardRows = ref<readonly LeaderboardRowDto[] | null>(null);
+const shareStatus = ref('');
+
+const orderedEntries = computed(() => {
+  const entries = [...(list.value?.entries ?? [])];
+  if (leaderboardRows.value === null) return entries;
+  const position = new Map(leaderboardRows.value.map((row, index) => [row.entryId, index]));
+  return entries.sort(
+    (a, b) =>
+      (position.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+      (position.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+});
+const standingsByEntry = computed(() =>
+  Object.fromEntries((leaderboardRows.value ?? []).map((row) => [row.entryId, row])),
+);
 
 const load = async () => {
+  leaderboardRows.value = null;
   const slug = encodeURIComponent(String(route.params.slug));
   const [detail, ballot, attribution] = await Promise.all([
     api.get<ListDetailDto>(`/api/lists/${slug}`),
@@ -44,6 +63,21 @@ const load = async () => {
   }
   if (ballot.ok) scores.value = ballot.data.scores;
   if (attribution.ok) publicScores.value = attribution.data;
+};
+
+const onLeaderboardLoaded = (board: LeaderboardDto) => {
+  leaderboardRows.value = board.hidden ? null : board.rows;
+};
+
+const copyMemberLink = async () => {
+  if (list.value === null) return;
+  const url = new URL(route.fullPath, window.location.origin).toString();
+  try {
+    await navigator.clipboard.writeText(url);
+    shareStatus.value = 'Member link copied. Sign-in is required to view or take part.';
+  } catch {
+    shareStatus.value = 'Copy failed. You can share this page address with community members.';
+  }
 };
 watch(() => route.params.slug, load, { immediate: true });
 usePageTitle(() => list.value?.title ?? null);
@@ -117,7 +151,11 @@ const onScored = (ballot: BallotDto) => {
       >
         Edit
       </RouterLink>
+      <button type="button" class="button share-link" @click="copyMemberLink">
+        Copy member link
+      </button>
     </header>
+    <p v-if="shareStatus !== ''" class="share-status" role="status">{{ shareStatus }}</p>
 
     <p v-if="list.description !== ''" class="lead">{{ list.description }}</p>
     <EventCountdown v-if="next !== null" :label="next.label" :at="next.at" />
@@ -159,7 +197,19 @@ const onScored = (ballot: BallotDto) => {
         </p>
         <p v-if="list.entries.length === 0" class="empty">Nothing nominated yet.</p>
         <ul v-else class="entries">
-          <EntryCard v-for="entry in list.entries" :key="entry.id" :entry="entry">
+          <EntryCard v-for="entry in orderedEntries" :key="entry.id" :entry="entry">
+            <p v-if="standingsByEntry[entry.id] !== undefined" class="entry__standing">
+              <template v-if="standingsByEntry[entry.id]?.rank === null">
+                Pending · no votes yet
+              </template>
+              <template v-else>
+                Rank {{ standingsByEntry[entry.id]?.rank }} ·
+                {{ standingsByEntry[entry.id]?.score?.toFixed(1) }} ·
+                {{ standingsByEntry[entry.id]?.votes }}
+                {{ standingsByEntry[entry.id]?.votes === 1 ? 'vote' : 'votes' }}
+                <span v-if="standingsByEntry[entry.id]?.provisional" class="tag">Provisional</span>
+              </template>
+            </p>
             <PublicScoreDisclosure
               v-if="publicScores.visible"
               :scores="publicScores.entries[entry.id] ?? []"
@@ -190,6 +240,7 @@ const onScored = (ballot: BallotDto) => {
           :list="list.slug"
           :my-scores="scores"
           :public-scores="publicScores"
+          @loaded="onLeaderboardLoaded"
         />
       </aside>
     </div>

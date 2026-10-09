@@ -779,6 +779,23 @@ legend {
   font-size: 0.85rem;
 }
 
+.entry__standing {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.entry__standing .tag {
+  margin-left: 0.25rem;
+}
+
+.share-status {
+  margin-top: -1rem;
+  color: var(--success);
+  font-size: 0.85rem;
+}
+
 .attribution {
   margin-top: 2rem;
   color: var(--muted);
