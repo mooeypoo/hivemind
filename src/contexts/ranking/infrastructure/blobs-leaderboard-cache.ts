@@ -41,4 +41,25 @@ export const createBlobsLeaderboardCache = (store: Store): LeaderboardCache => (
     };
     await store.setJSON(`leaderboard/${board.listId}`, record);
   },
+
+  async computedTimes() {
+    const { blobs } = await store.list({ prefix: 'leaderboard/' });
+    const records = await Promise.all(
+      blobs.map(async (blob) => ({
+        listId: blob.key.slice('leaderboard/'.length),
+        record: (await store.get(blob.key, {
+          type: 'json',
+        })) as Partial<LeaderboardRecordV1> | null,
+      })),
+    );
+    // An unreadable board counts as ancient, so it is cleared.
+    return records.map(({ listId, record }) => ({
+      listId,
+      computedAt: new Date(record?.computedAt ?? 0),
+    }));
+  },
+
+  async delete(listId) {
+    await store.delete(`leaderboard/${listId}`);
+  },
 });

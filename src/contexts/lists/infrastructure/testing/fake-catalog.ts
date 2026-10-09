@@ -62,6 +62,9 @@ export class FakeCatalog implements Catalog {
     return Promise.resolve(item === undefined ? err(notFound) : ok(item));
   };
 
+  snapshotRetentionDays: Catalog['snapshotRetentionDays'] = (source) =>
+    source === 'tmdb-movie' ? 183 : null;
+
   seedItems: Catalog['seedItems'] = (ref) =>
     Promise.resolve(ref.kind === 'preset' ? ok(this.albums) : err(cannotSeed));
 

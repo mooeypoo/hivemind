@@ -3,6 +3,7 @@ import { anonymous, type Actor, type MemberId } from '../../../shared/kernel/ind
 import { FixedClock } from '../../../shared/kernel/testing/index.ts';
 import { LEADERBOARD_TTL_SECONDS } from '../domain/leaderboard.ts';
 import { FakeRankingSources, InMemoryLeaderboardCache } from '../infrastructure/testing/fakes.ts';
+import { makeDropStaleLeaderboards } from './drop-stale-leaderboards.ts';
 import { makeGetLeaderboard, type LeaderboardView } from './get-leaderboard.ts';
 
 const member = (isAdmin = false): Actor => ({
@@ -110,5 +111,16 @@ describe('cache', () => {
         imageUrl: null,
       },
     });
+  });
+});
+
+describe('dropping stale boards', () => {
+  test('deletes boards older than a day; they are rebuilt when next viewed', async () => {
+    await leaderboard();
+    clock.advanceSeconds(23 * 3600);
+    expect(await makeDropStaleLeaderboards({ cache, clock })()).toEqual({ dropped: 0 });
+    clock.advanceSeconds(3600);
+    expect(await makeDropStaleLeaderboards({ cache, clock })()).toEqual({ dropped: 1 });
+    expect(await cache.get('l1')).toBeNull();
   });
 });

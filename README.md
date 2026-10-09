@@ -22,6 +22,16 @@ npm run dev            # netlify dev: web app + functions
 npm run check          # typecheck, lint, boundary rules, formatting, tests
 ```
 
+## Demo mode and previews
+
+With `DEMO_MODE=true` (set in `.env.example`), local dev and Netlify deploy previews show **Try as Demo Admin / Member A / Member B** buttons and a set of sample lists, so the site can be explored without Discord. To enable it on previews, set `DEMO_MODE=true` for the _Deploy previews_ context in Netlify's environment variables. It never runs in production, even if set there, and previews use their own empty data, never the real lists.
+
+## Operations
+
+- `npm run seed` creates the first list, "Best Sci-Fi Movies" (TMDB, 1–10), as a draft. Locally it writes to `netlify dev`'s data; with `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` (a personal access token) set, to the deployed site. Running it again does nothing.
+- `npm run check:headers -- https://your-site.netlify.app` checks a deployed site's security headers. A GitHub Action runs it after every Netlify deploy.
+- A daily scheduled function removes movie details from lists archived more than 6 months ago, as TMDB's terms require.
+
 ## Architecture
 
 [AGENTS.md](AGENTS.md) is the architecture contract: the bounded contexts, the dependency rules (enforced by dependency-cruiser), the domain invariants, and the security and privacy requirements. Read it before changing code.

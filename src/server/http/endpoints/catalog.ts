@@ -16,7 +16,7 @@ export const availableSources = async (request: Request, app: App): Promise<Resp
 
 /** `POST /api/catalog/presets` */
 export const importPreset = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, importPresetBody);
   if (!body.ok) return body.response;

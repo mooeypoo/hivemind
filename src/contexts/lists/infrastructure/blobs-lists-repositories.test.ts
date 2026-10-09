@@ -110,6 +110,7 @@ describe('Blobs lists repositories', () => {
       item,
       nominatedBy: { memberId: 'm1' as MemberId, displayName: 'Ada' },
       nominatedAt: new Date('2026-03-12T00:00:00Z'),
+      snapshotPurgedAt: null,
     };
     expect(await entries.create(entry)).toBe(true);
     expect(await entries.create(entry)).toBe(false);
@@ -125,6 +126,7 @@ describe('Blobs lists repositories', () => {
       item,
       nominatedBy: null,
       nominatedAt: '2026-03-12T00:00:00.000Z',
+      snapshotPurgedAt: null,
     });
   });
 

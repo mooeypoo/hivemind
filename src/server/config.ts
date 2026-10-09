@@ -16,6 +16,8 @@ export interface AppConfig {
   readonly tmdbReadToken: string | null;
   /** How the site shows which Discord community it belongs to. Both optional. */
   readonly community: { readonly inviteCode: string | null; readonly name: string | null };
+  /** `DEMO_MODE=true`. Demo mode also requires a non-production deploy; see composition. */
+  readonly demoRequested: boolean;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -84,6 +86,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     sessionSecret,
     tmdbReadToken: tmdbReadToken === '' ? null : tmdbReadToken,
     community: { inviteCode, name: communityName === '' ? null : communityName },
+    demoRequested: env.DEMO_MODE?.trim().toLowerCase() === 'true',
   });
 };
 

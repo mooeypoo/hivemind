@@ -82,4 +82,6 @@ export const saveRoleLabelsBody = z.strictObject({
   version: z.string().max(200).nullable(),
 });
 
+export const demoSignInBody = z.strictObject({ persona: z.string().min(1).max(40) });
+
 export const searchQuery = z.object({ q: z.string().max(200).default('') });

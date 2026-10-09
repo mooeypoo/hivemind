@@ -4,6 +4,7 @@ import { createApp, type App } from '../../composition.ts';
 import { LOGIN_STATE_COOKIE, SESSION_COOKIE } from '../cookies.ts';
 import { authCallback, authLogin } from '../endpoints/auth.ts';
 import type { AppConfig } from '../../config.ts';
+import type { DeployContext } from '../../deploy-context.ts';
 
 export const SITE_URL = 'https://lists.example.org';
 export const GUILD_ID = '900000000000000001';
@@ -18,6 +19,7 @@ export const testConfig: AppConfig = {
   sessionSecret: 'test-session-secret-at-least-32-chars',
   tmdbReadToken: 'tmdb-test-token',
   community: { inviteCode: null, name: 'Test Community' },
+  demoRequested: false,
 };
 
 /** Discord as the HTTP layer sees it: who is signing in, and whether they are in the server. */
@@ -58,22 +60,27 @@ export interface Harness {
 export const startHarness = async (
   config: AppConfig = testConfig,
   extraFetch: Partial<Record<string, (url: URL) => Response>> = { 'api.themoviedb.org': fakeTmdb },
+  deployContext: DeployContext = 'production',
 ): Promise<Harness> => {
   const blobs = await startLocalBlobs();
   const discord: FakeDiscordState = { member: null };
   const clock = new FixedClock(new Date('2026-01-01T00:00:00Z'));
   const discordFetch = fakeDiscordFetch(discord);
 
-  const app = createApp(config, {
-    clock,
-    ids: new SequentialIds(),
-    store: (name) => blobs.store(name),
-    fetch: (input, init) => {
-      const url = new URL(urlOf(input));
-      const handler = extraFetch[url.host];
-      return handler === undefined ? discordFetch(input, init) : Promise.resolve(handler(url));
+  const app = createApp(
+    config,
+    {
+      clock,
+      ids: new SequentialIds(),
+      store: (name) => blobs.store(name),
+      fetch: (input, init) => {
+        const url = new URL(urlOf(input));
+        const handler = extraFetch[url.host];
+        return handler === undefined ? discordFetch(input, init) : Promise.resolve(handler(url));
+      },
     },
-  });
+    deployContext,
+  );
 
   return { app, discord, clock, close: () => blobs.close() };
 };

@@ -8,6 +8,8 @@ import type { PersonalDataContributor } from './application/ports.ts';
 import { makeResolveActor } from './application/resolve-actor.ts';
 import { makeStartLogin } from './application/start-login.ts';
 import { makeGetCommunity } from './application/get-community.ts';
+import { makeStartDemoSession } from './application/start-demo-session.ts';
+import { DEMO_PERSONAS, demoActor, demoVoter, operatorActor } from './domain/demo.ts';
 import { makeGetRoleLabels, makeSaveRoleLabels } from './application/role-labels.ts';
 import {
   createBlobsCommunityCache,
@@ -34,6 +36,8 @@ export interface IdentityModuleDeps {
   readonly inviteCode: string | null;
   /** Optional name to show when there is no invite or Discord can't be reached. */
   readonly communityName: string | null;
+  /** Demo mode: `DEMO_MODE=true` outside production. Enables pretend sign-in. */
+  readonly demo: boolean;
 }
 
 export const createIdentityModule = (deps: IdentityModuleDeps) => {
@@ -52,7 +56,11 @@ export const createIdentityModule = (deps: IdentityModuleDeps) => {
       clock,
       admins: {
         roleId: deps.admins.roleId as RoleId | null,
-        memberIds: deps.admins.memberIds as readonly MemberId[],
+        // In demo mode the Demo Admin persona is an Admin too.
+        memberIds: [
+          ...(deps.admins.memberIds as readonly MemberId[]),
+          ...(deps.demo ? [DEMO_PERSONAS.admin.id as MemberId] : []),
+        ],
       },
     }),
     getMe: makeGetMe({ members }),
@@ -71,6 +79,18 @@ export const createIdentityModule = (deps: IdentityModuleDeps) => {
       fallbackName: deps.communityName,
     }),
     getRoleLabels: makeGetRoleLabels({ roleLabels }),
+    startDemoSession: makeStartDemoSession({ enabled: deps.demo, members, signer, clock }),
+    /** Actors for demo sample data. Null outside demo mode. */
+    demoActors: deps.demo
+      ? {
+          admin: demoActor('admin'),
+          memberA: demoActor('member-a'),
+          memberB: demoActor('member-b'),
+          voters: [1, 2, 3, 4].map(demoVoter),
+        }
+      : null,
+    /** For trusted server-side jobs only (scripts, schedules); never from a request. */
+    operatorActor,
     saveRoleLabels: makeSaveRoleLabels({ roleLabels }),
   };
 };

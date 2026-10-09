@@ -839,3 +839,35 @@ legend {
 .hero .actions + .meta {
   margin-top: 1rem;
 }
+
+/* Demo mode */
+
+.demo-banner {
+  margin: 0;
+  padding: 0.4rem var(--space);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.demo-sign-in {
+  margin-top: 1.5rem;
+  text-align: left;
+}
+
+.demo-sign-in__personas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.demo-sign-in__personas li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

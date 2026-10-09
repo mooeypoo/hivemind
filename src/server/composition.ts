@@ -4,6 +4,7 @@ import { createListsModule, type ListsModule } from '../contexts/lists/index.ts'
 import { createRankingModule, type RankingModule } from '../contexts/ranking/index.ts';
 import { createVotingModule, type VotingModule } from '../contexts/voting/index.ts';
 import { loadConfig, type AppConfig } from './config.ts';
+import { deployContextFrom, isProduction, type DeployContext } from './deploy-context.ts';
 import { netlifyPlatform, type Platform } from './platform.ts';
 
 export interface App {
@@ -13,13 +14,26 @@ export interface App {
   readonly lists: ListsModule;
   readonly voting: VotingModule;
   readonly ranking: RankingModule;
+  readonly deployContext: DeployContext;
+  /** Demo mode is on only with `DEMO_MODE=true` and outside production: two locks. */
+  readonly demo: boolean;
+  /**
+   * The origin mutations must come from. Production: exactly `SITE_URL`. Elsewhere each deploy
+   * has its own address, so the request's own origin: still a same-origin check.
+   */
+  siteOrigin(request: Request): string;
 }
 
 /**
  * Connects the context modules in context-map order: catalog → lists → voting → ranking, then identity,
  * which receives every context's personal-data contributor. No business logic lives here.
  */
-export const createApp = (config: AppConfig, platform: Platform): App => {
+export const createApp = (
+  config: AppConfig,
+  platform: Platform,
+  deployContext: DeployContext = 'production',
+): App => {
+  const demo = config.demoRequested && !isProduction(deployContext);
   const { clock, ids, fetch } = platform;
 
   const catalog = createCatalogModule({
@@ -48,22 +62,45 @@ export const createApp = (config: AppConfig, platform: Platform): App => {
     sessionSecret: config.sessionSecret,
     inviteCode: config.community.inviteCode,
     communityName: config.community.name,
+    demo,
     contributors: [lists.personalData, voting.personalData],
   });
 
-  return { config, identity, catalog, lists, voting, ranking };
+  return {
+    config,
+    identity,
+    catalog,
+    lists,
+    voting,
+    ranking,
+    deployContext,
+    demo,
+    siteOrigin: (request) =>
+      isProduction(deployContext) ? config.siteUrl : new URL(request.url).origin,
+  };
 };
 
-let app: App | undefined;
+const apps = new Map<DeployContext, App>();
+let warnedDemoInProduction = false;
 
-/** The app for this function instance, built on first use. The only reader of `process.env`. */
-export const getApp = (): App => {
+/**
+ * The app for this function instance and deploy context, built on first use.
+ * The only reader of `process.env`.
+ */
+export const getApp = (context?: string): App => {
+  const deployContext = deployContextFrom(context);
+  let app = apps.get(deployContext);
   if (app === undefined) {
     const config = loadConfig(process.env);
     if (!config.ok) {
       throw new Error(`Invalid configuration:\n- ${config.error.join('\n- ')}`);
     }
-    app = createApp(config.value, netlifyPlatform());
+    if (config.value.demoRequested && isProduction(deployContext) && !warnedDemoInProduction) {
+      warnedDemoInProduction = true;
+      console.warn('DEMO_MODE is set, but demo mode never runs in production; ignoring it.');
+    }
+    app = createApp(config.value, netlifyPlatform(deployContext), deployContext);
+    apps.set(deployContext, app);
   }
   return app;
 };

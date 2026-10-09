@@ -62,6 +62,7 @@ export const makeNominate =
       item: item.value,
       nominatedBy: { memberId: member.value.memberId, displayName: member.value.displayName },
       nominatedAt: now,
+      snapshotPurgedAt: null,
     };
 
     const reserved = await withConflictRetry(() =>

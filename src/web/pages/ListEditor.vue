@@ -14,7 +14,7 @@ import type {
 import { api, type ApiError } from '../services/api.ts';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
-import { fromLocalInput, toLocalInput } from '../lib/datetime.ts';
+import { formatDateTime, fromLocalInput, toLocalInput } from '../lib/datetime.ts';
 import { clearDraft, loadDraft, saveDraft } from '../lib/drafts.ts';
 import { sourceLabel } from '../lib/labels.ts';
 import { slugify } from '../lib/slugify.ts';
@@ -76,6 +76,8 @@ const form = reactive<Form>({
 });
 
 const existing = ref<ListDto | null>(null);
+/** Archived movie lists: when TMDB details will be removed. */
+const snapshotsExpireAt = ref<string | null>(null);
 
 const roleLabels = ref<readonly RoleLabelDto[]>([]);
 /** Named roles, plus any role a list already requires that has no name yet, so nothing is lost. */
@@ -144,6 +146,7 @@ const load = async () => {
       return;
     }
     existing.value = result.data;
+    snapshotsExpireAt.value = result.data.snapshotsExpireAt;
     fillFrom(result.data);
   } else {
     existing.value = null;
@@ -297,6 +300,11 @@ const importCsv = async () => {
       move the closing time later.
     </p>
     <p v-if="finished" class="notice">This list has closed. It can be archived, but not edited.</p>
+    <p v-if="snapshotsExpireAt !== null" class="notice">
+      Movie details in this archived list will be removed on
+      <time :datetime="snapshotsExpireAt">{{ formatDateTime(snapshotsExpireAt) }}</time
+      >, as TMDB’s terms require. Titles become “details removed”; scores and ranks stay.
+    </p>
 
     <form class="stack" @submit.prevent="existing === null ? create() : save()">
       <fieldset class="card stack" :disabled="finished">

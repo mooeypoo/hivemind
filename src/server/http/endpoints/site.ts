@@ -11,6 +11,7 @@ export const getSite = async (_request: Request, app: App): Promise<Response> =>
   const body: SiteDto = {
     community: await app.identity.getCommunity(),
     offersMovieData: app.config.tmdbReadToken !== null,
+    demo: app.demo,
   };
   return json(body, 200, new Headers({ 'Cache-Control': 'public, max-age=3600' }));
 };
@@ -25,7 +26,7 @@ export const getRoleLabels = async (request: Request, app: App): Promise<Respons
 
 /** `PUT /api/roles` */
 export const saveRoleLabels = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, saveRoleLabelsBody);
   if (!body.ok) return body.response;

@@ -51,4 +51,6 @@ export interface Catalog {
   /** Validates the item against its source. `key` is an externalId, or a title for free text. */
   resolve(ref: ItemSourceRef, key: string): Promise<Result<ItemSnapshot, DomainError>>;
   seedItems(ref: ItemSourceRef): Promise<Result<readonly ItemSnapshot[], DomainError>>;
+  /** How long a source's item details may be kept after a list is archived; null: no limit. */
+  snapshotRetentionDays(source: string): number | null;
 }

@@ -1,0 +1,19 @@
+name: deployed headers
+
+# After every successful Netlify deploy (previews and production), check the live site's
+# security headers and CSP-safety. See scripts/check-headers.ts.
+on: deployment_status
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/check-headers.ts "${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}"

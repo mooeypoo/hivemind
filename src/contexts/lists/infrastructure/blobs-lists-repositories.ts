@@ -38,6 +38,8 @@ interface ListRecordV2 {
   readonly schedule: ScheduleRecord | null;
   readonly phase: Phase;
   readonly createdAt: string;
+  /** Added after v2 shipped; absent on lists archived before it existed. */
+  readonly archivedAt?: string | null;
 }
 
 /** v1: a single optional required role. Still read; never written. */
@@ -55,6 +57,8 @@ interface EntryRecordV1 {
   readonly item: Entry['item'];
   readonly nominatedBy: { readonly memberId: string; readonly displayName: string } | null;
   readonly nominatedAt: string;
+  /** Optional: absent on entries written before retention existed. */
+  readonly snapshotPurgedAt?: string | null;
 }
 
 interface LedgerRecordV1 {
@@ -95,6 +99,7 @@ const listToRecord = (list: List): ListRecordV2 => ({
   schedule: scheduleToRecord(list.schedule),
   phase: list.phase,
   createdAt: list.createdAt.toISOString(),
+  archivedAt: list.archivedAt?.toISOString() ?? null,
 });
 
 const upgradeList = (data: unknown): ListRecordV2 => {
@@ -118,6 +123,7 @@ const listFromRecord = (data: unknown): List => {
     schedule: scheduleFromRecord(record.schedule),
     phase: record.phase,
     createdAt: new Date(record.createdAt),
+    archivedAt: record.archivedAt == null ? null : new Date(record.archivedAt),
   };
 };
 
@@ -128,6 +134,7 @@ const entryToRecord = (entry: Entry): EntryRecordV1 => ({
   item: entry.item,
   nominatedBy: entry.nominatedBy,
   nominatedAt: entry.nominatedAt.toISOString(),
+  snapshotPurgedAt: entry.snapshotPurgedAt?.toISOString() ?? null,
 });
 
 const entryFromRecord = (data: unknown): Entry => {
@@ -145,6 +152,7 @@ const entryFromRecord = (data: unknown): Entry => {
             displayName: record.nominatedBy.displayName,
           },
     nominatedAt: new Date(record.nominatedAt),
+    snapshotPurgedAt: record.snapshotPurgedAt == null ? null : new Date(record.snapshotPurgedAt),
   };
 };
 

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import type { ListDto, ListsDto } from '../../server/http/contracts.ts';
 import { api, loginUrl, type ApiError } from '../services/api.ts';
 import ErrorNotice from '../components/ErrorNotice.vue';
+import DemoSignIn from '../components/DemoSignIn.vue';
 import ListCard from '../components/ListCard.vue';
 import { isLoginOutcome, loginMessage } from '../lib/labels.ts';
 import { session } from '../state/session.ts';
@@ -58,6 +59,7 @@ onMounted(async () => {
     <p class="meta">
       <RouterLink :to="{ name: 'privacy' }">What we store, and what we don’t</RouterLink>
     </p>
+    <DemoSignIn v-if="site.info?.demo === true" />
   </section>
 
   <template v-else>

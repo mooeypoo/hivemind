@@ -43,6 +43,14 @@ describe('Blobs leaderboard cache', () => {
     expect(await cache.get('l2')).toBeNull();
   });
 
+  test('lists computed times and deletes boards', async () => {
+    const cache = createBlobsLeaderboardCache(blobs.store('ranking-gc'));
+    await cache.put(board);
+    expect(await cache.computedTimes()).toEqual([{ listId: 'l1', computedAt: board.computedAt }]);
+    await cache.delete('l1');
+    expect(await cache.get('l1')).toBeNull();
+  });
+
   test('holds no member ids', async () => {
     const store = blobs.store('ranking');
     await createBlobsLeaderboardCache(store).put(board);

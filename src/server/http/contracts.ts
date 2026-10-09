@@ -128,6 +128,8 @@ export interface ListsDto {
 /** `GET /api/lists/:list` (id or slug) */
 export interface ListDetailDto extends ListDto {
   readonly entries: readonly EntryDto[];
+  /** Archived movie lists: when movie details will be removed (TMDB terms). */
+  readonly snapshotsExpireAt: string | null;
 }
 
 /** `POST /api/lists` body. Omitted fields take the list defaults. */
@@ -202,6 +204,15 @@ export interface SiteDto {
   readonly community: CommunityDto | null;
   /** Whether movie lists (TMDB) are offered, for the attribution line. */
   readonly offersMovieData: boolean;
+  /** Demo mode: pretend sign-in with sample data. Never true in production. */
+  readonly demo: boolean;
+}
+
+export type DemoPersona = 'admin' | 'member-a' | 'member-b';
+
+/** `POST /api/auth/demo` body. */
+export interface DemoSignInRequest {
+  readonly persona: DemoPersona;
 }
 
 export interface RoleLabelDto {

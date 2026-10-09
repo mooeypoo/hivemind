@@ -7,7 +7,14 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { findList } from './find-list.ts';
-import type { EntryRepository, LedgerRepository, ListRepository, SlugIndex } from './ports.ts';
+import { archivedSince } from '../domain/list.ts';
+import type {
+  Catalog,
+  EntryRepository,
+  LedgerRepository,
+  ListRepository,
+  SlugIndex,
+} from './ports.ts';
 import { toEntryView, toListView, type ListDetail } from './views.ts';
 
 export interface GetListDeps {
@@ -16,6 +23,7 @@ export interface GetListDeps {
   readonly entries: EntryRepository;
   readonly ledgers: LedgerRepository;
   readonly clock: Clock;
+  readonly catalog: Pick<Catalog, 'snapshotRetentionDays'>;
 }
 
 export const makeGetList =
@@ -35,6 +43,7 @@ export const makeGetList =
     ]);
     return ok({
       ...toListView(list, member.value, deps.clock.now(), ledger?.value.entryIds.length ?? 0),
+      snapshotsExpireAt: expiry(list, deps.catalog),
       entries: entries
         .sort(
           (a, b) =>
@@ -44,3 +53,12 @@ export const makeGetList =
         .map((entry) => toEntryView(entry, list, member.value)),
     });
   };
+
+const expiry = (
+  list: Parameters<typeof archivedSince>[0],
+  catalog: Pick<Catalog, 'snapshotRetentionDays'>,
+): Date | null => {
+  const since = archivedSince(list);
+  const days = catalog.snapshotRetentionDays(list.config.itemSource.kind);
+  return since === null || days === null ? null : new Date(since.getTime() + days * 86_400_000);
+};

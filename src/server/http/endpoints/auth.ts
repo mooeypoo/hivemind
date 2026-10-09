@@ -12,7 +12,10 @@ import type { LoginOutcomeCode } from '../contracts.ts';
 import { rejectForeignOrigin } from '../origin.ts';
 import { noContent, redirect, withCookies } from '../respond.ts';
 import { safeReturnPath } from '../return-to.ts';
-import { loginCallbackQuery } from '../schemas.ts';
+import { demoSignInBody, loginCallbackQuery } from '../schemas.ts';
+import { readJson } from '../body.ts';
+import { domainErrorResponse } from '../respond.ts';
+import { ensureDemoData } from '../../demo-data.ts';
 
 /** `GET /api/auth/login?returnTo=<same-site path>` */
 export const authLogin = (request: Request, app: App): Promise<Response> => {
@@ -60,6 +63,23 @@ export const authCallback = async (request: Request, app: App): Promise<Response
 /** `POST /api/auth/logout` */
 export const authLogout = (request: Request, app: App): Promise<Response> =>
   Promise.resolve(
-    rejectForeignOrigin(request, app.config.siteUrl) ??
+    rejectForeignOrigin(request, app.siteOrigin(request)) ??
       noContent(withCookies(clearCookie(SESSION_COOKIE))),
   );
+
+/**
+ * `POST /api/auth/demo`: pretend sign-in for demo mode (previews and local dev). Refused
+ * everywhere else by the identity use case. Creates the sample lists on first use.
+ */
+export const demoSignIn = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, demoSignInBody);
+  if (!body.ok) return body.response;
+  const result = await app.identity.startDemoSession(body.data.persona);
+  if (!result.ok) return domainErrorResponse(result.error);
+  await ensureDemoData(app);
+  return noContent(
+    withCookies(setCookie(SESSION_COOKIE, result.value.token, result.value.maxAgeSeconds)),
+  );
+};

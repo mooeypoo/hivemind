@@ -35,6 +35,8 @@ export interface EntryView {
 
 export interface ListDetail extends ListView {
   readonly entries: readonly EntryView[];
+  /** For an archived list whose source limits retention: when item details will be removed. */
+  readonly snapshotsExpireAt: Date | null;
 }
 
 export const toListView = (

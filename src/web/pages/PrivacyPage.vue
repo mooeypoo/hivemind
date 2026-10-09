@@ -34,7 +34,8 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       </li>
       <li v-if="site.info?.offersMovieData !== false">
         <strong>Details of nominated movies</strong> (title, year, poster address) from TMDB. These
-        are about the movies, not about you; they are removed 6 months after a list is archived.
+        are about the movies, not about you. Six months after a list is archived, they are removed:
+        the entry keeps its scores and place, labelled “details removed”.
       </li>
     </ul>
 
@@ -89,6 +90,14 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         product uses the TMDB API but is not endorsed or certified by TMDB.
       </li>
     </ul>
+
+    <template v-if="site.info?.demo === true">
+      <h2>Demo mode</h2>
+      <p>
+        This copy of the site is a demo. The “Try as…” accounts are pretend, the lists are samples,
+        and none of it is shared with the live site.
+      </p>
+    </template>
 
     <h2>Questions</h2>
     <p>

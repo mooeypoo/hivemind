@@ -66,6 +66,8 @@ export interface List {
   readonly schedule: Schedule | null;
   readonly phase: Phase;
   readonly createdAt: Date;
+  /** When it was archived; snapshot retention counts from here. */
+  readonly archivedAt: Date | null;
 }
 
 export const DEFAULT_SCALE: Scale = { min: 1, max: 10 };
@@ -138,6 +140,7 @@ export const newList = (id: ListId, config: ListConfig, now: Date): List => ({
   schedule: null,
   phase: 'draft',
   createdAt: now,
+  archivedAt: null,
 });
 
 export const lifecycleOf = (list: List, now: Date): Lifecycle => {
@@ -157,7 +160,7 @@ export const publish = (list: List, schedule: Schedule, now: Date): Result<List,
 
 export const archive = (list: List, now: Date): Result<List, DomainError> =>
   lifecycleOf(list, now) === 'closed'
-    ? ok({ ...list, phase: 'archived' })
+    ? ok({ ...list, phase: 'archived', archivedAt: now })
     : err(listsErrors.notClosed);
 
 /** A change to a list. Config fields replace the current ones; `closesAt` moves the close. */
@@ -209,3 +212,7 @@ export const mayParticipate = (list: List, roleIds: readonly RoleId[]): boolean 
 /** Whether a member who has used this many nominations may make another. */
 export const underNominationCap = (list: List, used: number): boolean =>
   list.config.maxNominationsPerMember === null || used < list.config.maxNominationsPerMember;
+
+/** When retention starts for an archived list. Lists archived before `archivedAt` existed use their close. */
+export const archivedSince = (list: List): Date | null =>
+  list.phase !== 'archived' ? null : (list.archivedAt ?? list.schedule?.closesAt ?? list.createdAt);

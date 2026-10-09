@@ -11,6 +11,7 @@ import { makeScheduleList } from './application/schedule-list.ts';
 import { makeSearchForList } from './application/search-for-list.ts';
 import { makeEntryExists, makeRulesForVoting } from './application/voting-rules.ts';
 import { makeEntriesForRanking, makeRankingContext } from './application/ranking-services.ts';
+import { makePurgeExpiredSnapshots } from './application/purge-expired-snapshots.ts';
 import {
   createBlobsEntryRepository,
   createBlobsLedgerRepository,
@@ -56,6 +57,8 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     entryExists: makeEntryExists(repositories),
     rankingContext: makeRankingContext(repositories),
     entriesForRanking: makeEntriesForRanking(repositories),
+    /** Scheduled job (TMDB retention); never from a request. */
+    purgeExpiredSnapshots: makePurgeExpiredSnapshots(shared),
   };
 };
 

@@ -31,6 +31,7 @@ const siteInfo: SiteDto = {
     inviteUrl: 'https://discord.gg/x',
   },
   offersMovieData: true,
+  demo: false,
 };
 const me = {
   id: '1',
@@ -40,12 +41,13 @@ const me = {
 };
 
 /** Mounts the whole app (header, page, footer) at `path`, as a signed-in Admin or signed out. */
-const renderAt = async (path: string, signedIn: boolean) => {
+const renderAt = async (path: string, signedIn: boolean, demo = false) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
-  site.info = siteInfo;
+  site.info = { ...siteInfo, demo };
   stubApi({
-    'GET /api/site': () => Response.json(siteInfo),
+    'GET /api/site': () => Response.json({ ...siteInfo, demo }),
+    'POST /api/auth/demo': () => new Response(null, { status: 204 }),
     'GET /api/me': () => (signedIn ? Response.json(me) : Response.json({}, { status: 401 })),
     'GET /api/lists': () =>
       Response.json({ lists: [list(), list({ id: 'l2', slug: 'draft', lifecycle: 'draft' })] }),
@@ -119,9 +121,28 @@ describe('every page passes automated accessibility checks', () => {
     ['the roles page', '/admin/roles', true],
     ['the privacy page', '/privacy', false],
     ['not found', '/nope', false],
-  ])('%s', async (_, path, signedIn) => {
-    const wrapper = await renderAt(path, signedIn);
+    ['the welcome page in demo mode', '/', false, true],
+    ['a list page in demo mode', '/lists/best-sci-fi', true, true],
+  ])('%s', async (_, path, signedIn, demo = false) => {
+    const wrapper = await renderAt(path, signedIn, demo);
     await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+});
+
+describe('demo mode', () => {
+  test('offers pretend sign-in and a banner only when the site is in demo mode', async () => {
+    let wrapper = await renderAt('/', false, false);
+    expect(document.body.textContent).not.toContain('Try as Demo');
+    expect(document.querySelector('.demo-banner')).toBeNull();
+    wrapper.unmount();
+
+    wrapper = await renderAt('/', false, true);
+    expect(document.querySelector('.demo-banner')?.textContent).toContain('Demo mode');
+    const buttons = [...document.querySelectorAll('.demo-sign-in button')].map((b) =>
+      b.textContent.trim(),
+    );
+    expect(buttons).toEqual(['Try as Demo Admin', 'Try as Demo Member A', 'Try as Demo Member B']);
     wrapper.unmount();
   });
 });
@@ -143,7 +164,7 @@ describe('site-wide content', () => {
 
   test('without movie lists, the footer does not mention TMDB', async () => {
     const wrapper = await renderAt('/privacy', false);
-    site.info = { community: null, offersMovieData: false };
+    site.info = { community: null, offersMovieData: false, demo: false };
     await flushPromises();
     expect(document.querySelector('footer')?.textContent).not.toContain('TMDB');
     expect(document.querySelector('footer')?.textContent).toContain(

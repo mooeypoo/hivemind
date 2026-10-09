@@ -32,7 +32,7 @@ export const getList = async (request: Request, app: App): Promise<Response> =>
 
 /** `POST /api/lists` */
 export const createList = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, createListBody);
   if (!body.ok) return body.response;
@@ -45,7 +45,7 @@ export const createList = async (request: Request, app: App): Promise<Response> 
 
 /** `PUT /api/lists/:list` */
 export const editList = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, editListBody);
   if (!body.ok) return body.response;
@@ -60,7 +60,7 @@ export const editList = async (request: Request, app: App): Promise<Response> =>
 
 /** `POST /api/lists/:list/schedule` */
 export const scheduleList = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, scheduleBody);
   if (!body.ok) return body.response;
@@ -75,7 +75,7 @@ export const scheduleList = async (request: Request, app: App): Promise<Response
 
 /** `POST /api/lists/:list/archive` */
 export const archiveList = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   return respond(
     await app.lists.archiveList(await actorOf(request, app), { list: listParam(request) }),
@@ -98,7 +98,7 @@ export const searchForList = async (request: Request, app: App): Promise<Respons
 
 /** `POST /api/lists/:list/entries` */
 export const nominate = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, nominateBody);
   if (!body.ok) return body.response;

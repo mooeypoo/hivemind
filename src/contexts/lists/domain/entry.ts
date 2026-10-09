@@ -25,6 +25,8 @@ export interface Entry {
   /** Null for seeded entries, and after the nominator erased their data. */
   readonly nominatedBy: Nominator | null;
   readonly nominatedAt: Date;
+  /** Set once the item's details were removed under its source's retention terms. */
+  readonly snapshotPurgedAt: Date | null;
 }
 
 /**
@@ -33,3 +35,21 @@ export interface Entry {
  */
 export const entryIdFor = (item: Pick<ItemSnapshot, 'source' | 'externalId'>): EntryId =>
   `${item.source}.${encodeURIComponent(item.externalId)}` as EntryId;
+
+export const PURGED_TITLE = 'Details removed (archived over 6 months ago)';
+
+/**
+ * The entry with its item's details removed, keeping only what identifies it, so scores and
+ * ranks still line up. Used for sources whose terms limit how long details may be kept (TMDB).
+ */
+export const purgeSnapshot = (entry: Entry, now: Date): Entry => ({
+  ...entry,
+  item: {
+    source: entry.item.source,
+    externalId: entry.item.externalId,
+    title: PURGED_TITLE,
+    subtitle: null,
+    imageUrl: null,
+  },
+  snapshotPurgedAt: now,
+});

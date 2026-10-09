@@ -64,6 +64,7 @@ const seed = async (
     item,
     nominatedBy: null,
     nominatedAt: now,
+    snapshotPurgedAt: null,
   }));
   for (let i = 0; i < entries.length; i += SEED_BATCH) {
     await Promise.all(entries.slice(i, i + SEED_BATCH).map((entry) => deps.entries.create(entry)));

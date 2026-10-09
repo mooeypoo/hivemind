@@ -28,4 +28,7 @@ export interface ScoreSource {
 export interface LeaderboardCache {
   get(listId: string): Promise<Leaderboard | null>;
   put(board: Leaderboard): Promise<void>;
+  /** When each cached board was computed, for clearing out old ones. */
+  computedTimes(): Promise<{ readonly listId: string; readonly computedAt: Date }[]>;
+  delete(listId: string): Promise<void>;
 }

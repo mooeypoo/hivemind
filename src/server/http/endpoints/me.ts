@@ -27,7 +27,7 @@ export const exportMyData = async (request: Request, app: App): Promise<Response
 
 /** `DELETE /api/me` */
 export const deleteMyData = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const result = await app.identity.deleteMyData(await actorOf(request, app));
   if (!result.ok) return domainErrorResponse(result.error);

@@ -18,7 +18,7 @@ export const getMyBallot = async (request: Request, app: App): Promise<Response>
 
 /** `PUT /api/lists/:list/ballot` */
 export const changeScore = async (request: Request, app: App): Promise<Response> => {
-  const rejected = rejectForeignOrigin(request, app.config.siteUrl);
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
   const body = await readJson(request, changeScoreBody);
   if (!body.ok) return body.response;

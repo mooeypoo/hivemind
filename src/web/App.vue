@@ -3,7 +3,7 @@ import { nextTick, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import AppFooter from './components/AppFooter.vue';
 import AppHeader from './components/AppHeader.vue';
-import { loadSite } from './state/site.ts';
+import { loadSite, site } from './state/site.ts';
 
 const router = useRouter();
 onMounted(() => {
@@ -21,6 +21,9 @@ onMounted(() => {
 
 <template>
   <a class="skip-link" href="#main">Skip to content</a>
+  <aside v-if="site.info?.demo === true" class="demo-banner" aria-label="Demo mode">
+    Demo mode: sample data and pretend accounts. Nothing here is real.
+  </aside>
   <AppHeader />
   <main id="main" tabindex="-1" class="page">
     <RouterView />

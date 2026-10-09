@@ -22,6 +22,7 @@ export const openTmdbList = (overrides: Partial<ListDetailDto> = {}): ListDetail
   },
   viewer: { canParticipate: true, canNominate: true, nominationsUsed: 0 },
   entries: [],
+  snapshotsExpireAt: null,
   ...overrides,
 });
 

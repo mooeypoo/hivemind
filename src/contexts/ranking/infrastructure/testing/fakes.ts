@@ -63,4 +63,13 @@ export class InMemoryLeaderboardCache implements LeaderboardCache {
     this.boards.set(board.listId, board);
     return Promise.resolve();
   }
+  computedTimes() {
+    return Promise.resolve(
+      [...this.boards.values()].map(({ listId, computedAt }) => ({ listId, computedAt })),
+    );
+  }
+  delete(listId: string) {
+    this.boards.delete(listId);
+    return Promise.resolve();
+  }
 }

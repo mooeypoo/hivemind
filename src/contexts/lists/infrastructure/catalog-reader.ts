@@ -8,7 +8,10 @@ import type { Catalog } from '../application/ports.ts';
 import type { ItemSourceRef } from '../domain/list.ts';
 
 /** What lists needs from the catalog module's public interface. */
-export type CatalogApi = Pick<CatalogModule, 'checkSource' | 'search' | 'resolve' | 'seedItems'>;
+export type CatalogApi = Pick<
+  CatalogModule,
+  'checkSource' | 'search' | 'resolve' | 'seedItems' | 'snapshotRetentionDays'
+>;
 
 const unknownSource = (): Promise<Result<never, DomainError>> =>
   Promise.resolve(
@@ -43,6 +46,7 @@ export const createCatalogReader = (catalog: CatalogApi): Catalog => ({
     const catalogRef = toCatalogRef(ref);
     return catalogRef === null ? unknownSource() : catalog.resolve(catalogRef, key);
   },
+  snapshotRetentionDays: (source) => catalog.snapshotRetentionDays(source),
   seedItems(ref) {
     const catalogRef = toCatalogRef(ref);
     return catalogRef === null ? unknownSource() : catalog.seedItems(catalogRef);

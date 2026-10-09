@@ -32,6 +32,7 @@ describe('GET /api/site', () => {
       body: {
         community: { name: 'Test Community', iconUrl: null, inviteUrl: null },
         offersMovieData: true,
+        demo: false,
       },
     });
   });
