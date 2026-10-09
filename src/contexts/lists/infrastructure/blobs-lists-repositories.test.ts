@@ -114,6 +114,7 @@ describe('Blobs lists repositories', () => {
     expect(await entries.create(entry)).toBe(true);
     expect(await entries.create(entry)).toBe(false);
     expect(await entries.forList(listId)).toEqual([entry]);
+    expect(await entries.idsForList(listId)).toEqual([entry.id]);
 
     const stored = await entries.get(listId, entry.id);
     expect(await entries.save({ ...entry, nominatedBy: null }, stored?.version ?? '')).toBe(true);

@@ -661,3 +661,69 @@ legend {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+/* Leaderboard */
+
+.leaderboard {
+  margin: 1.5rem 0;
+}
+
+.leaderboard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ranking__row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ranking__rank {
+  grid-row: span 2;
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ranking__title strong {
+  margin-right: 0.35rem;
+}
+
+.ranking__title .tag {
+  margin-left: 0.25rem;
+}
+
+.ranking__numbers {
+  font-size: 0.95rem;
+}
+
+@media (min-width: 40rem) {
+  .ranking__row {
+    grid-template-columns: 3rem 1fr auto;
+  }
+
+  .ranking__rank {
+    grid-row: auto;
+  }
+
+  .ranking__numbers {
+    text-align: right;
+  }
+}

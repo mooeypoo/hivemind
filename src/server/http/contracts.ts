@@ -161,3 +161,28 @@ export interface ChangeScoreRequest {
   readonly entryId: string;
   readonly score: number | null;
 }
+
+// ---- Ranking ----
+
+export interface LeaderboardRowDto {
+  /** Null while the entry has no votes. Equal scores share a rank. */
+  readonly rank: number | null;
+  readonly entryId: string;
+  readonly item: CatalogItemDto;
+  /** The ranking score, rounded to 2 decimals. Null without votes. */
+  readonly score: number | null;
+  readonly votes: number;
+  /** Fewer votes than the list's minimum: shown in place, not yet confirmed. */
+  readonly provisional: boolean;
+  readonly votesNeeded: number;
+}
+
+/** `GET /api/lists/:list/leaderboard`. A hidden board carries no numbers at all. */
+export type LeaderboardDto =
+  | { readonly hidden: true; readonly revealsAt: string | null }
+  | {
+      readonly hidden: false;
+      readonly computedAt: string;
+      readonly minVotes: number;
+      readonly rows: readonly LeaderboardRowDto[];
+    };

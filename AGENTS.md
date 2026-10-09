@@ -123,8 +123,10 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 **Ranking**
 
 - Ranking is a pure function. The default is a Bayesian average, `(v/(v+m))·R + (m/(v+m))·C`, and entries with `v < m` are flagged `provisional`. Provisional entries stay in their computed place on the leaderboard, tagged with how many more votes they need. `minVotes` never limits voting, which is open the whole time the list is.
-- The leaderboard is cached per list and rebuilt when its TTL expires or when a new entry is nominated. Scores alone do not invalidate it.
-- When `resultsVisibility = 'after-close'`, no aggregate numbers leave the server before `closesAt`.
+- Entries with no votes are unranked and listed last; with no votes at all, nothing is ranked. Equal scores share a rank (1, 2, 2, 4), ordered by votes, then title. Strategies are pure functions registered in `ranking/domain/strategies.ts`.
+- The leaderboard is cached per list and rebuilt when its TTL (`LEADERBOARD_TTL_SECONDS`, 2 minutes) expires or when a new entry is nominated (the cached board's entry ids differ from the list's). Scores alone do not invalidate it.
+- When `resultsVisibility = 'after-close'`, no aggregate numbers leave the server before `closesAt`, for anyone, Admins included: the response is only `{ hidden: true, revealsAt }`.
+- Ranking never receives member ids: voting's `scoresForList` hands it anonymous score maps, and the leaderboard stores aggregates only. Ranking has no personal-data contributor. After an erasure, a cached board can include that member's anonymous scores until its TTL ends.
 
 ## Persistence (Netlify Blobs)
 
@@ -136,7 +138,7 @@ Each context has its own store. A context never reads another context's store.
 | `catalog`  | `preset/{presetId}`                                                                                                                                                                                                              |
 | `lists`    | `list/{listId}`, `slug/{slug}` (unique slug → listId), `entry/{listId}/{entryId}`, `nominator/{memberId}/{listId}` (a member's nominations in a list; member-first so export and erasure find them by prefix)                    |
 | `voting`   | `ballot/{listId}/{memberId}` (list-first for ranking; a member's ballots, needed only for export and erasure, are found by listing `ballot/` and filtering by the member suffix, so there is no second index to keep consistent) |
-| `ranking`  | `leaderboard/{listId}`                                                                                                                                                                                                           |
+| `ranking`  | `leaderboard/{listId}` (derived, no member ids; written unconditionally, since a concurrent rebuild produces the same board)                                                                                                     |
 
 - Aggregate writes use optimistic concurrency, either `onlyIfMatch` with the ETag or `onlyIfNew`. On a conflict, retry the use case once, then return `409`. Use `withConflictRetry` from the kernel, wrapped around the part of the use case that reads and writes state. Never repeat a single-use external call, such as an OAuth code exchange.
 - Repositories map versioned persistence records (`{ v: 1, ... }`) to and from domain objects. Domain objects are never serialized directly.
@@ -145,26 +147,27 @@ Each context has its own store. A context never reads another context's store.
 
 Each route is one file in `netlify/functions` (`export default handle(endpoint)` plus `config.path` and `config.method`). Its endpoint lives in `src/server/http/endpoints/` and does three things: parse, call one use case, map the result. Wire types live in `contracts.ts`. API responses send `Cache-Control: no-store`.
 
-| Route                        | Method | Notes                                                                                |
-| ---------------------------- | ------ | ------------------------------------------------------------------------------------ |
-| `/api/auth/login`            | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord           |
-| `/api/auth/callback`         | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure |
-| `/api/auth/logout`           | POST   | Clears the session cookie                                                            |
-| `/api/me`                    | GET    | `MeDto`; 401 when signed out                                                         |
-| `/api/me/export`             | GET    | `MyDataExportDto` as a download                                                      |
-| `/api/me`                    | DELETE | Erases the member's data in every context and clears the session cookie              |
-| `/api/catalog/sources`       | GET    | Admin: the item sources this site offers                                             |
-| `/api/catalog/presets`       | POST   | Admin: import a CSV preset; errors by row                                            |
-| `/api/lists`                 | GET    | Lists the caller may see                                                             |
-| `/api/lists`                 | POST   | Admin: create a draft                                                                |
-| `/api/lists/:list`           | GET    | Detail with entries. `:list` is an id or a slug                                      |
-| `/api/lists/:list`           | PUT    | Admin: edit, within the lifecycle rules                                              |
-| `/api/lists/:list/schedule`  | POST   | Admin: set the schedule and publish (seeds a seeded list)                            |
-| `/api/lists/:list/archive`   | POST   | Admin: archive a closed list                                                         |
-| `/api/lists/:list/search?q=` | GET    | Search the list's item source while nominations are open                             |
-| `/api/lists/:list/entries`   | POST   | Nominate `{ externalId }`, or `{ title }` for free text                              |
-| `/api/lists/:list/ballot`    | GET    | The caller's own scores                                                              |
-| `/api/lists/:list/ballot`    | PUT    | `{ entryId, score }` sets a score; `score: null` clears it                           |
+| Route                          | Method | Notes                                                                                |
+| ------------------------------ | ------ | ------------------------------------------------------------------------------------ |
+| `/api/auth/login`              | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord           |
+| `/api/auth/callback`           | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure |
+| `/api/auth/logout`             | POST   | Clears the session cookie                                                            |
+| `/api/me`                      | GET    | `MeDto`; 401 when signed out                                                         |
+| `/api/me/export`               | GET    | `MyDataExportDto` as a download                                                      |
+| `/api/me`                      | DELETE | Erases the member's data in every context and clears the session cookie              |
+| `/api/catalog/sources`         | GET    | Admin: the item sources this site offers                                             |
+| `/api/catalog/presets`         | POST   | Admin: import a CSV preset; errors by row                                            |
+| `/api/lists`                   | GET    | Lists the caller may see                                                             |
+| `/api/lists`                   | POST   | Admin: create a draft                                                                |
+| `/api/lists/:list`             | GET    | Detail with entries. `:list` is an id or a slug                                      |
+| `/api/lists/:list`             | PUT    | Admin: edit, within the lifecycle rules                                              |
+| `/api/lists/:list/schedule`    | POST   | Admin: set the schedule and publish (seeds a seeded list)                            |
+| `/api/lists/:list/archive`     | POST   | Admin: archive a closed list                                                         |
+| `/api/lists/:list/search?q=`   | GET    | Search the list's item source while nominations are open                             |
+| `/api/lists/:list/entries`     | POST   | Nominate `{ externalId }`, or `{ title }` for free text                              |
+| `/api/lists/:list/ballot`      | GET    | The caller's own scores                                                              |
+| `/api/lists/:list/ballot`      | PUT    | `{ entryId, score }` sets a score; `score: null` clears it                           |
+| `/api/lists/:list/leaderboard` | GET    | The leaderboard, or `{ hidden: true, revealsAt }` until an after-close list closes   |
 
 Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
 
@@ -234,6 +237,6 @@ The privacy page describes exactly what the app stores. Any change to stored dat
 | M2        | Catalog and lists, with choosable item sources                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | done   |
 | Web slice | Browser UI for identity and lists                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | done   |
 | M3        | Voting, with its rating UI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | done   |
-| M4        | Ranking, with the leaderboard UI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | next   |
-| M5        | Web polish and accessibility audit; **community badge** (Discord server name and icon from a public invite lookup, `DISCORD_INVITE_CODE`, falling back to a name setting); **footer** (community, credit to Moriel Schottlender linking to https://moriel.tech, source link to https://github.com/mooeypoo/hivemind, configurable for forks, and the license line: code GPL-3.0-or-later, community content belongs to the community, movie data under TMDB's terms); **privacy page** (what is stored and what never is, retention, and what Download and Delete my data do) |        |
+| M4        | Ranking, with the leaderboard UI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | done   |
+| M5        | Web polish and accessibility audit; **community badge** (Discord server name and icon from a public invite lookup, `DISCORD_INVITE_CODE`, falling back to a name setting); **footer** (community, credit to Moriel Schottlender linking to https://moriel.tech, source link to https://github.com/mooeypoo/hivemind, configurable for forks, and the license line: code GPL-3.0-or-later, community content belongs to the community, movie data under TMDB's terms); **privacy page** (what is stored and what never is, retention, and what Download and Delete my data do) | next   |
 | M6        | Hardening and launch: rate limits, CSP check, retention purge, seed script, deploy previews                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |        |

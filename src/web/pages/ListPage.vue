@@ -6,6 +6,7 @@ import { api, type ApiError } from '../services/api.ts';
 import EventCountdown from '../components/EventCountdown.vue';
 import EntryCard from '../components/EntryCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
+import LeaderboardPanel from '../components/LeaderboardPanel.vue';
 import NominatePanel from '../components/NominatePanel.vue';
 import ScorePicker from '../components/ScorePicker.vue';
 import StatusBadge from '../components/StatusBadge.vue';
@@ -83,6 +84,8 @@ const onScored = (ballot: BallotDto) => {
     <p v-if="list.description !== ''" class="lead">{{ list.description }}</p>
     <EventCountdown v-if="next !== null" :label="next.label" :at="next.at" />
 
+    <LeaderboardPanel v-if="listClosed" :list="list.slug" :my-scores="scores" />
+
     <NominatePanel v-if="showNominate" :list="list" @nominated="load" />
 
     <section aria-labelledby="entries-heading">
@@ -115,6 +118,13 @@ const onScored = (ballot: BallotDto) => {
         </EntryCard>
       </ul>
     </section>
+
+    <LeaderboardPanel
+      v-if="list.lifecycle === 'open'"
+      :key="list.entries.length"
+      :list="list.slug"
+      :my-scores="scores"
+    />
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />
   </article>

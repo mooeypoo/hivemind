@@ -19,6 +19,7 @@ const mountWith = async (list: ListDetailDto, scores: Record<string, number> = {
   stubApi({
     'GET /api/lists/games': () => Response.json(list),
     'GET /api/lists/games/ballot': () => Response.json({ listId: list.id, scores }),
+    'GET /api/lists/games/leaderboard': () => Response.json({ hidden: true, revealsAt: null }),
   });
   const router = createRouter({
     history: createMemoryHistory(),

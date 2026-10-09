@@ -202,6 +202,11 @@ export const createBlobsEntryRepository = (store: Store): EntryRepository => ({
       expectedVersion,
     ),
   forList: (listId) => readAll(store, `entry/${listId}/`, entryFromRecord),
+  async idsForList(listId) {
+    const prefix = `entry/${listId}/`;
+    const { blobs } = await store.list({ prefix });
+    return blobs.map((blob) => blob.key.slice(prefix.length) as EntryId);
+  },
 });
 
 export const createBlobsLedgerRepository = (store: Store): LedgerRepository => ({

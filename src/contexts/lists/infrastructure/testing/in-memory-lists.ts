@@ -61,6 +61,8 @@ export class InMemoryEntryRepository implements EntryRepository {
   save = (entry: Entry, expectedVersion: string) =>
     this.table.save(this.key(entry.listId, entry.id), entry, expectedVersion);
   forList = (listId: ListId) => Promise.resolve(this.table.values(`${listId}/`));
+  idsForList = (listId: ListId) =>
+    Promise.resolve(this.table.values(`${listId}/`).map((entry) => entry.id));
 }
 
 export class InMemoryLedgerRepository implements LedgerRepository {

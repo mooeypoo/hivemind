@@ -1,6 +1,7 @@
 import { createCatalogModule, type CatalogModule } from '../contexts/catalog/index.ts';
 import { createIdentityModule, type IdentityModule } from '../contexts/identity/index.ts';
 import { createListsModule, type ListsModule } from '../contexts/lists/index.ts';
+import { createRankingModule, type RankingModule } from '../contexts/ranking/index.ts';
 import { createVotingModule, type VotingModule } from '../contexts/voting/index.ts';
 import { loadConfig, type AppConfig } from './config.ts';
 import { netlifyPlatform, type Platform } from './platform.ts';
@@ -11,10 +12,11 @@ export interface App {
   readonly catalog: CatalogModule;
   readonly lists: ListsModule;
   readonly voting: VotingModule;
+  readonly ranking: RankingModule;
 }
 
 /**
- * Connects the context modules in context-map order: catalog → lists → voting, then identity,
+ * Connects the context modules in context-map order: catalog → lists → voting → ranking, then identity,
  * which receives every context's personal-data contributor. No business logic lives here.
  */
 export const createApp = (config: AppConfig, platform: Platform): App => {
@@ -31,6 +33,8 @@ export const createApp = (config: AppConfig, platform: Platform): App => {
 
   const voting = createVotingModule({ store: platform.store('voting'), lists });
 
+  const ranking = createRankingModule({ store: platform.store('ranking'), clock, lists, voting });
+
   const identity = createIdentityModule({
     store: platform.store('identity'),
     clock,
@@ -45,7 +49,7 @@ export const createApp = (config: AppConfig, platform: Platform): App => {
     contributors: [lists.personalData, voting.personalData],
   });
 
-  return { config, identity, catalog, lists, voting };
+  return { config, identity, catalog, lists, voting, ranking };
 };
 
 let app: App | undefined;

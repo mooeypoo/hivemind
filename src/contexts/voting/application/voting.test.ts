@@ -8,6 +8,7 @@ import {
 import { makeChangeScore } from './change-score.ts';
 import { makeGetMyBallot } from './get-my-ballot.ts';
 import { makeVotingPersonalData } from './personal-data.ts';
+import { makeScoresForList } from './scores-for-list.ts';
 
 const member = (id: string, roles: string[] = []): Actor => ({
   kind: 'member',
@@ -119,5 +120,15 @@ describe('personal data', () => {
     expect((await data.eraseFor('ada' as MemberId)).ok).toBe(true);
     expect(await ballots.forMember('ada' as MemberId)).toEqual([]);
     expect(await ballots.forList('l1' as BallotListId)).toHaveLength(1);
+  });
+});
+
+describe('scores for ranking', () => {
+  test('are every ballot of the list, without who cast them', async () => {
+    await score(ada, 'e1', 7);
+    await score(bob, 'e1', 3);
+    const scores = await makeScoresForList({ ballots })('l1');
+    expect(scores).toEqual([{ e1: 7 }, { e1: 3 }]);
+    expect(JSON.stringify(scores)).not.toMatch(/ada|bob/);
   });
 });

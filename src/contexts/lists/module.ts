@@ -10,6 +10,7 @@ import { makeListsPersonalData } from './application/personal-data.ts';
 import { makeScheduleList } from './application/schedule-list.ts';
 import { makeSearchForList } from './application/search-for-list.ts';
 import { makeEntryExists, makeRulesForVoting } from './application/voting-rules.ts';
+import { makeEntriesForRanking, makeRankingContext } from './application/ranking-services.ts';
 import {
   createBlobsEntryRepository,
   createBlobsLedgerRepository,
@@ -53,6 +54,8 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),
     entryExists: makeEntryExists(repositories),
+    rankingContext: makeRankingContext(repositories),
+    entriesForRanking: makeEntriesForRanking(repositories),
   };
 };
 

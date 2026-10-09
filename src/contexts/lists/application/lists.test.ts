@@ -20,6 +20,7 @@ import { makeListsPersonalData } from './personal-data.ts';
 import { makeScheduleList } from './schedule-list.ts';
 import { makeSearchForList } from './search-for-list.ts';
 import { makeEntryExists, makeRulesForVoting } from './voting-rules.ts';
+import { makeEntriesForRanking, makeRankingContext } from './ranking-services.ts';
 
 const actor = (id: string, opts: { admin?: boolean; roles?: string[] } = {}): Actor => ({
   kind: 'member',
@@ -362,5 +363,26 @@ describe('services for voting', () => {
     const exists = makeEntryExists(deps);
     expect(await exists(list.id, 'tmdb-movie.78' as EntryId)).toBe(true);
     expect(await exists(list.id, 'tmdb-movie.603' as EntryId)).toBe(false);
+  });
+});
+
+describe('services for ranking', () => {
+  test('report visibility, close time, strategy and current entry ids', async () => {
+    const list = await openList({ resultsVisibility: 'after-close' });
+    await nominate(ada, '78');
+    expect(await makeRankingContext(deps)('best-sci-fi')).toEqual({
+      ok: true,
+      value: {
+        listId: list.id,
+        resultsVisibility: 'after-close',
+        closesAt: at(20),
+        strategy: 'bayesian',
+        minVotes: 3,
+        entryIds: ['tmdb-movie.78'],
+      },
+    });
+    expect((await makeEntriesForRanking(deps)(list.id)).map((entry) => entry.item.title)).toEqual([
+      'Blade Runner',
+    ]);
   });
 });
