@@ -2,10 +2,13 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { App } from '../../composition.ts';
 import { sharePage } from './share.ts';
 import { checkHeaders } from '../../../../scripts/security-headers.ts';
-
 afterEach(() => vi.unstubAllGlobals());
-
-const setup = (preview: { title: string; slug: string } | null = null) => {
+const setup = (
+  preview: {
+    title: string;
+    slug: string;
+  } | null = null,
+) => {
   const fetchTemplate = vi
     .fn()
     .mockResolvedValue(
@@ -18,11 +21,12 @@ const setup = (preview: { title: string; slug: string } | null = null) => {
   const app = {
     siteOrigin: () => 'https://site.example',
     lists: { getSharePreview },
-    identity: { getCommunity: async () => ({ name: 'The Community <&>', iconUrl: null }) },
+    identity: {
+      getCommunity: vi.fn().mockResolvedValue({ name: 'The Community <&>', iconUrl: null }),
+    },
   } as unknown as App;
   return { app, fetchTemplate, getSharePreview };
 };
-
 test('serves site and community metadata in HTML without JavaScript', async () => {
   const { app, fetchTemplate, getSharePreview } = setup();
   const response = await sharePage(new Request('https://site.example/?login=anything'), app);
@@ -40,7 +44,6 @@ test('serves site and community metadata in HTML without JavaScript', async () =
   expect(getSharePreview).not.toHaveBeenCalled();
   expect(fetchTemplate).toHaveBeenCalledWith(new URL('https://site.example/index.html'));
 });
-
 test('list previews escape names and canonicalize id links to the slug', async () => {
   const { app, getSharePreview } = setup({ title: 'Best "<&> movies', slug: 'best-movies' });
   const response = await sharePage(new Request('https://site.example/lists/list-id?secret=x'), app);
@@ -50,7 +53,6 @@ test('list previews escape names and canonicalize id links to the slug', async (
   expect(html).toContain('property="og:url" content="https://site.example/lists/best-movies"');
   expect(html).not.toContain('secret=');
 });
-
 test('missing, draft and hidden lists get the generic site preview', async () => {
   const { app } = setup();
   const response = await sharePage(new Request('https://site.example/lists/hidden-list'), app);
@@ -58,7 +60,6 @@ test('missing, draft and hidden lists get the generic site preview', async () =>
   expect(html).toContain('property="og:title" content="Our Site"');
   expect(html).not.toContain('hidden-list');
 });
-
 test('handles communities without a configured public name', async () => {
   const { app } = setup();
   vi.spyOn(app.identity, 'getCommunity').mockResolvedValue(null);
