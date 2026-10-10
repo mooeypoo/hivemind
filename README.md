@@ -26,7 +26,13 @@ Open `http://localhost:8888`. Use `npm run dev` rather than invoking `netlify de
 the launcher cleans up its child processes on exit, including after a Netlify CLI crash.
 On Linux and macOS, Netlify and Vite run in an owned process group so stopping the launcher
 also stops Vite. Ports 8888 and 5173 stay fixed; unrelated processes using them are never killed.
-Force-killing the launcher with `SIGKILL` bypasses cleanup.
+On Linux, running `npm run dev` again recognizes an existing server from this workspace and
+prints its URL without launching a competing session. If only an orphaned workspace Vite
+server remains, the launcher stops it before starting Netlify. Ownership is verified using
+`ss` and `/proc`; if it cannot be verified, the launcher reports the occupied port and stops.
+Force-killing the launcher with `SIGKILL` bypasses exit cleanup. Use Ctrl+C in the original
+dev terminal to stop a running session. Explicit CLI options (`npm run dev -- ...`) are
+passed directly to Netlify without the default-port startup checks.
 
 ## Demo mode and previews
 
