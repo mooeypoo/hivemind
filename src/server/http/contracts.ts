@@ -204,6 +204,8 @@ export interface LeaderboardRowDto {
   readonly item: CatalogItemDto;
   /** The ranking score, rounded to 2 decimals. Null without votes. */
   readonly score: number | null;
+  /** The plain mean of its scores, rounded to 2 decimals. Null without votes. */
+  readonly average: number | null;
   readonly votes: number;
   /** Fewer votes than the list's minimum: shown in place, not yet confirmed. */
   readonly provisional: boolean;

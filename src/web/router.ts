@@ -22,6 +22,12 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
         meta: { member: true },
       },
       {
+        path: '/lists/:slug/results',
+        name: 'list-results',
+        component: () => import('./pages/ListResultsPage.vue'),
+        meta: { member: true },
+      },
+      {
         path: '/admin/lists/new',
         name: 'new-list',
         component: () => import('./pages/ListEditor.vue'),

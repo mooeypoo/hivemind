@@ -900,6 +900,35 @@ legend {
   margin: 0.35rem 0 0.75rem;
 }
 
+.list-order {
+  max-width: 48rem;
+  margin: 0 0 0.75rem;
+}
+
+/* Results page */
+
+.results-page {
+  max-width: 48rem;
+}
+
+.back-link {
+  margin: 0 0 0.5rem;
+}
+
+.back-link a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.results-group {
+  margin-top: 1.75rem;
+}
+
+.results__nominator {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;

@@ -38,6 +38,7 @@ const mountWith = async (
     history: createMemoryHistory(),
     routes: [
       { path: '/lists/:slug', name: 'list', component: ListPage },
+      { path: '/lists/:slug/results', name: 'list-results', component: Blank },
       { path: '/admin/lists/:slug', name: 'edit-list', component: Blank },
     ],
   });
@@ -124,6 +125,7 @@ describe('ListPage rating', () => {
           entryId: 'b',
           item: entry('b', 'Wingspan').item,
           score: 8.4,
+          average: 8.6,
           votes: 5,
           provisional: false,
           votesNeeded: 0,
@@ -133,6 +135,7 @@ describe('ListPage rating', () => {
           entryId: 'a',
           item: entry('a', 'Root').item,
           score: 7.2,
+          average: 9,
           votes: 2,
           provisional: true,
           votesNeeded: 1,
@@ -142,6 +145,7 @@ describe('ListPage rating', () => {
           entryId: 'c',
           item: entry('c', 'Azul').item,
           score: null,
+          average: null,
           votes: 0,
           provisional: true,
           votesNeeded: 3,

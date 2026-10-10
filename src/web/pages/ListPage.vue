@@ -174,9 +174,12 @@ const onScored = (ballot: BallotDto) => {
       class="list-jump"
       aria-label="List sections"
     >
-      <a href="#entries-heading">The list</a>
-      <a href="#leaderboard-heading">Standings</a>
+      <a href="#entries-heading">{{ canVote ? 'Rate entries' : 'Entries' }}</a>
+      <a href="#leaderboard-heading">Leaderboard</a>
       <a v-if="showNominate" href="#nomination-panel">Nominate</a>
+      <RouterLink :to="{ name: 'list-results', params: { slug: list.slug } }">
+        Full results
+      </RouterLink>
     </nav>
 
     <div class="list-workspace">
@@ -197,6 +200,16 @@ const onScored = (ballot: BallotDto) => {
           >
             You can rate any entry while voting is open.</template
           >
+        </p>
+        <p v-if="list.lifecycle === 'open' || listClosed" class="meta list-order">
+          <template v-if="leaderboardRows !== null">
+            Sorted by the current leaderboard, provisional entries included in place.
+          </template>
+          <template v-else>Not in ranking order: results are hidden until voting closes.</template>
+          <RouterLink :to="{ name: 'list-results', params: { slug: list.slug } }">
+            See the full results
+          </RouterLink>
+          for a read-only ranking.
         </p>
         <p v-if="list.scoreVisibility === 'public'" class="notice public-score-notice">
           Scores on this list are public: other members can see the score you give each entry.
@@ -248,17 +261,13 @@ const onScored = (ballot: BallotDto) => {
       <aside
         v-if="showNominate || list.lifecycle === 'open' || listClosed"
         class="list-sidebar"
-        aria-label="List actions and standings"
+        aria-label="Nominate and leaderboard"
       >
         <details v-if="showNominate" id="nomination-panel" class="sidebar-disclosure">
           <summary>Nominate another item</summary>
           <NominatePanel :list="list" @nominated="load" />
         </details>
-        <section
-          v-if="list.lifecycle === 'open' || listClosed"
-          class="list-sidebar__standings"
-          aria-label="Standings"
-        >
+        <div v-if="list.lifecycle === 'open' || listClosed" class="list-sidebar__standings">
           <LeaderboardPanel
             :key="list.entries.length"
             :list="list.slug"
@@ -266,7 +275,7 @@ const onScored = (ballot: BallotDto) => {
             :public-scores="publicScores"
             @loaded="onLeaderboardLoaded"
           />
-        </section>
+        </div>
       </aside>
     </div>
 
