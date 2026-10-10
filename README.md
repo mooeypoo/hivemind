@@ -22,6 +22,12 @@ npm run dev            # netlify dev: web app + functions
 npm run check          # typecheck, lint, boundary rules, formatting, tests
 ```
 
+Open `http://localhost:8888`. Use `npm run dev` rather than invoking `netlify dev` directly:
+the launcher cleans up its child processes on exit, including after a Netlify CLI crash.
+On Linux and macOS, Netlify and Vite run in an owned process group so stopping the launcher
+also stops Vite. Ports 8888 and 5173 stay fixed; unrelated processes using them are never killed.
+Force-killing the launcher with `SIGKILL` bypasses cleanup.
+
 ## Demo mode and previews
 
 With `DEMO_MODE=true` (set in `.env.example`), local dev and Netlify deploy previews show **Try as Demo Admin / Member A / Member B** buttons and a set of sample lists, so the site can be explored without Discord. To enable it on previews, set `DEMO_MODE=true` for the _Deploy previews_ context in Netlify's environment variables. It never runs in production, even if set there, and previews use their own empty data, never the real lists.
