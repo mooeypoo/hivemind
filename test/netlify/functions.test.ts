@@ -28,6 +28,11 @@ describe('Netlify functions', () => {
     expect(files.length).toBeGreaterThan(20);
   });
 
+  test('leaves the homepage to the static app', async () => {
+    const configs = await Promise.all(files.map(load));
+    expect(configs.some((config) => config.path === '/')).toBe(false);
+  });
+
   test.each(files)('%s has the right rate limit', async (file) => {
     const config = await load(file);
     if (config.schedule !== undefined) return; // scheduled jobs have no route
