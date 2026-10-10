@@ -71,7 +71,10 @@ const onLeaderboardLoaded = (board: LeaderboardDto) => {
 
 const copyMemberLink = async () => {
   if (list.value === null) return;
-  const url = new URL(route.fullPath, window.location.origin).toString();
+  const url = new URL(
+    `/lists/${encodeURIComponent(list.value.slug)}`,
+    window.location.origin,
+  ).toString();
   try {
     await navigator.clipboard.writeText(url);
     shareStatus.value = 'Member link copied. Sign-in is required to view or take part.';

@@ -126,6 +126,7 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 - Scheduling publishes a draft.
 - Nominations are allowed while the list is open and before `nominationsCloseAt`, and never on a seeded list. A given item (`source` and `externalId`) can be nominated only once per list: the entry id derives from them and entries are created with `onlyIfNew`. Each member has a nomination cap, enforced by their nomination ledger; a duplicate gives the nomination back.
 - An entry snapshots the catalog item and the nominator's display name. `showNominators` decides whether members see that name.
+- Anonymous social previews expose only the title and canonical slug of published, non-hidden lists, plus the public site and community names. Draft, hidden and missing lists get the generic site preview. No descriptions, entries, scores or member data are exposed. Viewing lists and all list API endpoints still require sign-in.
 - Every list endpoint needs a signed-in member. Drafts exist only for Admins; everyone else gets not-found. `requiredRoleIds` limit who may take part (nominate, and later vote), not who may view. Admins name roles once on the Roles page (`/admin/roles`, a name → role ID table owned by identity); the list editor offers them as checkboxes, and keeps any required role that has no name yet.
 
 **Voting**

@@ -17,6 +17,7 @@ export { changeScore, getMyBallot, getPublicScores } from './http/endpoints/voti
 export { getLeaderboard } from './http/endpoints/ranking.ts';
 export { exportBackup, importBackup } from './http/endpoints/backup.ts';
 export { getRoleLabels, getSite, saveRoleLabels } from './http/endpoints/site.ts';
+export { sharePage } from './http/endpoints/share.ts';
 export {
   archiveList,
   closeVoting,

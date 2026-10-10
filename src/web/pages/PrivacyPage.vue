@@ -52,6 +52,14 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       <li>Analytics, tracking, advertising, or your IP address.</li>
     </ul>
 
+    <h2>Shared links</h2>
+    <p>
+      Link previews can show the site and community names and the title of a published list. Draft
+      and hidden list titles are not included. Entries, nominations, scores and member details are
+      never included in these previews. Viewing a list still requires sign-in. Social platforms may
+      keep a preview after a list is hidden.
+    </p>
+
     <h2>Cookies</h2>
     <ul>
       <li>

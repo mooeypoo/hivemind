@@ -319,6 +319,7 @@ describe('site-wide content', () => {
     expect(headings).toEqual([
       'What we store about you',
       'What we never store',
+      'Shared links',
       'Cookies',
       'Download my data',
       'Delete my data',
