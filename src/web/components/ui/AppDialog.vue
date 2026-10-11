@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref, useId, watch } from 'vue';
 
-const props = defineProps<{ open: boolean; title: string }>();
+const props = defineProps<{
+  open: boolean;
+  title: string;
+  /** `sheet`: slides up from the bottom on phones, drops down from the top corner on wider screens. */
+  variant?: 'dialog' | 'sheet';
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
@@ -27,6 +32,7 @@ const onClick = (event: MouseEvent) => {
   <dialog
     ref="dialog"
     class="dialog"
+    :class="{ 'dialog--sheet': variant === 'sheet' }"
     :aria-labelledby="titleId"
     @cancel.prevent="emit('close')"
     @click="onClick"

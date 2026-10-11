@@ -18,8 +18,11 @@ forks hivemind can restyle it, or replace its frontend, without touching how it 
 src/web/public/
   styles.css               entry: declares the layer order and imports the rest
   themes/night/tokens.css  the theme: every colour, font, radius, shadow and duration
+  themes/night/fonts/      the theme's self-hosted display face, with its licence (OFL)
   styles/legacy.css        pre-redesign rules, shrinking phase by phase (docs/redesign.md)
+  styles/base.css          reset, typography, focus, accessibility helpers
   styles/components.css    UI primitives (dialog, toasts, …)
+  styles/shell.css         header, menu, footer, demo banner
 ```
 
 Everything is plain CSS served as static files: the Content Security Policy (`style-src 'self'`)

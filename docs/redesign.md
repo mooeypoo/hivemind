@@ -1,6 +1,6 @@
 # Redesign plan (branch `redesign`)
 
-Status: **phase 1 (foundations) done; phase 2 (shell) next** (see [Decisions](#decisions)).
+Status: **phases 1 (foundations) and 2 (shell) done; phase 3 (list page and voting) next** (see [Decisions](#decisions)).
 
 Goal: make hivemind feel distinctive, smooth and fun on desktop and mobile while keeping every
 behaviour, every privacy rule and the architecture in [AGENTS.md](../AGENTS.md). The redesign is
@@ -232,5 +232,5 @@ Each phase leaves `npm run check` green and the site usable.
   script, after the stylesheet. A member whose saved choice differs from their system may see a
   brief flash on a full page load. Acceptable for now; the fix (a tiny same-origin script in
   `<head>`) would be the only non-TypeScript file in the web app.
-- **Display face.** Candidate: a variable OFL grotesque with character for titles and numbers
-  (shortlist in phase 2, with a screenshot comparison).
+- **Display face.** Phase 2 uses Bricolage Grotesque (variable weight, OFL, latin and latin-ext
+  subsets, ~60 KB, in `themes/night/fonts/`). Easy to swap in the theme if you prefer another.

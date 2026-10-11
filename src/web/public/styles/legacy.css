@@ -3,119 +3,7 @@
  * keeps into base, components or pages and deletes it here. See docs/redesign.md.
  */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-h1,
-h2,
-h3 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1.08;
-  margin: 0 0 0.5rem;
-}
-
-h1 {
-  font-size: 2.5rem;
-}
-
-h2 {
-  font-size: 1.65rem;
-}
-
-h3 {
-  font-size: 1.25rem;
-}
-
-p {
-  margin: 0 0 0.75rem;
-}
-
-a {
-  color: var(--accent);
-}
-
-code {
-  font-size: 0.9em;
-  background: var(--surface-2);
-  padding: 0.1em 0.3em;
-  border-radius: 2px;
-}
-
-:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-
-img {
-  max-width: 100%;
-  height: auto;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.skip-link {
-  position: absolute;
-  left: 0.5rem;
-  top: -3rem;
-  padding: 0.5rem 1rem;
-  background: var(--surface);
-  border-radius: var(--radius);
-  z-index: 10;
-}
-
-.skip-link:focus {
-  top: 0.5rem;
-}
-
 /* Layout */
-
-.site-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space);
-  padding: 0.65rem clamp(0.75rem, 2vw, 1.75rem);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  z-index: 4;
-}
-
-.site-header__name {
-  font-weight: 700;
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  color: var(--text);
-  text-decoration: none;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-}
 
 .page {
   max-width: 82rem;
@@ -406,118 +294,7 @@ legend {
   background: var(--accent-soft);
 }
 
-/* Header menu */
-
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-}
-
-.menu {
-  position: relative;
-}
-
-.site-header__nav {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.menu__trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 44px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.menu__trigger::-webkit-details-marker {
-  display: none;
-}
-
-.site-menu > .menu__trigger {
-  justify-content: center;
-  min-width: 4.5rem;
-  padding: 0 0.75rem;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-weight: 600;
-}
-
-@media (max-width: 26rem) {
-  .site-header {
-    gap: 0.4rem;
-    padding-inline: 0.7rem;
-  }
-
-  .site-header__name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 1.05rem;
-  }
-
-  .site-header__nav {
-    flex: 0 0 auto;
-    gap: 0.35rem;
-  }
-
-  .account-name {
-    display: none;
-  }
-
-  .site-menu > .menu__trigger {
-    min-width: 0;
-    padding-inline: 0.65rem;
-  }
-}
-
-.menu__panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.25rem);
-  display: flex;
-  flex-direction: column;
-  min-width: 12rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0.25rem;
-  z-index: 5;
-}
-
-.menu__item {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 0.75rem;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.menu__item:hover {
-  background: var(--surface-2);
-}
-
-.menu__item--danger {
-  color: var(--danger);
-}
-
-.account-name {
-  max-width: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* Public scores */
 
 .public-scores {
   margin-top: 0.35rem;
@@ -1091,40 +868,7 @@ legend {
   background: transparent;
 }
 
-/* Footer and community */
-
-.site-footer {
-  max-width: 82rem;
-  margin: 0 auto;
-  padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.9rem;
-}
-
-.site-footer p {
-  margin-bottom: 0.4rem;
-}
-
-.community {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  vertical-align: middle;
-}
-
-.community__icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-}
-
-.community__name {
-  font-weight: 600;
-}
-
-.site-header__name {
-  gap: 0.5rem;
-}
+/* Community badge in page content */
 
 .hero__community {
   font-size: 1.1rem;
@@ -1222,15 +966,6 @@ legend {
 }
 
 /* Demo mode */
-
-.demo-banner {
-  margin: 0;
-  padding: 0.4rem var(--space);
-  background: var(--accent-soft);
-  color: var(--text);
-  font-size: 0.9rem;
-  text-align: center;
-}
 
 .demo-sign-in {
   margin-top: 1.5rem;

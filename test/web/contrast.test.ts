@@ -50,6 +50,8 @@ const pairs: [string, string, number][] = [
   ['focus', 'surface', 3],
   ['highlight', 'bg', 4.5],
   ['highlight', 'surface', 4.5],
+  ['highlight', 'surface-2', 4.5],
+  ['accent', 'accent-soft', 4.5],
 ];
 
 describe.each([

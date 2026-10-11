@@ -32,6 +32,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`the open menu at ${String(width)} px fits on screen`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.goto('/');
+        await page.getByRole('button', { name: /^Menu/ }).click();
+        const menu = page.getByRole('dialog', { name: 'Menu' });
+        await expect(menu.getByRole('link', { name: 'Backups' })).toBeVisible();
+        const box = await menu.boundingBox();
+        expect(box).not.toBeNull();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+        await expectNoSidewaysScroll(page);
+      });
+
       for (const path of memberRoutes) {
         test(`${path} at ${String(width)} px fits`, async ({ page }) => {
           await page.setViewportSize({ width, height: 800 });
@@ -54,5 +67,6 @@ const expectNoSidewaysScroll = async (page: Page) => {
       .map((element) => `${element.tagName.toLowerCase()}.${element.className}`);
     return { extra: document.documentElement.scrollWidth - width, culprits };
   });
-  expect(overflow, 'page is wider than the viewport').toEqual({ extra: 0, culprits: [] });
+  // Culprits only explain a failure: elements inside a scrolling strip may extend past the edge.
+  expect(overflow.extra, `page scrolls sideways; widest: ${overflow.culprits.join(', ')}`).toBe(0);
 };

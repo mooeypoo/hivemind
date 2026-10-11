@@ -25,11 +25,17 @@ onMounted(() => {
 <template>
   <a class="skip-link" href="#main">Skip to content</a>
   <aside v-if="site.info?.demo === true" class="demo-banner" aria-label="Demo mode">
-    Demo mode: sample data and pretend accounts. Nothing here is real.
+    <strong>Demo mode</strong> · sample data and pretend accounts, nothing here is real
   </aside>
   <AppHeader />
   <main id="main" tabindex="-1" class="page">
-    <RouterView />
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="page" mode="out-in">
+        <div :key="route.path" class="page__view">
+          <component :is="Component" />
+        </div>
+      </Transition>
+    </RouterView>
   </main>
   <AppFooter />
   <AppToasts :toasts="toasts" @dismiss="dismiss" />
