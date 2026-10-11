@@ -371,6 +371,7 @@
   overflow: hidden;
   color: var(--title-card-text);
   text-align: center;
+  container-type: inline-size;
   background:
     radial-gradient(
       circle at 30% 15%,
@@ -408,12 +409,12 @@
   display: -webkit-box;
   overflow: hidden;
   font-family: var(--font-display);
-  font-size: 0.75rem;
+  /* Sized to the card, so long words fit small tiles and large ones read like a title. */
+  font-size: clamp(0.6rem, 12cqi, 2.2rem);
   font-weight: 800;
   line-height: 1.1;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  overflow-wrap: anywhere;
+  letter-spacing: -0.01em;
+  overflow-wrap: break-word;
   hyphens: auto;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
@@ -429,7 +430,7 @@
 }
 
 .title-card__subtitle {
-  font-size: 0.7rem;
+  font-size: clamp(0.55rem, 7cqi, 1rem);
   opacity: 0.85;
 }
 
@@ -437,14 +438,6 @@
   font-family: var(--font-display);
   font-size: 1.2rem;
   font-weight: 800;
-}
-
-.item-art--large .title-card__title {
-  font-size: 1.5rem;
-}
-
-.item-art--large .title-card__subtitle {
-  font-size: 0.95rem;
 }
 
 /* Score input (ScoreInput): chips for small scales, a slider for wide ones */

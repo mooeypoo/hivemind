@@ -1,6 +1,6 @@
 # Redesign plan (branch `redesign`)
 
-Status: **phases 1–3 done (foundations, shell, list page and voting); phase 4 (standings and results) next** (see [Decisions](#decisions)).
+Status: **phases 1–4 done (foundations, shell, list page and voting, standings and results); phase 5 (index and landing) next** (see [Decisions](#decisions)).
 
 Goal: make hivemind feel distinctive, smooth and fun on desktop and mobile while keeping every
 behaviour, every privacy rule and the architecture in [AGENTS.md](../AGENTS.md). The redesign is
@@ -143,6 +143,11 @@ As built in phase 3, two changes from the plan above:
 - **Sealed results** (after-close): a "sealed" card with the reveal countdown instead of a notice.
 - The results page becomes the full-width, shareable version of Standings, using the same
   component, so R1 can't recur (see Q6).
+
+As built in phase 4: `components/StandingsBoard.vue` (with `lib/standings.ts`) renders both. The
+podium holds the first three ranked entries, provisional ones included in place; tied ranks
+show as shared numbers. Score bars are SVG rects (an attribute, not an inline style, so the CSP
+allows them). The results page never receives the viewer's own scores.
 
 ### Index and landing
 

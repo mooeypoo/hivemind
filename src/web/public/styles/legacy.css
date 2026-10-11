@@ -103,30 +103,6 @@
   text-decoration: underline;
 }
 
-/* Results page */
-
-.results-page {
-  max-width: 48rem;
-}
-
-.back-link {
-  margin: 0 0 0.5rem;
-}
-
-.back-link a {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-}
-
-.results-group {
-  margin-top: 1.75rem;
-}
-
-.results__nominator {
-  display: block;
-}
-
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
@@ -134,74 +110,7 @@
   }
 }
 
-/* Leaderboard */
-
-.leaderboard {
-  margin: 1.5rem 0;
-}
-
-.leaderboard__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.ranking {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.ranking__row {
-  display: grid;
-  grid-template-columns: 2.5rem 1fr;
-  gap: 0.25rem 0.75rem;
-  align-items: center;
-  padding: 0.6rem 0.75rem;
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-}
-
-.ranking__rank {
-  grid-row: span 2;
-  color: var(--accent);
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  font-weight: 700;
-  text-align: center;
-}
-
-.ranking__title strong {
-  margin-right: 0.35rem;
-}
-
-.ranking__title .tag {
-  margin-left: 0.25rem;
-}
-
-.ranking__numbers {
-  font-size: 0.95rem;
-}
-
-@media (min-width: 40rem) {
-  .ranking__row {
-    grid-template-columns: 3rem 1fr auto;
-  }
-
-  .ranking__rank {
-    grid-row: auto;
-  }
-
-  .ranking__numbers {
-    text-align: right;
-  }
-}
+/* Editor (phase 6) */
 
 .legend--small {
   font-size: 1rem;

@@ -259,7 +259,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
     >
       <LeaderboardPanel
         :key="list.entries.length"
-        :list="list.slug"
+        :list="list"
         :my-scores="scores"
         :public-scores="publicScores"
         @loaded="page.onLeaderboard"
