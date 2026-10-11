@@ -70,6 +70,16 @@ code {
   outline-offset: 2px;
 }
 
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Anchored targets clear the sticky header and tabs. */
+[id] {
+  scroll-margin-top: 7rem;
+}
+
 img {
   max-width: 100%;
   height: auto;

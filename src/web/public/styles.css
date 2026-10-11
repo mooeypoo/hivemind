@@ -14,3 +14,4 @@
 @import url('styles/shell.css') layer(components);
 @import url('styles/list.css') layer(pages);
 @import url('styles/standings.css') layer(pages);
+@import url('styles/index.css') layer(pages);

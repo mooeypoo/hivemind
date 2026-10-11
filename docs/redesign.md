@@ -1,6 +1,6 @@
 # Redesign plan (branch `redesign`)
 
-Status: **phases 1–4 done (foundations, shell, list page and voting, standings and results); phase 5 (index and landing) next** (see [Decisions](#decisions)).
+Status: **phases 1–5 done (foundations, shell, list page and voting, standings and results, index and landing); phase 6 (admin) next** (see [Decisions](#decisions)).
 
 Goal: make hivemind feel distinctive, smooth and fun on desktop and mobile while keeping every
 behaviour, every privacy rule and the architecture in [AGENTS.md](../AGENTS.md). The redesign is

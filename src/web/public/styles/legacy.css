@@ -3,106 +3,6 @@
  * keeps into base, components or pages and deletes it here. See docs/redesign.md.
  */
 
-/* Index and landing (phase 5) */
-
-.hero {
-  max-width: 58rem;
-  margin: 4rem auto 5rem;
-  padding: 0 0 0 1.5rem;
-  border-left: 5px solid var(--accent);
-  text-align: left;
-}
-
-.hero h1 {
-  max-width: 12ch;
-  font-size: 3.5rem;
-}
-
-.hero > p {
-  max-width: 42rem;
-  font-size: 1.1rem;
-}
-
-.eyebrow {
-  margin-bottom: 0.35rem;
-  color: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.lists-heading {
-  align-items: center;
-}
-
-/* Lists */
-
-.list-card__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.list-card {
-  display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  padding: 1.1rem 0.25rem;
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-}
-
-.list-card:last-child {
-  border-bottom: 1px solid var(--border);
-}
-
-.list-card__index {
-  color: var(--accent);
-  font-family: var(--font-display);
-  font-size: 2rem;
-  line-height: 1;
-}
-
-.list-card__main {
-  min-width: 0;
-}
-
-.list-card__header {
-  justify-content: flex-start;
-}
-
-.list-card__title {
-  margin: 0;
-}
-
-.list-card__description,
-.list-card .meta {
-  margin: 0.3rem 0 0;
-}
-
-.list-card__edit {
-  align-self: center;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 0.75rem;
-  border-left: 1px solid var(--border);
-  font-weight: 700;
-}
-
-.list-card__title a {
-  color: var(--text);
-  text-decoration: none;
-}
-
-.list-card__title a:hover {
-  text-decoration: underline;
-}
-
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
@@ -184,16 +84,6 @@
   padding-top: 1.25rem;
   border-top: 2px solid var(--danger);
   background: transparent;
-}
-
-/* Community badge in page content */
-
-.hero__community {
-  font-size: 1.1rem;
-}
-
-.actions--center {
-  justify-content: center;
 }
 
 /* Prose pages */
@@ -279,33 +169,6 @@
   }
 }
 
-.hero .actions + .meta {
-  margin-top: 1rem;
-}
-
-/* Demo mode */
-
-.demo-sign-in {
-  margin-top: 1.5rem;
-  text-align: left;
-}
-
-.demo-sign-in__personas {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.demo-sign-in__personas li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .status-section {
   margin-top: 1.5rem;
   border: 0;
@@ -314,53 +177,22 @@
   background: transparent;
 }
 
-.list-group {
-  margin-bottom: 2.5rem;
-}
-
-.list-group > h2 {
-  margin-bottom: 0;
-  padding: 0.35rem 0;
-  color: var(--muted);
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.prose a,
-.list-card__title a {
+.prose a {
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
-}
-
-::selection {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-
-[id] {
-  scroll-margin-top: 1rem;
-}
-
-.badges {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-.badge--hidden {
-  border: 1px dashed var(--danger);
-  background: transparent;
-  color: var(--danger);
-}
-
-.list-group {
-  margin-bottom: 1.75rem;
 }
 
 .danger-text {
   color: var(--danger);
   font-size: 1.05rem;
+}
+
+.dialog__confirm {
+  margin: 0.75rem 0;
+}
+
+.dialog ul {
+  padding-left: 1.25rem;
 }
 
 .dialog__confirm {

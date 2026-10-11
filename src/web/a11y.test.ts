@@ -358,7 +358,7 @@ describe('site-wide content', () => {
 
   test('the welcome page names the community and offers to join it', async () => {
     const wrapper = await renderAt('/', false);
-    expect(document.querySelector('.hero')?.textContent).toContain('For members of Film Club');
+    expect(document.querySelector('.landing')?.textContent).toContain('For members of Film Club');
     expect(document.querySelector('a[href="https://discord.gg/x"]')?.textContent.trim()).toBe(
       'Join the server',
     );
