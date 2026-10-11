@@ -52,6 +52,11 @@ const pairs: [string, string, number][] = [
   ['highlight', 'surface', 4.5],
   ['highlight', 'surface-2', 4.5],
   ['accent', 'accent-soft', 4.5],
+  ...[1, 2, 3, 4, 5, 6].map((n): [string, string, number] => [
+    'title-card-text',
+    `title-card-${String(n)}`,
+    4.5,
+  ]),
 ];
 
 describe.each([

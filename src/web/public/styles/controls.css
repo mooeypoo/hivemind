@@ -1,0 +1,341 @@
+/* Layout utilities, controls and feedback used across pages. Role tokens only. */
+
+/* Layout */
+
+.page {
+  max-width: 82rem;
+  margin: 0 auto;
+  padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.page:focus {
+  outline: none;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space);
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.card {
+  padding: var(--space);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.lead {
+  max-width: 44rem;
+  font-size: 1.1rem;
+}
+
+.empty {
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Buttons */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast),
+    transform var(--duration-fast);
+}
+
+.button:hover {
+  border-color: var(--accent);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.button--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.button--primary:hover {
+  filter: brightness(1.08);
+}
+
+.button--danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.button--quiet,
+.button--link {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+
+.button--quiet:hover,
+.button--link:hover {
+  background: var(--accent-soft);
+}
+
+.button--large {
+  padding: 0.75rem 1.6rem;
+  font-size: 1.1rem;
+}
+
+/* Form controls */
+
+label {
+  font-weight: 600;
+}
+
+input[type='text'],
+input[type='search'],
+input[type='number'],
+input[type='datetime-local'],
+input[type='file'],
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+input[type='text']:focus-visible,
+input[type='search']:focus-visible,
+input[type='number']:focus-visible,
+textarea:focus-visible {
+  border-color: var(--focus);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:disabled,
+textarea:disabled {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0;
+}
+
+legend {
+  padding: 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+@media (min-width: 40rem) {
+  .choices {
+    flex-flow: row wrap;
+    column-gap: 1.5rem;
+  }
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  font-weight: 400;
+}
+
+.choice input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--accent);
+}
+
+.input-prefix {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.input-prefix span {
+  color: var(--muted);
+}
+
+/* Feedback */
+
+.notice {
+  margin-bottom: var(--space);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.notice--error:empty {
+  display: none;
+}
+
+.notice--error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.notice--error ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.notice--success {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* Status badges and tags */
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.badge,
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.badge::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.badge--open::before {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.badge--scheduled::before {
+  background: var(--accent);
+}
+
+.badge--draft {
+  border-style: dashed;
+  background: transparent;
+}
+
+.badge--hidden::before {
+  background: var(--danger);
+}
+
+.tag {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pill--mine {
+  background: color-mix(in srgb, var(--highlight) 16%, var(--surface));
+  color: var(--highlight);
+}
+
+/* Public scores (who gave what, on lists with public scores) */
+
+.public-scores {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.public-scores summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.public-scores ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+}

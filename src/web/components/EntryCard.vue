@@ -1,40 +1,47 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { EntryDto } from '../../server/http/contracts.ts';
+import type { EntryDto, LeaderboardRowDto } from '../../server/http/contracts.ts';
+import ItemArt from './ui/ItemArt.vue';
 
-const props = defineProps<{ entry: EntryDto }>();
-/** A poster that fails to load falls back to the text tile. */
-const imageFailed = ref(false);
-const initials = computed(() =>
-  props.entry.item.title
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join(''),
-);
+defineProps<{ entry: EntryDto; standing?: LeaderboardRowDto | undefined; rated?: boolean }>();
+const emit = defineEmits<{ open: [] }>();
 </script>
 
 <template>
-  <li class="entry">
-    <img
-      v-if="entry.item.imageUrl !== null && !imageFailed"
-      :src="entry.item.imageUrl"
-      :alt="`Poster for ${entry.item.title}`"
-      class="entry__image"
-      loading="lazy"
-      width="342"
-      height="513"
-      @error="imageFailed = true"
-    />
-    <div v-else class="entry__image entry__image--text" aria-hidden="true">{{ initials }}</div>
+  <li class="entry" :class="{ 'entry--mine': entry.isMine, 'entry--rated': rated === true }">
+    <button
+      type="button"
+      class="entry__art"
+      :aria-label="`Details for ${entry.item.title}`"
+      @click="emit('open')"
+    >
+      <ItemArt
+        :title="entry.item.title"
+        :subtitle="entry.item.subtitle"
+        :image-url="entry.item.imageUrl"
+      />
+      <span
+        v-if="standing !== undefined && standing.rank !== null"
+        class="rank-badge"
+        :class="{ 'rank-badge--provisional': standing.provisional }"
+        aria-hidden="true"
+        >#{{ standing.rank }}</span
+      >
+    </button>
     <div class="entry__body">
       <h3 class="entry__title">{{ entry.item.title }}</h3>
       <p v-if="entry.item.subtitle !== null" class="entry__subtitle">{{ entry.item.subtitle }}</p>
-      <p class="entry__meta">
-        <span v-if="entry.isMine" class="tag">Your nomination</span>
-        <span v-else-if="entry.nominatedBy !== null">Nominated by {{ entry.nominatedBy }}</span>
+      <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
+      <p v-else-if="entry.nominatedBy !== null" class="entry__meta">
+        Nominated by {{ entry.nominatedBy }}
       </p>
-      <slot />
+      <p v-if="standing !== undefined" class="entry__standing">
+        <template v-if="standing.rank === null">No votes yet</template>
+        <template v-else>
+          Rank {{ standing.rank }}
+          <span v-if="standing.provisional" class="tag">Provisional</span>
+        </template>
+      </p>
     </div>
+    <div class="entry__rate"><slot /></div>
   </li>
 </template>

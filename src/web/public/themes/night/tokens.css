@@ -55,6 +55,15 @@
   --shadow-color: light-dark(rgb(23 24 30 / 14%), rgb(0 0 0 / 55%));
   --shadow-raised: 0 8px 28px var(--shadow-color);
 
+  /* Title cards: stand-ins for posters, one of six per title, light text on deep colour */
+  --title-card-text: light-dark(#fdf6e3, #fdf6e3);
+  --title-card-1: light-dark(#3b1d5c, #3b1d5c);
+  --title-card-2: light-dark(#0f3d4a, #0f3d4a);
+  --title-card-3: light-dark(#5a1f2b, #5a1f2b);
+  --title-card-4: light-dark(#1f3d2a, #1f3d2a);
+  --title-card-5: light-dark(#4a3410, #4a3410);
+  --title-card-6: light-dark(#1d2a5c, #1d2a5c);
+
   /* Shape and rhythm */
   --radius: 10px;
   --radius-lg: 16px;

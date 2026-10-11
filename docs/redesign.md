@@ -1,6 +1,6 @@
 # Redesign plan (branch `redesign`)
 
-Status: **phases 1 (foundations) and 2 (shell) done; phase 3 (list page and voting) next** (see [Decisions](#decisions)).
+Status: **phases 1–3 done (foundations, shell, list page and voting); phase 4 (standings and results) next** (see [Decisions](#decisions)).
 
 Goal: make hivemind feel distinctive, smooth and fun on desktop and mobile while keeping every
 behaviour, every privacy rule and the architecture in [AGENTS.md](../AGENTS.md). The redesign is
@@ -121,6 +121,19 @@ Replace both menus with a single account/menu trigger:
 - **Nominate sheet:** search box with results as poster rows, remaining nominations counter,
   duplicate/limit errors inline.
 - Fewer words: the explanatory copy moves into one collapsible "How this list works" line.
+
+As built in phase 3, two changes from the plan above:
+
+- **Tabs at every width.** A sticky standings column beside the entries made a tab panel
+  visible while not selected, which the tabs pattern can't express cleanly. Instead, entries use
+  a responsive card grid (one to three columns), and Standings is a tab everywhere.
+- **Nominate is a tab, not a sheet.** It holds a search with results, so it reads better as a
+  full panel than as a dialog over the list.
+- Score saves settle for 250 ms and send only the latest value per entry (at most one request
+  in flight each), so moving across chips with the arrow keys doesn't flood the mutation rate
+  limit. Leaving the page sends anything still settling.
+- Chips: up to five per row so each stays at least 44 px wide at 320 px (1–10 is two rows
+  of five); a slider for scales wider than 11 values.
 
 ### Standings and results
 

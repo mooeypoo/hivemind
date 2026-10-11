@@ -229,6 +229,28 @@ describe('the menu', () => {
   });
 });
 
+describe('list page dialogs', () => {
+  test('entry details pass automated accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('.entry__art').trigger('click');
+    await flushPromises();
+    const details = [...document.querySelectorAll('dialog')].find((d) => d.open);
+    expect(details?.textContent).toContain('Blade Runner');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
+  test('rating one by one passes automated accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('.ballot-bar .button--primary').trigger('click');
+    await flushPromises();
+    const stage = document.querySelector('dialog.dialog--stage');
+    expect(stage?.textContent).toContain('Alien');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+});
+
 describe('archiving', () => {
   test('explains plainly that it is permanent, and asks for the address to be typed', async () => {
     const wrapper = await renderAt('/admin/lists/best-sci-fi', true);

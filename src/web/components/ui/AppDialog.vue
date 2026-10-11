@@ -4,8 +4,11 @@ import { onMounted, ref, useId, watch } from 'vue';
 const props = defineProps<{
   open: boolean;
   title: string;
-  /** `sheet`: slides up from the bottom on phones, drops down from the top corner on wider screens. */
-  variant?: 'dialog' | 'sheet';
+  /**
+   * `sheet`: slides up from the bottom on phones, drops down from the top corner on wider screens.
+   * `stage`: fills a phone screen, a large centred panel on wider screens.
+   */
+  variant?: 'dialog' | 'sheet' | 'stage';
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -32,7 +35,7 @@ const onClick = (event: MouseEvent) => {
   <dialog
     ref="dialog"
     class="dialog"
-    :class="{ 'dialog--sheet': variant === 'sheet' }"
+    :class="variant === undefined || variant === 'dialog' ? '' : `dialog--${variant}`"
     :aria-labelledby="titleId"
     @cancel.prevent="emit('close')"
     @click="onClick"

@@ -45,6 +45,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`list dialogs at ${String(width)} px fit on screen`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.goto('/lists/films');
+        await page.getByRole('button', { name: /^Details for Alien/ }).click();
+        const details = page.getByRole('dialog', { name: 'Alien' });
+        await expect(details.getByText('Your score')).toBeVisible();
+        const box = await details.boundingBox();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+        await expectNoSidewaysScroll(page);
+        await details.getByRole('button', { name: 'Close' }).click();
+        await page.getByRole('button', { name: 'Rate one by one' }).click();
+        await expect(page.getByRole('dialog', { name: 'Rate one by one' })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
       for (const path of memberRoutes) {
         test(`${path} at ${String(width)} px fits`, async ({ page }) => {
           await page.setViewportSize({ width, height: 800 });
