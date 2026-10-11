@@ -65,8 +65,11 @@ const save = async () => {
 </script>
 
 <template>
-  <div class="stack">
-    <h1>Roles</h1>
+  <div class="stack admin-page">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h1>Roles</h1>
+    </div>
     <p class="lead">
       Give Discord roles a name here, and they can be chosen by name when limiting who may take part
       in a list.

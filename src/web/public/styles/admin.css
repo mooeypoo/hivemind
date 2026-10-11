@@ -1,0 +1,177 @@
+/* Admin pages: the list editor, Roles and Backups. */
+
+.editor,
+.admin-page {
+  max-width: 54rem;
+  margin: 0 auto;
+}
+
+.editor > .page-header {
+  align-items: flex-end;
+}
+
+/* Section links, sticky under the header like the list tabs. */
+.editor-index {
+  position: sticky;
+  top: 3.75rem;
+  z-index: 5;
+  display: flex;
+  gap: 0.25rem;
+  margin: 0 calc(-1 * clamp(1rem, 3vw, 2.5rem)) 1.25rem;
+  padding: 0.4rem clamp(1rem, 3vw, 2.5rem);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  scrollbar-width: none;
+}
+
+.editor-index a {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.editor-index a:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Each section is a card; its legend reads as the card's title. */
+.editor form > fieldset.card {
+  padding: 1.25rem clamp(1rem, 3vw, 1.5rem) 1.5rem;
+}
+
+.editor form > fieldset.card > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.editor form > fieldset.card > legend + * {
+  clear: both;
+}
+
+.editor fieldset fieldset {
+  padding: 0;
+  border: 0;
+}
+
+.legend--small {
+  font-size: 1rem;
+}
+
+/* The save bar stays in reach at the bottom of the screen. */
+.editor-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 0 calc(-1 * clamp(1rem, 3vw, 2.5rem));
+  padding: 0.75rem clamp(1rem, 3vw, 2.5rem) max(0.75rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 39.99rem) {
+  .editor-actions .button {
+    flex: 1 1 auto;
+  }
+}
+
+/* Where the page has margins of its own, the bars line up with the cards. */
+@media (min-width: 60rem) {
+  .editor-index,
+  .editor-actions {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+}
+
+/* Status: lifecycle actions, set apart as a danger zone. */
+.status-section {
+  margin-top: 2rem;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-top: 3px solid var(--danger);
+}
+
+/* Roles */
+
+.roles-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.roles-table th {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.roles-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.roles-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* On narrow screens each role is a small stacked card, so the full role ID stays visible. */
+@media (max-width: 39.99rem) {
+  .roles-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .roles-table tr {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .roles-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .roles-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+}
+
+.admin-page details.card > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}

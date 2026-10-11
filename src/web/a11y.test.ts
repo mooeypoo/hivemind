@@ -279,13 +279,13 @@ describe('score visibility editor', () => {
     draft.unmount();
 
     const published = await renderAt('/admin/lists/best-sci-fi', true);
-    const ratingFieldset = [
-      ...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset'),
-    ].find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Rating');
-    expect(ratingFieldset?.disabled).toBe(false);
-    expect(ratingFieldset?.querySelector<HTMLFieldSetElement>('fieldset.stack')?.disabled).toBe(
-      true,
-    );
+    const section = (legend: string) =>
+      [...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset')].find(
+        (fieldset) => fieldset.querySelector('legend')?.textContent === legend,
+      );
+    expect(section('Rating')?.disabled).toBe(true);
+    expect(section('Scores')?.disabled).toBe(true);
+    expect(section('Nominations')?.disabled).toBe(false);
     const unlimited = document.querySelector<HTMLInputElement>('#unlimited');
     expect(unlimited?.disabled).toBe(false);
     unlimited?.click();

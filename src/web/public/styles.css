@@ -15,3 +15,4 @@
 @import url('styles/list.css') layer(pages);
 @import url('styles/standings.css') layer(pages);
 @import url('styles/index.css') layer(pages);
+@import url('styles/admin.css') layer(pages);

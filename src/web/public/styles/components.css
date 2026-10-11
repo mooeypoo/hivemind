@@ -45,6 +45,19 @@
   }
 }
 
+.dialog__body ul {
+  padding-left: 1.25rem;
+}
+
+.dialog__confirm {
+  margin: 0.75rem 0;
+}
+
+.danger-text {
+  color: var(--danger);
+  font-size: 1.05rem;
+}
+
 /* Toasts */
 
 .toasts {
