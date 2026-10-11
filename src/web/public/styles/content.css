@@ -1,0 +1,81 @@
+/* Reading pages: About, Privacy, Backups' explanations, Not found. */
+
+.prose {
+  max-width: 46rem;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.prose > h1 {
+  margin-bottom: 0.75rem;
+}
+
+.prose h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 2.5rem;
+}
+
+/* A marquee bulb marks each section. */
+.prose h2::before {
+  content: '';
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.prose ul {
+  padding-left: 1.25rem;
+}
+
+.prose li {
+  margin-bottom: 0.6rem;
+}
+
+.prose li::marker {
+  color: var(--accent);
+}
+
+.prose a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.prose > section.card {
+  margin-top: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.prose > section.card h2 {
+  margin-top: 0;
+}
+
+/* Not found */
+
+.not-found {
+  max-width: 34rem;
+  margin: clamp(2rem, 8vw, 5rem) auto;
+  text-align: center;
+}
+
+.not-found__code {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 3rem + 8vw, 8rem);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 32px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.not-found__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}

@@ -1,6 +1,6 @@
 # Redesign plan (branch `redesign`)
 
-Status: **phases 1–6 done (foundations, shell, list page and voting, standings and results, index and landing, admin); phase 7 (content and polish) next** (see [Decisions](#decisions)).
+Status: **all seven phases done.** The pre-redesign stylesheet is gone (see [Decisions](#decisions) and [Open questions](#open-questions)).
 
 Goal: make hivemind feel distinctive, smooth and fun on desktop and mobile while keeping every
 behaviour, every privacy rule and the architecture in [AGENTS.md](../AGENTS.md). The redesign is
@@ -194,10 +194,9 @@ A fork that wants a different frontend keeps `services/ state/ lib/ composables/
 src/web/public/
   styles.css                 entry: @layer order + @imports, nothing else
   themes/night/tokens.css    colours (light + dark), type, radii, shadows, motion: the reskin surface
-  styles/legacy.css          pre-redesign rules, lowest layer; each phase moves what it keeps out
   styles/base.css            reset, typography, focus, utilities
-  styles/components.css      primitives (dialog, sheet, menu, tabs, chips, pills, cards)
-  styles/pages.css           page layouts
+  styles/components.css      primitives (dialog, toasts); controls.css and shell.css alongside
+  styles/<page>.css          list, standings, index, admin, content: one file per page family
 ```
 
 - Cascade layers: `@layer tokens, base, components, pages, overrides;` A fork adds an
@@ -229,7 +228,8 @@ Each phase leaves `npm run check` green and the site usable.
 5. **Index and landing.**
 6. **Admin.** Editor sections and sticky save bar, lifecycle panel, Roles, Backups; fix A1–A2.
 7. **Content and polish.** About, Privacy, Not found; a11y cases for every new state in
-   `a11y.test.ts`; AGENTS.md "Web app" section updated; README screenshots.
+   `a11y.test.ts`; AGENTS.md "Web app" section updated. README screenshots: left out, see Open
+   questions.
 
 ## Decisions
 
@@ -245,6 +245,9 @@ Each phase leaves `npm run check` green and the site usable.
 | Q8  | Real-browser layout tests        | **Yes**: `@playwright/test` as a dev dependency, a small overflow suite at 320/375/1280 px against the built app with a mocked API, run in CI |
 
 ## Open questions
+
+- **README screenshots.** Not added: images in the repository grow every clone, and they go
+  stale with each visual change. Worth it only if the README is the project's shop window.
 
 - **Theme flash.** The CSP forbids inline scripts, so a saved theme is applied by the app's module
   script, after the stylesheet. A member whose saved choice differs from their system may see a

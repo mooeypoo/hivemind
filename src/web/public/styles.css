@@ -4,10 +4,9 @@
  * rules to the overrides layer. See docs/theming.md.
  */
 
-@layer tokens, legacy, base, components, pages, overrides;
+@layer tokens, base, components, pages, overrides;
 
 @import url('themes/night/tokens.css') layer(tokens);
-@import url('styles/legacy.css') layer(legacy);
 @import url('styles/base.css') layer(base);
 @import url('styles/components.css') layer(components);
 @import url('styles/controls.css') layer(components);
@@ -16,3 +15,4 @@
 @import url('styles/standings.css') layer(pages);
 @import url('styles/index.css') layer(pages);
 @import url('styles/admin.css') layer(pages);
+@import url('styles/content.css') layer(pages);
