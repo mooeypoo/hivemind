@@ -10,6 +10,7 @@ import type {
   RoleLabelsDto,
 } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
+import { useToast } from '../composables/toast.ts';
 import EventCountdown from '../components/EventCountdown.vue';
 import EntryCard from '../components/EntryCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
@@ -31,7 +32,7 @@ const error = ref<ApiError | null>(null);
 const scores = ref<Readonly<Record<string, number>>>({});
 const publicScores = ref<PublicScoresDto>({ visible: false });
 const leaderboardRows = ref<readonly LeaderboardRowDto[] | null>(null);
-const shareStatus = ref('');
+const toast = useToast();
 
 const orderedEntries = computed(() => {
   const entries = [...(list.value?.entries ?? [])];
@@ -77,9 +78,9 @@ const copyMemberLink = async () => {
   ).toString();
   try {
     await navigator.clipboard.writeText(url);
-    shareStatus.value = 'Member link copied. Sign-in is required to view or take part.';
+    toast.show('Member link copied. Sign-in is required to view or take part.', 'success');
   } catch {
-    shareStatus.value = 'Copy failed. You can share this page address with community members.';
+    toast.show('Copy failed. You can share this page address with community members.', 'error');
   }
 };
 watch(() => route.params.slug, load, { immediate: true });
@@ -158,7 +159,6 @@ const onScored = (ballot: BallotDto) => {
         Copy member link
       </button>
     </header>
-    <p v-if="shareStatus !== ''" class="share-status" role="status">{{ shareStatus }}</p>
 
     <p v-if="list.description !== ''" class="lead">{{ list.description }}</p>
     <EventCountdown v-if="next !== null" :label="next.label" :at="next.at" />

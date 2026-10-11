@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import type { LeaderboardDto, ListDetailDto } from '../../server/http/contracts.ts';
+import { useToast } from '../composables/toast.ts';
 import { openTmdbList, stubApi } from '../testing/fixtures.ts';
 import ListPage from './ListPage.vue';
 
@@ -192,6 +193,6 @@ describe('ListPage rating', () => {
     await page.get('.share-link').trigger('click');
     await flushPromises();
     expect(writeText).toHaveBeenCalledWith('http://localhost:3000/lists/games');
-    expect(page.get('.share-status').text()).toContain('Sign-in is required');
+    expect(useToast().toasts.value.at(-1)?.message).toContain('Sign-in is required');
   });
 });

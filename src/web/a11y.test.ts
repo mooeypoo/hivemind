@@ -263,9 +263,12 @@ describe('score visibility editor', () => {
     expect(button).not.toBeUndefined();
     button?.click();
     await flushPromises();
-    expect(
-      document.querySelector('dialog[aria-label="Make scores private?"]')?.textContent,
-    ).toContain(
+    const dialog = [...document.querySelectorAll('dialog')].find(
+      (item) =>
+        document.getElementById(item.getAttribute('aria-labelledby') ?? '')?.textContent ===
+        'Make scores private?',
+    );
+    expect(dialog?.textContent).toContain(
       'Members will no longer see who gave what score. This setting can’t be changed back.',
     );
     wrapper.unmount();

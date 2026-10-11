@@ -115,6 +115,22 @@ const config: IConfiguration = {
       to: { dependencyTypes: ['core'] },
     },
     {
+      name: 'web-ui-primitives-dumb',
+      comment:
+        'UI primitives (web/components/ui) take props and emit events; they never reach the API, app state or composables.',
+      severity: 'error',
+      from: { path: '^src/web/components/ui/', pathNot: TEST_FILE },
+      to: { path: '^src/web/(services|state|composables|pages)/' },
+    },
+    {
+      name: 'web-composables-headless',
+      comment:
+        'Composables hold behaviour without markup, so a fork can reuse them under its own UI.',
+      severity: 'error',
+      from: { path: '^src/web/composables/', pathNot: TEST_FILE },
+      to: { path: '^src/web/(components|pages)/' },
+    },
+    {
       name: 'zod-at-boundary',
       comment: 'zod validates input at the HTTP boundary only.',
       severity: 'error',

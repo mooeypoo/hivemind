@@ -12,6 +12,7 @@ export default defineConfig({
       VITE_SOURCE_URL: 'https://github.com/mooeypoo/hivemind',
     },
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-    exclude: ['test/boundaries/fixture/**'],
+    // test/e2e runs in real browsers under Playwright (npm run test:e2e).
+    exclude: ['test/boundaries/fixture/**', 'test/e2e/**'],
   },
 });

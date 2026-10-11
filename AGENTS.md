@@ -52,7 +52,7 @@ src/
     platform.ts           Clock, IdGenerator, Blobs stores, fetch: what the runtime provides
     functions.ts          the only module netlify/functions imports: `handle(endpoint)` and the endpoints
     http/                 zod schemas, cookies, auth/origin checks, Result → HTTP mapping, endpoints/, contracts.ts (API types)
-  web/                    Vue app: pages/, components/, services/api.ts (typed fetch), state/, lib/ (pure helpers), public/styles.css
+  web/                    Vue app: pages/, components/ (ui/ holds the primitives), composables/ (headless behaviour), services/api.ts (typed fetch), state/, lib/ (pure helpers), public/ (styles.css, styles/, themes/)
 netlify/functions/        thin handlers: parse → use case → map. No business logic.
 ```
 
@@ -70,6 +70,7 @@ netlify/functions/        thin handlers: parse → use case → map. No business
 - zod is imported only in `src/server/http`.
 - `netlify/functions` imports only `src/server`.
 - `web` imports only types from `src/server/http/contracts.ts`.
+- `web/components/ui` (primitives) never imports `services`, `state`, `composables` or `pages`; `web/composables` never imports `components` or `pages`.
 
 Each rule has a case in `test/boundaries/`. A new rule gets a new fixture case in the same change.
 
@@ -202,10 +203,12 @@ Request bodies are JSON, at most 256 KB, validated by zod with unknown keys reje
 ## Web app
 
 - Vue 3 with `<script setup lang="ts">`, `vue-router`, and no UI kit. The web app imports only types from `contracts.ts`; it calls the API through `services/api.ts`.
-- **Styling lives only in `src/web/public/styles.css`.** The CSP (`style-src 'self'`) blocks `<style>` blocks and inline `style` attributes, including the ones Vite injects in development. ESLint rejects `<style>` blocks and `style` bindings in `.vue` files.
-- **Mobile-first and accessible:** semantic landmarks and a skip link, a label for every input, errors announced with `role="alert"`, visible focus, WCAG AA contrast, light and dark themes from `prefers-color-scheme`, 44 px touch targets, and no horizontal scrolling at 320 px.
+- **Styling lives only in static CSS under `src/web/public`.** The CSP (`style-src 'self'`) blocks `<style>` blocks and inline `style` attributes, including the ones Vite injects in development. ESLint rejects `<style>` blocks and `style` bindings in `.vue` files. `styles.css` declares the cascade layers and imports the theme (`themes/night/tokens.css`, every colour, font, radius and duration as a token) and the stylesheets in `styles/`, which use tokens only, never colour literals (tested). See [docs/theming.md](docs/theming.md).
+- **Layers.** `services/`, `state/`, `lib/` and `composables/` are the system: behaviour without markup. `components/ui/` holds primitives (props in, events out). `components/` and `pages/` wire the two. A fork can replace the theme, or the whole UI, and keep the system.
+- **Mobile-first and accessible:** semantic landmarks and a skip link, a label for every input, errors announced with `role="alert"`, visible focus, WCAG AA contrast, light and dark modes, 44 px touch targets, and no horizontal scrolling at 320 px.
 - Authorization stays in use cases. The UI hides what a member can't do (it reads `viewer` and `isAdmin`), but the server decides.
-- **Accessibility is tested.** `src/web/a11y.test.ts` mounts the whole app on every route in realistic states and runs axe (WCAG 2.1 A/AA and best practice); a new route or state gets a case there. `test/web/contrast.test.ts` checks every colour token pair in both themes (4.5:1 for text, 3:1 for control borders and focus). Each page sets its title with `usePageTitle`, and focus moves to the page on navigation.
+- **Accessibility is tested.** `src/web/a11y.test.ts` mounts the whole app on every route in realistic states and runs axe (WCAG 2.1 A/AA and best practice); a new route or state gets a case there. `test/web/contrast.test.ts` checks every colour token pair in both modes (4.5:1 for text, 3:1 for control borders and focus). Each page sets its title with `usePageTitle`, and focus moves to the page on navigation.
+- **Layout is tested in real browsers.** `npm run test:e2e` (Playwright, `test/e2e/`) runs the built app against a fake API and fails if any route scrolls sideways at 320, 375 or 1280 px, in light and dark mode. CI runs it; a new route gets a case there.
 - The header's site menu links to Lists, About and Privacy. `/about` describes list participation, score visibility, the community and credits.
 - Logic worth testing goes in `lib/` as pure functions. Components are tested with `@vue/test-utils` in happy-dom (`// @vitest-environment happy-dom`).
 - Netlify serves `index.html` for any path that isn't a file or a function, so deep links work.

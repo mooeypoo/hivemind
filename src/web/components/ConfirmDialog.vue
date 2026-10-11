@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
+import AppDialog from './ui/AppDialog.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -14,9 +15,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
-const dialog = ref<HTMLDialogElement | null>(null);
 const typed = ref('');
-const inputId = `confirm-${Math.random().toString(36).slice(2)}`;
+const inputId = useId();
 
 const canConfirm = computed(
   () => props.confirmText === undefined || typed.value.trim() === props.confirmText,
@@ -24,18 +24,15 @@ const canConfirm = computed(
 
 watch(
   () => props.open,
-  (open) => {
+  () => {
     typed.value = '';
-    if (open) dialog.value?.showModal();
-    else dialog.value?.close();
   },
 );
 </script>
 
 <template>
-  <dialog ref="dialog" class="dialog" :aria-label="title" @cancel.prevent="emit('cancel')">
-    <h2 class="dialog__title">{{ title }}</h2>
-    <div class="dialog__body"><slot /></div>
+  <AppDialog :open="open" :title="title" @close="emit('cancel')">
+    <slot />
     <div v-if="confirmText !== undefined" class="stack dialog__confirm">
       <label :for="inputId">
         Type <code>{{ confirmText }}</code> to confirm
@@ -49,8 +46,8 @@ watch(
         spellcheck="false"
       />
     </div>
-    <div class="actions">
-      <!-- Focus starts on the safe choice; the native modal dialog traps focus and restores it on close. -->
+    <template #actions>
+      <!-- Focus starts on the safe choice. -->
       <button type="button" class="button" autofocus @click="emit('cancel')">Cancel</button>
       <button
         type="button"
@@ -61,6 +58,6 @@ watch(
       >
         {{ confirmLabel }}
       </button>
-    </div>
-  </dialog>
+    </template>
+  </AppDialog>
 </template>

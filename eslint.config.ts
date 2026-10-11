@@ -34,12 +34,12 @@ export default defineConfig(
   },
   {
     // AGENTS.md: the CSP (style-src 'self') blocks inline styles, so all styling lives in
-    // src/web/public/styles.css.
+    // static CSS under src/web/public.
     files: ['src/web/**/*.vue'],
     rules: {
       'vue/no-restricted-block': [
         'error',
-        { element: 'style', message: 'Put styles in src/web/public/styles.css (CSP).' },
+        { element: 'style', message: 'Put styles in src/web/public/styles/ (CSP).' },
       ],
       'vue/no-restricted-static-attribute': [
         'error',

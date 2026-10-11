@@ -1,0 +1,63 @@
+/*
+ * Night cinema: the default theme. This file is the whole reskin surface: every colour, font,
+ * radius, shadow and duration the stylesheets use is a token here. Each colour is
+ * light-dark(light, dark); test/web/contrast.test.ts checks every pair in both modes.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Page and surfaces */
+  --bg: light-dark(#f7f4ee, #0c0e14);
+  --surface: light-dark(#ffffff, #161a24);
+  --surface-2: light-dark(#efe9de, #212736);
+  --text: light-dark(#17181e, #f4f1ea);
+  --muted: light-dark(#545967, #aab1c2);
+  --border: light-dark(#ddd6c8, #2b3243);
+  /* Boundaries of inputs and buttons: at least 3:1 against the page (WCAG 1.4.11). */
+  --control-border: light-dark(#7b8090, #737d93);
+
+  /* Marquee gold: primary actions, scores, links */
+  --accent: light-dark(#9a4600, #ffc94d);
+  --accent-text: light-dark(#ffffff, #1a1405);
+  --accent-soft: light-dark(#f6e7c8, #2a2516);
+  /* Neon: what is yours (your score, your nomination) */
+  --highlight: light-dark(#b8125a, #ff6fae);
+
+  --danger: light-dark(#b3261e, #ff8a80);
+  --success: light-dark(#1d6b45, #6fe3a5);
+  --focus: light-dark(#0b6aa2, #5ad1ff);
+  --backdrop: light-dark(rgb(23 24 30 / 45%), rgb(0 0 0 / 70%));
+  --shadow-color: light-dark(rgb(23 24 30 / 14%), rgb(0 0 0 / 55%));
+  --shadow-raised: 0 8px 28px var(--shadow-color);
+
+  /* Shape and rhythm */
+  --radius: 10px;
+  --radius-lg: 16px;
+  --space: 1.125rem;
+
+  /* Type */
+  --font-display: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-body: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+
+  /* Motion: zeroed under prefers-reduced-motion */
+  --duration-fast: 120ms;
+  --duration: 220ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* A member's choice of Light or Dark (data-theme on <html>) overrides the system setting. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration: 0ms;
+  }
+}
