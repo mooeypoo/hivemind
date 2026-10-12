@@ -55,6 +55,9 @@ export interface CatalogItemDto {
   readonly title: string;
   readonly subtitle: string | null;
   readonly imageUrl: string | null;
+  readonly overview?: string;
+  readonly director?: string;
+  readonly cast?: readonly string[];
 }
 
 /** `GET /api/catalog/sources` */
@@ -168,6 +171,15 @@ export type ScheduleListRequest = ScheduleDto;
 /** `GET /api/lists/:list/search?q=` */
 export interface SearchResultsDto {
   readonly items: readonly CatalogItemDto[];
+}
+
+/** `POST /api/lists/:list/refresh-movie-details` */
+export interface RefreshMovieDetailsDto {
+  readonly eligible: number;
+  readonly updated: number;
+  readonly skipped: number;
+  readonly failed: number;
+  readonly remaining: number;
 }
 
 /** `POST /api/lists/:list/entries` body: an item from search, or a title for a free-text list. */

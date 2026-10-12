@@ -102,8 +102,28 @@ const responses = (me: MeDto | null): Record<string, unknown> => ({
 });
 
 /** Serves every `/api/` request from the fake API; `me: null` is a signed-out visitor. */
-export const fakeApi = async (page: Page, me: MeDto | null) => {
+export const fakeApi = async (
+  page: Page,
+  me: MeDto | null,
+  options: { readonly movieSearch?: boolean } = {},
+) => {
   const routes = responses(me);
+  if (options.movieSearch === true) {
+    routes['GET /api/lists/films'] = { ...list, itemSource: { kind: 'tmdb-movie' } };
+    routes['GET /api/lists/list-1/search'] = {
+      items: [
+        {
+          source: 'tmdb-movie',
+          externalId: '78',
+          title: 'Blade Runner',
+          subtitle: '1982',
+          imageUrl: null,
+          overview:
+            'A blade runner must pursue replicants in a future Los Angeles where the line between human and machine is uncertain.',
+        },
+      ],
+    };
+  }
   await page.route('**/api/**', (route: Route) => {
     const url = new URL(route.request().url());
     if (

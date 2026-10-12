@@ -9,6 +9,8 @@ import type {
 import { api, type ApiError } from '../services/api.ts';
 import { formatDateTime } from '../lib/datetime.ts';
 import { clearDraft, loadDraft, saveDraft } from '../lib/drafts.ts';
+import AppDialog from './ui/AppDialog.vue';
+import ItemArt from './ui/ItemArt.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 const props = defineProps<{ list: ListDetailDto }>();
@@ -43,6 +45,7 @@ const busy = ref(false);
 const announcement = ref('');
 const query = ref('');
 const results = ref<readonly CatalogItemDto[]>([]);
+const selectedItem = ref<CatalogItemDto | null>(null);
 const searched = ref(false);
 const searching = ref(false);
 let debounce: ReturnType<typeof setTimeout> | undefined;
@@ -114,6 +117,18 @@ const submitTitle = async () => {
   if (await nominate({ title: title.value })) {
     title.value = '';
     clearDraft(draftKey);
+  }
+};
+
+const review = (item: CatalogItemDto) => {
+  selectedItem.value = item;
+  error.value = null;
+};
+
+const nominateSelected = async () => {
+  const item = selectedItem.value;
+  if (item !== null && (await nominate({ externalId: item.externalId }))) {
+    selectedItem.value = null;
   }
 };
 </script>
@@ -195,6 +210,7 @@ const submitTitle = async () => {
               <span v-if="item.subtitle !== null" class="result__subtitle">{{
                 item.subtitle
               }}</span>
+              <span v-if="item.overview != null" class="result__overview">{{ item.overview }}</span>
             </span>
             <span v-if="inList.has(`${item.source}:${item.externalId}`)" class="tag"
               >Already in the list</span
@@ -204,15 +220,69 @@ const submitTitle = async () => {
               type="button"
               class="button"
               :disabled="busy"
-              @click="nominate({ externalId: item.externalId })"
+              @click="
+                item.source === 'tmdb-movie'
+                  ? review(item)
+                  : nominate({ externalId: item.externalId })
+              "
             >
-              Nominate
+              {{ item.source === 'tmdb-movie' ? 'Review' : 'Nominate' }}
             </button>
           </li>
         </ul>
       </div>
     </template>
 
-    <ErrorNotice :error="error" />
+    <ErrorNotice v-if="selectedItem === null" :error="error" />
+
+    <AppDialog
+      :open="selectedItem !== null"
+      :title="selectedItem?.title ?? ''"
+      @close="selectedItem = null"
+    >
+      <div v-if="selectedItem !== null" class="nomination-review">
+        <ItemArt
+          :title="selectedItem.title"
+          :subtitle="selectedItem.subtitle"
+          :image-url="selectedItem.imageUrl"
+          :alt="`Poster for ${selectedItem.title}`"
+          size="large"
+        />
+        <div class="nomination-review__info">
+          <p v-if="selectedItem.subtitle !== null" class="entry-details__subtitle">
+            {{ selectedItem.subtitle }}
+          </p>
+          <p v-if="selectedItem.overview != null" class="nomination-review__overview">
+            {{ selectedItem.overview }}
+          </p>
+          <p v-else class="meta">No overview available.</p>
+          <dl
+            v-if="selectedItem.director != null || selectedItem.cast != null"
+            class="entry-details__credits"
+          >
+            <div v-if="selectedItem.director != null">
+              <dt>Director</dt>
+              <dd>{{ selectedItem.director }}</dd>
+            </div>
+            <div v-if="selectedItem.cast != null && selectedItem.cast.length > 0">
+              <dt>Starring</dt>
+              <dd>{{ selectedItem.cast.join(', ') }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+      <ErrorNotice :error="error" />
+      <template #actions>
+        <button type="button" class="button" @click="selectedItem = null">Cancel</button>
+        <button
+          type="button"
+          class="button button--primary"
+          :disabled="busy"
+          @click="nominateSelected"
+        >
+          Nominate
+        </button>
+      </template>
+    </AppDialog>
   </section>
 </template>

@@ -142,14 +142,33 @@ export const signInAs = async (
 
 const TMDB_MOVIES: Record<
   string,
-  { id: number; title: string; release_date: string; poster_path: string }
+  {
+    id: number;
+    title: string;
+    release_date: string;
+    poster_path: string;
+    overview: string;
+    credits: { crew: { job: string; name: string }[]; cast: { name: string }[] };
+  }
 > = {
-  '78': { id: 78, title: 'Blade Runner', release_date: '1982-06-25', poster_path: '/br.jpg' },
+  '78': {
+    id: 78,
+    title: 'Blade Runner',
+    release_date: '1982-06-25',
+    poster_path: '/br.jpg',
+    overview: 'A blade runner must pursue replicants.',
+    credits: {
+      crew: [{ job: 'Director', name: 'Ridley Scott' }],
+      cast: [{ name: 'Harrison Ford' }, { name: 'Rutger Hauer' }],
+    },
+  },
   '335984': {
     id: 335984,
     title: 'Blade Runner 2049',
     release_date: '2017-10-04',
     poster_path: '/br2049.jpg',
+    overview: 'A new blade runner discovers a buried secret.',
+    credits: { crew: [], cast: [] },
   },
 };
 

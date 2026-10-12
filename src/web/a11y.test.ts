@@ -126,6 +126,7 @@ const renderAt = async (
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
 });
@@ -154,6 +155,37 @@ describe('every page passes automated accessibility checks', () => {
   ])('%s', async (_, path, signedIn, demo = false, publicScores = false) => {
     const wrapper = await renderAt(path, signedIn, demo, publicScores);
     await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
+  test('the movie nomination review dialog is accessible', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    stubApi({
+      'GET /api/lists/list-1/search': () =>
+        Response.json({
+          items: [
+            {
+              source: 'tmdb-movie',
+              externalId: '78',
+              title: 'Blade Runner',
+              subtitle: '1982',
+              imageUrl: null,
+              overview: 'A blade runner must pursue replicants.',
+            },
+          ],
+        }),
+    });
+    vi.useFakeTimers();
+
+    await wrapper.get('#list-tab-nominate').trigger('click');
+    await wrapper.get('input[type=search]').setValue('blade');
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    await wrapper.get('.result button').trigger('click');
+    await flushPromises();
+    vi.useRealTimers();
+    await expectAccessible(document.body);
+
     wrapper.unmount();
   });
 });

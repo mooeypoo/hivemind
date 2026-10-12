@@ -36,6 +36,22 @@ const emit = defineEmits<{
         <p v-if="entry.item.subtitle !== null" class="entry-details__subtitle">
           {{ entry.item.subtitle }}
         </p>
+        <p v-if="entry.item.overview != null" class="entry-details__overview">
+          {{ entry.item.overview }}
+        </p>
+        <dl
+          v-if="entry.item.director != null || entry.item.cast != null"
+          class="entry-details__credits"
+        >
+          <div v-if="entry.item.director != null">
+            <dt>Director</dt>
+            <dd>{{ entry.item.director }}</dd>
+          </div>
+          <div v-if="entry.item.cast != null && entry.item.cast.length > 0">
+            <dt>Starring</dt>
+            <dd>{{ entry.item.cast.join(', ') }}</dd>
+          </div>
+        </dl>
         <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
         <p v-else-if="entry.nominatedBy !== null" class="entry__meta">
           Nominated by {{ entry.nominatedBy }}

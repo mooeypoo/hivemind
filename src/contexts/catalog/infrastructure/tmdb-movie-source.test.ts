@@ -32,7 +32,7 @@ describe('TMDB movie source', () => {
     const { fetchFn, urls, headers } = fakeFetch(() =>
       Response.json({
         results: [
-          bladeRunner,
+          { ...bladeRunner, overview: 'A blade runner must pursue replicants.' },
           { id: 2, title: 'Adult', adult: true },
           { id: 3, title: 'No Date', release_date: '', poster_path: null },
           { nonsense: true },
@@ -54,6 +54,7 @@ describe('TMDB movie source', () => {
           title: 'Blade Runner',
           subtitle: '1982',
           imageUrl: 'https://image.tmdb.org/t/p/w342/63N9uy8nd9j7Eog2axPQ8lbr3Wj.jpg',
+          overview: 'A blade runner must pursue replicants.',
         },
         { source: 'tmdb-movie', externalId: '3', title: 'No Date', subtitle: null, imageUrl: null },
       ],
@@ -64,7 +65,32 @@ describe('TMDB movie source', () => {
     const { fetchFn, urls } = fakeFetch(() => Response.json(bladeRunner));
     const result = await createTmdbMovieSource('t', fetchFn).resolve(ref, '78');
     expect(urls[0]?.pathname).toBe('/3/movie/78');
+    expect(urls[0]?.searchParams.get('append_to_response')).toBe('credits');
     expect(result.ok && result.value.title).toBe('Blade Runner');
+  });
+
+  test('maps overview, director, and two actors for the extended movie view', async () => {
+    const { fetchFn } = fakeFetch(() =>
+      Response.json({
+        ...bladeRunner,
+        overview: 'A blade runner must pursue replicants.',
+        credits: {
+          crew: [{ job: 'Director', name: 'Ridley Scott' }],
+          cast: [{ name: 'Harrison Ford' }, { name: 'Rutger Hauer' }, { name: 'Sean Young' }],
+        },
+      }),
+    );
+
+    const result = await createTmdbMovieSource('t', fetchFn).resolve(ref, '78');
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        overview: 'A blade runner must pursue replicants.',
+        director: 'Ridley Scott',
+        cast: ['Harrison Ford', 'Rutger Hauer'],
+      },
+    });
   });
 
   test('treats an unknown id, a non-numeric id, or an adult title as not found', async () => {

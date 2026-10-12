@@ -35,9 +35,10 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         list private hides its public scores, and deleting your data removes your scores and name.
       </li>
       <li v-if="site.info?.offersMovieData !== false">
-        <strong>Details of nominated movies</strong> (title, year, poster address) from TMDB. These
-        are about the movies, not about you. Six months after a list is archived, they are removed:
-        the entry keeps its scores and place, labelled “details removed”.
+        <strong>Details of nominated movies</strong> (title, year, poster address, overview,
+        director, and two cast members) from TMDB. These are about the movies, not about you. Six
+        months after a list is archived, they are removed: the entry keeps its scores and place,
+        labelled “details removed”.
       </li>
     </ul>
 

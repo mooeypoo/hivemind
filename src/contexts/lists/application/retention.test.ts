@@ -66,6 +66,9 @@ const entry = (listId: string, source: string, title: string): Entry => {
     title,
     subtitle: '1982',
     imageUrl: 'https://image.tmdb.org/t/p/w342/x.jpg',
+    overview: 'A blade runner must pursue replicants.',
+    director: 'Ridley Scott',
+    cast: ['Harrison Ford', 'Rutger Hauer'],
   };
   return {
     id: entryIdFor(item),
@@ -109,9 +112,15 @@ describe('snapshot retention', () => {
       (e) => e.item.source === 'tmdb-movie',
     );
     expect(purged).toMatchObject({
-      item: { externalId: 'blade runner', subtitle: null },
+      item: {
+        externalId: 'blade runner',
+        subtitle: null,
+      },
       snapshotPurgedAt: clock.now(),
     });
+    expect(purged?.item).not.toHaveProperty('overview');
+    expect(purged?.item).not.toHaveProperty('director');
+    expect(purged?.item).not.toHaveProperty('cast');
   });
 
   test('is idempotent', async () => {

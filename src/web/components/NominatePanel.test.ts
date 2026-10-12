@@ -10,6 +10,7 @@ const bladeRunner = {
   title: 'Blade Runner',
   subtitle: '1982',
   imageUrl: null,
+  overview: 'A blade runner must pursue replicants.',
 };
 
 beforeEach(() => {
@@ -22,7 +23,7 @@ afterEach(() => {
 });
 
 describe('NominatePanel', () => {
-  test('searches the list as you type, then nominates a result', async () => {
+  test('searches, reviews a movie result, then nominates after confirmation', async () => {
     const calls = stubApi({
       'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunner] }),
       'POST /api/lists/list-1/entries': () =>
@@ -44,14 +45,36 @@ describe('NominatePanel', () => {
     await flushPromises();
     expect(calls[0]?.url).toBe('/api/lists/list-1/search?q=blade');
     expect(panel.text()).toContain('Blade Runner');
+    expect(panel.text()).toContain('A blade runner must pursue replicants.');
 
     await panel.get('.result button').trigger('click');
+    await flushPromises();
+    expect(calls).toHaveLength(1);
+    expect(panel.get('dialog').text()).toContain('A blade runner must pursue replicants.');
+
+    await panel.get('dialog .button--primary').trigger('click');
     await flushPromises();
     expect(calls[1]).toMatchObject({ method: 'POST', body: { externalId: '78' } });
     expect(panel.emitted('nominated')).toHaveLength(1);
     expect((panel.get('input[type=search]').element as HTMLInputElement).value).toBe('');
     expect(panel.find('.results').exists()).toBe(false);
     expect(panel.get('[role=status]').text()).toContain('Nominated Blade Runner');
+  });
+
+  test('canceling a reviewed movie does not nominate it', async () => {
+    const calls = stubApi({
+      'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunner] }),
+    });
+    const panel = mount(NominatePanel, { props: { list: openTmdbList() } });
+
+    await panel.get('input[type=search]').setValue('blade');
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    await panel.get('.result button').trigger('click');
+    await panel.get('dialog .button:not(.button--primary)').trigger('click');
+
+    expect(calls).toHaveLength(1);
+    expect(panel.find('dialog[open]').exists()).toBe(false);
   });
 
   test('announces when the catalog search is still loading', async () => {

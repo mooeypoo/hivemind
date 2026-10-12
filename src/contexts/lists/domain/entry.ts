@@ -10,6 +10,9 @@ export interface ItemSnapshot {
   readonly title: string;
   readonly subtitle: string | null;
   readonly imageUrl: string | null;
+  readonly overview?: string;
+  readonly director?: string;
+  readonly cast?: readonly string[];
 }
 
 /** Display name is a snapshot too, so lists never needs identity. Erasure sets it to null. */

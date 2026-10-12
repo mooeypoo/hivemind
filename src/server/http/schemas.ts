@@ -132,6 +132,9 @@ const backupListPart = z.object({
           title: z.string().max(500),
           subtitle: z.string().max(500).nullable(),
           imageUrl: z.url().max(500).nullable(),
+          overview: z.string().max(10_000).optional(),
+          director: z.string().max(200).optional(),
+          cast: z.array(z.string().max(200)).max(2).optional(),
         }),
         nominatedBy: z
           .object({ memberId: z.string().max(40), displayName: z.string().max(200) })

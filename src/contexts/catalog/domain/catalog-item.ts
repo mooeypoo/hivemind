@@ -20,4 +20,7 @@ export interface CatalogItem {
   readonly subtitle: string | null;
   /** Only ever on a host allowed by the CSP `img-src`. */
   readonly imageUrl: string | null;
+  readonly overview?: string;
+  readonly director?: string;
+  readonly cast?: readonly string[];
 }

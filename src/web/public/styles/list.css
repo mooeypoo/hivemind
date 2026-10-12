@@ -658,6 +658,24 @@
   color: var(--muted);
 }
 
+.entry-details__overview {
+  max-width: 62ch;
+}
+
+.entry-details__credits {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.entry-details__credits dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.entry-details__credits dd {
+  margin: 0;
+}
+
 .entry-details__stats {
   display: flex;
   gap: 1.5rem;
@@ -837,6 +855,31 @@
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.2;
+}
+
+.result__overview {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.nomination-review {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.nomination-review__info {
+  min-width: 0;
+}
+
+.nomination-review__overview {
+  max-width: 62ch;
+  white-space: pre-line;
 }
 
 .attribution {

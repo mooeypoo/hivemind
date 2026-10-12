@@ -61,6 +61,23 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`movie nomination review at ${String(width)} px fits on screen`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin, { movieSearch: true });
+        await page.goto('/lists/films');
+        await page.getByRole('tab', { name: 'Nominate' }).click();
+        await page.getByRole('searchbox', { name: 'Search' }).fill('blade');
+        const reviewButton = page.getByRole('button', { name: 'Review' });
+        await expect(reviewButton).toBeVisible();
+        await expect(page.getByText(/A blade runner must pursue replicants/)).toBeVisible();
+        await reviewButton.click();
+        const review = page.getByRole('dialog', { name: 'Blade Runner' });
+        await expect(review.getByText(/line between human and machine/)).toBeVisible();
+        const box = await review.boundingBox();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+        await expectNoSidewaysScroll(page);
+      });
+
       test(`withdrawing a nomination at ${String(width)} px fits and refreshes the list`, async ({
         page,
       }) => {
