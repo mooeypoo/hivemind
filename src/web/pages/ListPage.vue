@@ -131,9 +131,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
           Voting stays open until an Admin closes it.
         </p>
         <div class="list-hero__actions">
-          <button type="button" class="button share-link" @click="copyMemberLink">
-            Copy member link
-          </button>
+          <button type="button" class="button share-link" @click="copyMemberLink">Copy link</button>
           <RouterLink
             v-if="hasStandings && !resultsSealed"
             :to="{ name: 'list-results', params: { slug: list.slug } }"

@@ -41,6 +41,9 @@ const final = computed(
 const canRate = computed(
   () => list.value?.lifecycle === 'open' && list.value.viewer.canParticipate,
 );
+const canNominate = computed(
+  () => list.value?.entryMode === 'nominations' && list.value.viewer.canNominate,
+);
 </script>
 
 <template>
@@ -60,13 +63,22 @@ const canRate = computed(
       <p class="lead">
         {{ final ? 'Final results.' : 'Where things stand right now. Positions can still change.' }}
       </p>
-      <RouterLink
-        v-if="canRate"
-        :to="{ name: 'list', params: { slug: list.slug } }"
-        class="button button--primary"
-      >
-        Rate entries
-      </RouterLink>
+      <div v-if="canRate || canNominate" class="results-hero__actions">
+        <RouterLink
+          v-if="canRate"
+          :to="{ name: 'list', params: { slug: list.slug } }"
+          class="button button--primary"
+        >
+          Rate entries
+        </RouterLink>
+        <RouterLink
+          v-if="canNominate"
+          :to="{ name: 'list', params: { slug: list.slug }, query: { tab: 'nominate' } }"
+          class="button"
+        >
+          Nominate items
+        </RouterLink>
+      </div>
     </header>
 
     <StandingsBoard

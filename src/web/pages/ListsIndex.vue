@@ -81,7 +81,12 @@ onMounted(async () => {
         </a>
       </div>
       <p class="meta">
-        Sign in with the Discord account you use in this community.
+        Lists are only for members of
+        {{
+          site.info?.community != null
+            ? `the ${site.info.community.name} Discord server`
+            : 'this Discord community'
+        }}. Sign in with the Discord account you use there.
         <RouterLink :to="{ name: 'privacy' }">What we store, and what we don’t</RouterLink>
       </p>
     </div>

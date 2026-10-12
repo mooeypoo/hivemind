@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { session } from '../state/session.ts';
 import { site } from '../state/site.ts';
 import CommunityBadge from './CommunityBadge.vue';
 
@@ -12,6 +13,9 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
         Connected to
         <CommunityBadge v-if="site.info?.community != null" :community="site.info.community" />
         <template v-else>a Discord community</template>.
+        <template v-if="session.me !== null">
+          Lists here are visible only to its signed-in members.
+        </template>
       </p>
       <nav class="site-footer__links" aria-label="Footer">
         <RouterLink :to="{ name: 'about' }">About</RouterLink>

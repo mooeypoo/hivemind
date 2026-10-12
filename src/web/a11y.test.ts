@@ -359,8 +359,20 @@ describe('site-wide content', () => {
   test('the welcome page names the community and offers to join it', async () => {
     const wrapper = await renderAt('/', false);
     expect(document.querySelector('.landing')?.textContent).toContain('For members of Film Club');
+    expect(document.querySelector('.landing')?.textContent).toContain(
+      'Lists are only for members of the Film Club Discord server.',
+    );
+    expect(document.querySelector('.site-footer')?.textContent).not.toContain('signed-in members');
     expect(document.querySelector('a[href="https://discord.gg/x"]')?.textContent.trim()).toBe(
       'Join the server',
+    );
+    wrapper.unmount();
+  });
+
+  test('signed in, the footer says lists are for members only', async () => {
+    const wrapper = await renderAt('/', true);
+    expect(document.querySelector('.site-footer')?.textContent).toContain(
+      'Lists here are visible only to its signed-in members.',
     );
     wrapper.unmount();
   });

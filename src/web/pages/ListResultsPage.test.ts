@@ -155,4 +155,21 @@ describe('ListResultsPage', () => {
     expect(rate !== undefined).toBe(offered);
     if (rate !== undefined) expect(rate.attributes('href')).toBe('/lists/games');
   });
+
+  test.each([
+    ['a list open for nominations', games(), true],
+    [
+      'a list whose nominations are closed or used up',
+      games({ viewer: { canParticipate: true, canNominate: false, nominationsUsed: 3 } }),
+      false,
+    ],
+    ['a seeded list', games({ entryMode: 'seeded' }), false],
+  ])('offers a way to nominate on %s: %s', async (_, list, offered) => {
+    const page = await mountWith(list, { hidden: true, revealsAt: null });
+    const nominate = page.findAll('a').find((link) => link.text() === 'Nominate items');
+    expect(nominate !== undefined).toBe(offered);
+    if (nominate !== undefined) {
+      expect(nominate.attributes('href')).toBe('/lists/games?tab=nominate');
+    }
+  });
 });
