@@ -5,5 +5,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["test/e2e", "src/server/http/contracts.ts"]
+  "include": ["test/e2e", "scripts/screenshots.ts", "src/server/http/contracts.ts"]
 }

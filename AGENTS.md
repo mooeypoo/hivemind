@@ -5,7 +5,7 @@ Members of a Discord server create ranked lists ("Best sci-fi movies"), nominate
 ## Non-negotiables
 
 1. **Domain-driven design with strict bounded contexts.** The boundaries below are enforced by tooling, not by convention.
-2. **TypeScript, strict, everywhere.** That includes the server, the web app, config and scripts.
+2. **TypeScript, strict, everywhere.** That includes the server, the web app, config and scripts. The one exception is `src/web/public/theme-init.js` (see Web app).
 3. **Privacy and security by default.** See the section below. When in doubt, store less and expose less.
 4. **Ship small.** Every milestone must be deployable and green on `npm run check`, and ships the UI for what it adds, so it can be tried in a browser.
 5. **Deployment-agnostic.** One deployment serves one Discord community, and any community can fork and deploy its own. Nothing specific to a community (server, roles, site name, URLs, lists) is written into code: it comes from the environment (see Environment) or from the List aggregate.
@@ -209,7 +209,7 @@ Request bodies are JSON, at most 256 KB, validated by zod with unknown keys reje
 - Authorization stays in use cases. The UI hides what a member can't do (it reads `viewer` and `isAdmin`), but the server decides.
 - **Accessibility is tested.** `src/web/a11y.test.ts` mounts the whole app on every route in realistic states and runs axe (WCAG 2.1 A/AA and best practice); a new route or state gets a case there. `test/web/contrast.test.ts` checks every colour token pair in both modes (4.5:1 for text, 3:1 for control borders and focus). Each page sets its title with `usePageTitle`, and focus moves to the page on navigation.
 - **Layout is tested in real browsers.** `npm run test:e2e` (Playwright, `test/e2e/`) runs the built app against a fake API and fails if any route scrolls sideways at 320, 375 or 1280 px, in light and dark mode. CI runs it; a new route gets a case there.
-- **One menu.** The header shows the site name, Lists and About (on wide screens) and one menu button (the member's avatar, or a menu icon when signed out). It opens a sheet (bottom sheet on phones, a panel under the header on wider screens) with the site links, the Admin pages (`lib/navigation.ts`), Privacy and the member's data actions, the Appearance switch (System, Light, Dark; kept only in `localStorage`, `composables/theme.ts`) and sign-in or sign-out. `/about` describes list participation, score visibility, the community and credits.
+- **One menu.** The header shows the site name, Lists and About (on wide screens) and one menu button (the member's avatar, or a menu icon when signed out). It opens a sheet (bottom sheet on phones, a panel under the header on wider screens) with the site links, the Admin pages (`lib/navigation.ts`), Privacy and the member's data actions, the Appearance switch (System, Light, Dark; kept only in `localStorage`, `composables/theme.ts`) and sign-in or sign-out. A saved Light or Dark choice is applied before the first paint by `public/theme-init.js`, a few lines of plain JavaScript loaded render-blocking in `<head>` (the CSP allows same-origin scripts, never inline ones); `test/web/theme-init.test.ts` keeps it in step with the composable. `/about` describes list participation, score visibility, the community and credits.
 - Logic worth testing goes in `lib/` as pure functions. Components are tested with `@vue/test-utils` in happy-dom (`// @vitest-environment happy-dom`).
 - Netlify serves `index.html` for any path that isn't a file or a function, so deep links work.
 

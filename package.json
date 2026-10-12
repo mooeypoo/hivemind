@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "screenshots": "vite build && node scripts/screenshots.ts",
     "check": "npm run typecheck && npm run lint && npm run depcruise && npm run format:check && npm run test",
     "check:headers": "node scripts/check-headers.ts",
     "seed": "node --env-file-if-exists=.env scripts/seed.ts"

@@ -27,6 +27,12 @@ export default defineConfig(
     },
   },
   {
+    // The one plain-JS file: the pre-paint theme script (see AGENTS.md, Web app).
+    files: ['src/web/public/theme-init.js'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { sourceType: 'script' },
+  },
+  {
     files: ['**/*.vue'],
     languageOptions: {
       parserOptions: { parser: tseslint.parser },

@@ -228,8 +228,8 @@ Each phase leaves `npm run check` green and the site usable.
 5. **Index and landing.**
 6. **Admin.** Editor sections and sticky save bar, lifecycle panel, Roles, Backups; fix A1–A2.
 7. **Content and polish.** About, Privacy, Not found; a11y cases for every new state in
-   `a11y.test.ts`; AGENTS.md "Web app" section updated. README screenshots: left out, see Open
-   questions.
+   `a11y.test.ts`; AGENTS.md "Web app" section updated; README screenshots (in
+   `docs/screenshots/`).
 
 ## Decisions
 
@@ -246,12 +246,12 @@ Each phase leaves `npm run check` green and the site usable.
 
 ## Open questions
 
-- **README screenshots.** Not added: images in the repository grow every clone, and they go
-  stale with each visual change. Worth it only if the README is the project's shop window.
-
-- **Theme flash.** The CSP forbids inline scripts, so a saved theme is applied by the app's module
-  script, after the stylesheet. A member whose saved choice differs from their system may see a
-  brief flash on a full page load. Acceptable for now; the fix (a tiny same-origin script in
-  `<head>`) would be the only non-TypeScript file in the web app.
+- **README screenshots.** Added to `docs/screenshots/` as compressed JPEGs, taken from demo mode
+  with free-text and preset lists only, so no TMDB posters are copied into the repository.
+  Retake them after visible changes.
+- **Theme flash.** Fixed: `public/theme-init.js`, a few lines of plain JavaScript loaded
+  render-blocking in `<head>`, applies a saved Light or Dark choice before the first paint. It's
+  the web app's one non-TypeScript file, by decision; a test keeps it in step with the
+  composable.
 - **Display face.** Phase 2 uses Bricolage Grotesque (variable weight, OFL, latin and latin-ext
   subsets, ~60 KB, in `themes/night/fonts/`). Easy to swap in the theme if you prefer another.
