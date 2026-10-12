@@ -12,10 +12,17 @@ const props = defineProps<{
   entries: readonly EntryDto[];
   scale: { readonly min: number; readonly max: number };
   /** The viewer's own scores, shown beside the community's. Omitted on the results page. */
-  myScores?: Readonly<Record<string, number>>;
-  publicScores?: PublicScoresDto;
+  myScores?: Readonly<Record<string, number>> | undefined;
+  publicScores?: PublicScoresDto | undefined;
+  canVote?: boolean | undefined;
+  scoreState?:
+    | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
+    | undefined;
   /** The level of this board's own headings: one below the page section it sits in. */
-  headingLevel?: 'h2' | 'h3';
+  headingLevel?: 'h2' | 'h3' | undefined;
+}>();
+const emit = defineEmits<{
+  rate: [event: { entryId: string; score: number | null }];
 }>();
 
 const visible = computed(() => (props.board.hidden ? null : props.board));
@@ -115,6 +122,14 @@ const voters = (row: StandingRow) =>
           <p v-if="myScores?.[row.entryId] !== undefined" class="standing__mine">
             You: {{ myScores[row.entryId] }}
           </p>
+          <button
+            v-else-if="canVote"
+            type="button"
+            class="standing__rate-button"
+            @click="selectedId = row.entryId"
+          >
+            + Rate
+          </button>
           <PublicScoreDisclosure v-if="voters(row) !== null" :scores="voters(row) ?? []" />
         </li>
       </ol>
@@ -160,6 +175,14 @@ const voters = (row: StandingRow) =>
                 · you: {{ myScores[row.entryId] }}</template
               >
             </span>
+            <button
+              v-if="canVote && myScores?.[row.entryId] === undefined"
+              type="button"
+              class="standing__rate-button"
+              @click="selectedId = row.entryId"
+            >
+              + Rate
+            </button>
             <svg
               class="score-bar"
               viewBox="0 0 100 6"
@@ -231,6 +254,14 @@ const voters = (row: StandingRow) =>
                   · you: {{ myScores[row.entryId] }}</template
                 >
               </span>
+              <button
+                v-if="canVote && myScores?.[row.entryId] === undefined"
+                type="button"
+                class="standing__rate-button"
+                @click="selectedId = row.entryId"
+              >
+                + Rate
+              </button>
             </span>
           </li>
         </ul>
@@ -274,7 +305,17 @@ const voters = (row: StandingRow) =>
                 Nominated by {{ row.nominatedBy }}
               </span>
             </span>
-            <span class="ranking__numbers meta">No votes yet</span>
+            <span class="ranking__numbers meta">
+              No votes yet
+              <button
+                v-if="canVote && myScores?.[row.entryId] === undefined"
+                type="button"
+                class="standing__rate-button"
+                @click="selectedId = row.entryId"
+              >
+                + Rate
+              </button>
+            </span>
           </li>
         </ul>
       </section>
@@ -290,8 +331,14 @@ const voters = (row: StandingRow) =>
       :scale="scale"
       :standing="selectedStanding"
       :public-scores="selectedVoters"
+      :score="
+        selectedId !== null && canVote && scoreState !== undefined ? scoreState(selectedId) : null
+      "
       :final-score="selectedId === null ? undefined : myScores?.[selectedId]"
       @close="selectedId = null"
+      @change="
+        selectedId !== null ? emit('rate', { entryId: selectedId, score: $event }) : undefined
+      "
     />
   </div>
 </template>

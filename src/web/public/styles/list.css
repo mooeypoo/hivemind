@@ -845,6 +845,45 @@
   margin-bottom: 0.75rem;
 }
 
+.just-nominated {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+}
+
+.just-nominated__content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.just-nominated__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.just-nominated__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.just-nominated__status {
+  margin: 0;
+}
+
+.just-nominated__rating {
+  margin-top: 0.25rem;
+}
+
 .results {
   display: flex;
   flex-direction: column;

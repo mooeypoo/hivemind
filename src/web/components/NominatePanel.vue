@@ -11,11 +11,20 @@ import { formatDateTime } from '../lib/datetime.ts';
 import { clearDraft, loadDraft, saveDraft } from '../lib/drafts.ts';
 import AppDialog from './ui/AppDialog.vue';
 import ItemArt from './ui/ItemArt.vue';
+import ScoreInput from './ui/ScoreInput.vue';
 import MovieMetadata from './MovieMetadata.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
-const props = defineProps<{ list: ListDetailDto }>();
-const emit = defineEmits<{ nominated: [entry: EntryDto] }>();
+const props = defineProps<{
+  list: ListDetailDto;
+  scoreState?:
+    | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
+    | undefined;
+}>();
+const emit = defineEmits<{
+  nominated: [entry: EntryDto];
+  rate: [entryId: string, score: number | null];
+}>();
 
 const isFreeText = computed(() => props.list.itemSource.kind === 'freeform');
 /** Nominations left, or null when they are unlimited. */
@@ -44,6 +53,7 @@ const blocked = computed((): string | null => {
 const error = ref<ApiError | null>(null);
 const busy = ref(false);
 const announcement = ref('');
+const justNominated = ref<EntryDto | null>(null);
 const query = ref('');
 const results = ref<readonly CatalogItemDto[]>([]);
 const selectedItem = ref<CatalogItemDto | null>(null);
@@ -63,6 +73,7 @@ const nominate = async (body: { externalId: string } | { title: string }) => {
     return false;
   }
   announcement.value = `Nominated ${result.data.item.title}.`;
+  justNominated.value = result.data;
   if ('externalId' in body) {
     clearTimeout(debounce);
     query.value = '';
@@ -158,8 +169,44 @@ const nominateSelected = async () => {
     <p v-if="blocked !== null" class="notice">{{ blocked }}</p>
 
     <template v-else>
+      <div
+        v-if="justNominated !== null"
+        class="just-nominated card"
+        aria-labelledby="just-nominated-title"
+      >
+        <div class="just-nominated__content">
+          <ItemArt
+            :title="justNominated.item.title"
+            :subtitle="justNominated.item.subtitle"
+            :image-url="justNominated.item.imageUrl"
+            size="small"
+          />
+          <div class="just-nominated__text">
+            <p class="just-nominated__status meta" role="status">
+              <span class="pill pill--mine">Nominated</span> {{ announcement }}
+            </p>
+            <h3 id="just-nominated-title" class="just-nominated__title">
+              {{ justNominated.item.title }}
+            </h3>
+            <p v-if="justNominated.item.subtitle !== null" class="meta">
+              {{ justNominated.item.subtitle }}
+            </p>
+          </div>
+        </div>
+        <div
+          v-if="list.viewer.canParticipate && scoreState !== undefined"
+          class="just-nominated__rating"
+        >
+          <ScoreInput
+            v-bind="scoreState(justNominated.id)"
+            :scale="list.scale"
+            :item-title="justNominated.item.title"
+            @change="emit('rate', justNominated.id, $event)"
+          />
+        </div>
+      </div>
       <p
-        v-if="announcement !== ''"
+        v-else-if="announcement !== ''"
         class="notice notice--success nomination-feedback"
         role="status"
       >

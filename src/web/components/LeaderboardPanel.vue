@@ -14,9 +14,16 @@ const props = defineProps<{
   list: ListDetailDto;
   /** The caller's own scores, shown beside the community's. */
   myScores: Readonly<Record<string, number>>;
-  publicScores?: PublicScoresDto;
+  publicScores?: PublicScoresDto | undefined;
+  canVote?: boolean | undefined;
+  scoreState?:
+    | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
+    | undefined;
 }>();
-const emit = defineEmits<{ loaded: [board: LeaderboardDto] }>();
+const emit = defineEmits<{
+  loaded: [board: LeaderboardDto];
+  rate: [entryId: string, score: number | null];
+}>();
 
 const board = ref<LeaderboardDto | null>(null);
 const error = ref<ApiError | null>(null);
@@ -70,7 +77,10 @@ const updated = computed(() => {
       :entries="list.entries"
       :scale="list.scale"
       :my-scores="myScores"
+      :can-vote="canVote"
+      :score-state="scoreState"
       v-bind="publicScores === undefined ? {} : { publicScores }"
+      @rate="emit('rate', $event.entryId, $event.score)"
     />
   </section>
 </template>
