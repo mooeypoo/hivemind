@@ -105,9 +105,37 @@ const responses = (me: MeDto | null): Record<string, unknown> => ({
 export const fakeApi = async (
   page: Page,
   me: MeDto | null,
-  options: { readonly movieSearch?: boolean } = {},
+  options: { readonly movieSearch?: boolean; readonly movieDetails?: boolean } = {},
 ) => {
   const routes = responses(me);
+  if (options.movieDetails === true) {
+    const movie: EntryDto = {
+      ...entry('a', 'Blade Runner', '1982'),
+      item: {
+        source: 'tmdb-movie',
+        externalId: '78',
+        title: 'Blade Runner',
+        subtitle: '1982',
+        imageUrl: null,
+        overview:
+          'A blade runner must pursue replicants in a future Los Angeles where the line between human and machine is uncertain.',
+        director: 'Ridley Scott',
+        cast: ['Harrison Ford', 'Rutger Hauer'],
+      },
+    };
+    routes['GET /api/lists/films'] = {
+      ...list,
+      itemSource: { kind: 'tmdb-movie' },
+      entries: [movie],
+    };
+    routes['GET /api/lists/films/ballot'] = { listId: list.id, scores: {} };
+    routes['GET /api/lists/films/leaderboard'] = {
+      ...leaderboard,
+      rows: leaderboard.rows
+        .filter((row) => row.entryId === movie.id)
+        .map((row) => ({ ...row, item: movie.item })),
+    };
+  }
   if (options.movieSearch === true) {
     routes['GET /api/lists/films'] = { ...list, itemSource: { kind: 'tmdb-movie' } };
     routes['GET /api/lists/list-1/search'] = {
@@ -120,8 +148,21 @@ export const fakeApi = async (
           imageUrl: null,
           overview:
             'A blade runner must pursue replicants in a future Los Angeles where the line between human and machine is uncertain.',
+          director: 'Ridley Scott',
+          cast: ['Harrison Ford', 'Rutger Hauer'],
         },
       ],
+    };
+    routes['GET /api/lists/list-1/item'] = {
+      source: 'tmdb-movie',
+      externalId: '78',
+      title: 'Blade Runner',
+      subtitle: '1982',
+      imageUrl: null,
+      overview:
+        'A blade runner must pursue replicants in a future Los Angeles where the line between human and machine is uncertain.',
+      director: 'Ridley Scott',
+      cast: ['Harrison Ford', 'Rutger Hauer'],
     };
   }
   await page.route('**/api/**', (route: Route) => {

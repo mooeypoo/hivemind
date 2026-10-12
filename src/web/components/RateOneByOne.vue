@@ -48,6 +48,24 @@ const next = () => {
       <div class="one-by-one__body">
         <h3 class="one-by-one__title">{{ entry.item.title }}</h3>
         <p v-if="entry.item.subtitle !== null" class="meta">{{ entry.item.subtitle }}</p>
+        <div v-if="entry.item.source === 'tmdb-movie'" class="one-by-one__movie-details">
+          <p v-if="entry.item.overview != null" class="entry-details__overview">
+            {{ entry.item.overview }}
+          </p>
+          <dl
+            v-if="entry.item.director != null || entry.item.cast != null"
+            class="entry-details__credits"
+          >
+            <div v-if="entry.item.director != null">
+              <dt>Director</dt>
+              <dd>{{ entry.item.director }}</dd>
+            </div>
+            <div v-if="entry.item.cast != null && entry.item.cast.length > 0">
+              <dt>Starring</dt>
+              <dd>{{ entry.item.cast.join(', ') }}</dd>
+            </div>
+          </dl>
+        </div>
         <ScoreInput
           :value="scores[entry.id] ?? null"
           :scale="scale"

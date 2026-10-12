@@ -49,7 +49,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.setViewportSize({ width, height: 800 });
         await fakeApi(page, admin);
         await page.goto('/lists/films');
-        await page.getByRole('button', { name: /^Details for Alien/ }).click();
+        await page.getByRole('button', { name: /^Open full details for Alien/ }).click();
         const details = page.getByRole('dialog', { name: 'Alien' });
         await expect(details.getByText('Your score')).toBeVisible();
         const box = await details.boundingBox();
@@ -58,6 +58,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await details.getByRole('button', { name: 'Close' }).click();
         await page.getByRole('button', { name: 'Rate one by one' }).click();
         await expect(page.getByRole('dialog', { name: 'Rate one by one' })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
+      test(`movie details in rate-one-by-one at ${String(width)} px fit on screen`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin, { movieDetails: true });
+        await page.goto('/lists/films');
+        await page.getByRole('button', { name: 'Rate one by one' }).click();
+        const stage = page.getByRole('dialog', { name: 'Rate one by one' });
+        await expect(stage.getByText(/A blade runner must pursue replicants/)).toBeVisible();
+        await expect(stage.getByText('Ridley Scott')).toBeVisible();
+        await expect(stage.getByText('Harrison Ford, Rutger Hauer')).toBeVisible();
+        const box = await stage.boundingBox();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
         await expectNoSidewaysScroll(page);
       });
 
@@ -73,6 +89,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await reviewButton.click();
         const review = page.getByRole('dialog', { name: 'Blade Runner' });
         await expect(review.getByText(/line between human and machine/)).toBeVisible();
+        await expect(review.getByText('Ridley Scott')).toBeVisible();
+        await expect(review.getByText('Harrison Ford, Rutger Hauer')).toBeVisible();
+        await expect(review.getByText('Ridley Scott')).toBeVisible();
+        await expect(review.getByText('Harrison Ford, Rutger Hauer')).toBeVisible();
         const box = await review.boundingBox();
         expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
         await expectNoSidewaysScroll(page);
@@ -84,7 +104,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.setViewportSize({ width, height: 800 });
         await fakeApi(page, admin);
         await page.goto('/lists/films');
-        await page.getByRole('button', { name: /^Details for Dr\. Strangelove/ }).click();
+        await page.getByRole('button', { name: /^Open full details for Dr\. Strangelove/ }).click();
         await page.getByRole('button', { name: 'Withdraw nomination', exact: true }).click();
         const confirmation = page.getByRole('dialog', { name: /^Withdraw Dr\. Strangelove/ });
         await expect(confirmation).toBeVisible();
@@ -99,7 +119,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           .click();
         await expect(confirmation).not.toBeVisible();
         await expect(
-          page.getByRole('button', { name: /^Details for Dr\. Strangelove/ }),
+          page.getByRole('button', { name: /^Open full details for Dr\. Strangelove/ }),
         ).toHaveCount(0);
         await expect(page.getByRole('tab', { name: 'Rate 2', exact: true })).toBeVisible();
         await expectNoSidewaysScroll(page);

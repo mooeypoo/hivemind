@@ -35,4 +35,20 @@ describe('EntryDetails', () => {
     expect(dialog.text()).toContain('Harrison Ford, Rutger Hauer');
     dialog.unmount();
   });
+
+  test('does not show movie metadata for other catalog sources', () => {
+    const dialog = mount(EntryDetails, {
+      props: {
+        entry: { ...entry, item: { ...entry.item, source: 'freeform' } },
+        scale: { min: 1, max: 10 },
+      },
+      attachTo: document.body,
+    });
+
+    expect(dialog.text()).toContain('1982');
+    expect(dialog.text()).not.toContain('A blade runner must pursue replicants.');
+    expect(dialog.text()).not.toContain('Ridley Scott');
+    expect(dialog.text()).not.toContain('Harrison Ford');
+    dialog.unmount();
+  });
 });

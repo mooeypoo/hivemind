@@ -26,6 +26,7 @@ export {
   getList,
   listLists,
   nominate,
+  resolveItemForList,
   refreshMovieDetails,
   withdrawNomination,
   scheduleList,
@@ -41,7 +42,7 @@ export {
 export const rateLimits = {
   /** Anything that changes data. */
   mutation: { windowLimit: 30, windowSize: 60, aggregateBy: ['ip', 'domain'] },
-  /** Search calls TMDB on the member's behalf. */
+  /** Search and selected-item detail calls TMDB on the member's behalf. */
   search: { windowLimit: 60, windowSize: 60, aggregateBy: ['ip', 'domain'] },
   /** Sign-in, including demo sign-in. */
   signIn: { windowLimit: 10, windowSize: 60, aggregateBy: ['ip', 'domain'] },

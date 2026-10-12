@@ -11,6 +11,16 @@ const bladeRunner = {
   subtitle: '1982',
   imageUrl: null,
   overview: 'A blade runner must pursue replicants.',
+  director: 'Ridley Scott',
+  cast: ['Harrison Ford', 'Rutger Hauer'],
+};
+const bladeRunnerSearchResult = {
+  source: 'tmdb-movie',
+  externalId: '78',
+  title: 'Blade Runner',
+  subtitle: '1982',
+  imageUrl: null,
+  overview: 'A blade runner must pursue replicants.',
 };
 
 beforeEach(() => {
@@ -25,7 +35,8 @@ afterEach(() => {
 describe('NominatePanel', () => {
   test('searches, reviews a movie result, then nominates after confirmation', async () => {
     const calls = stubApi({
-      'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunner] }),
+      'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunnerSearchResult] }),
+      'GET /api/lists/list-1/item': () => Response.json(bladeRunner),
       'POST /api/lists/list-1/entries': () =>
         Response.json(
           {
@@ -49,12 +60,15 @@ describe('NominatePanel', () => {
 
     await panel.get('.result button').trigger('click');
     await flushPromises();
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.url).toBe('/api/lists/list-1/item?externalId=78');
     expect(panel.get('dialog').text()).toContain('A blade runner must pursue replicants.');
+    expect(panel.get('dialog').text()).toContain('Ridley Scott');
+    expect(panel.get('dialog').text()).toContain('Harrison Ford, Rutger Hauer');
 
     await panel.get('dialog .button--primary').trigger('click');
     await flushPromises();
-    expect(calls[1]).toMatchObject({ method: 'POST', body: { externalId: '78' } });
+    expect(calls[2]).toMatchObject({ method: 'POST', body: { externalId: '78' } });
     expect(panel.emitted('nominated')).toHaveLength(1);
     expect((panel.get('input[type=search]').element as HTMLInputElement).value).toBe('');
     expect(panel.find('.results').exists()).toBe(false);
@@ -63,7 +77,8 @@ describe('NominatePanel', () => {
 
   test('canceling a reviewed movie does not nominate it', async () => {
     const calls = stubApi({
-      'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunner] }),
+      'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunnerSearchResult] }),
+      'GET /api/lists/list-1/item': () => Response.json(bladeRunner),
     });
     const panel = mount(NominatePanel, { props: { list: openTmdbList() } });
 
@@ -73,7 +88,7 @@ describe('NominatePanel', () => {
     await panel.get('.result button').trigger('click');
     await panel.get('dialog .button:not(.button--primary)').trigger('click');
 
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
     expect(panel.find('dialog[open]').exists()).toBe(false);
   });
 

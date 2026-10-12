@@ -12,7 +12,7 @@ import { makeWithdrawNomination } from './application/withdraw-nomination.ts';
 import { makeRefreshMovieDetails } from './application/refresh-movie-details.ts';
 import { makeListsPersonalData } from './application/personal-data.ts';
 import { makeScheduleList } from './application/schedule-list.ts';
-import { makeSearchForList } from './application/search-for-list.ts';
+import { makeResolveItemForList, makeSearchForList } from './application/search-for-list.ts';
 import { makeEntryExists, makeRulesForVoting } from './application/voting-rules.ts';
 import { makeEntriesForRanking, makeRankingContext } from './application/ranking-services.ts';
 import { makePurgeExpiredSnapshots } from './application/purge-expired-snapshots.ts';
@@ -59,6 +59,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     getList: makeGetList(shared),
     getSharePreview: makeGetSharePreview(shared),
     searchForList: makeSearchForList(shared),
+    resolveItemForList: makeResolveItemForList(shared),
     nominate: makeNominate({ ...shared, ids: deps.ids }),
     withdrawNomination: makeWithdrawNomination(shared),
     refreshMovieDetails: makeRefreshMovieDetails(shared),

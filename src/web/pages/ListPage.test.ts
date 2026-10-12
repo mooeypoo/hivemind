@@ -67,6 +67,34 @@ afterEach(() => {
 });
 
 describe('ListPage rating', () => {
+  test('the title opens full details and the card shows movie director after the year', async () => {
+    const movie = {
+      ...entry('a', 'Blade Runner'),
+      item: {
+        source: 'tmdb-movie',
+        externalId: '78',
+        title: 'Blade Runner',
+        subtitle: '1982',
+        imageUrl: null,
+        overview: 'A blade runner must pursue replicants.',
+        director: 'Ridley Scott',
+      },
+    };
+    const page = await mountWith(
+      openTmdbList({ slug: 'games', entries: [movie] }),
+      {},
+      undefined,
+      true,
+    );
+
+    expect(page.get('.entry__subtitle').text()).toBe('1982 · Directed by Ridley Scott');
+    expect(page.get('.entry__info-icon').text()).toBe('i');
+    await page.get('.entry__title-button').trigger('click');
+    expect(page.get('dialog[open]').text()).toContain('A blade runner must pursue replicants.');
+
+    page.unmount();
+  });
+
   test('withdrawal asks for confirmation, supports cancel, and refreshes entries and allowance', async () => {
     const owned = { ...entry('a', 'Root'), isMine: true, withdrawalToken: 'claim-a' };
     let detail = games({
@@ -100,7 +128,9 @@ describe('ListPage rating', () => {
     await page.get('dialog[open] .button--danger').trigger('click');
     await flushPromises();
     expect(mutations).toEqual([{ entryId: 'a', token: 'claim-a' }]);
-    expect(page.findAll('.entry__title').map((title) => title.text())).toEqual(['Wingspan']);
+    expect(
+      page.findAll('.entry__title-button > span:first-child').map((title) => title.text()),
+    ).toEqual(['Wingspan']);
     expect(page.find('dialog[open]').exists()).toBe(false);
     expect(useToast().toasts.value.at(-1)?.message).toBe('Nomination withdrawn.');
     page.unmount();
@@ -206,6 +236,49 @@ describe('ListPage rating', () => {
     page.unmount();
   });
 
+  test('rate one by one shows full details only for TMDB movies', async () => {
+    const movie = {
+      ...entry('movie-78', 'Blade Runner'),
+      item: {
+        source: 'tmdb-movie',
+        externalId: '78',
+        title: 'Blade Runner',
+        subtitle: '1982',
+        imageUrl: null,
+        overview: 'A blade runner must pursue replicants.',
+        director: 'Ridley Scott',
+        cast: ['Harrison Ford', 'Rutger Hauer'],
+      },
+    };
+    const other = {
+      ...entry('book', 'A Novel'),
+      item: {
+        source: 'freeform',
+        externalId: 'book',
+        title: 'A Novel',
+        subtitle: '1982',
+        imageUrl: null,
+        overview: 'This should not be displayed.',
+        director: 'Someone Else',
+        cast: ['An Actor'],
+      },
+    };
+    const page = await mountWith(games({ entries: [movie, other] }), {}, undefined, true);
+
+    await page.get('.ballot-bar .button--primary').trigger('click');
+    const stage = page.get('.dialog--stage');
+    expect(stage.text()).toContain('A blade runner must pursue replicants.');
+    expect(stage.text()).toContain('Ridley Scott');
+    expect(stage.text()).toContain('Harrison Ford, Rutger Hauer');
+
+    await stage.findAll('.dialog__actions button').at(-1)?.trigger('click');
+    expect(stage.text()).toContain('A Novel');
+    expect(stage.text()).not.toContain('This should not be displayed.');
+    expect(stage.text()).not.toContain('Someone Else');
+    expect(stage.text()).not.toContain('An Actor');
+    page.unmount();
+  });
+
   test('a public list warns before rating and shows attribution when results are visible', async () => {
     const page = await mountWith(games({ scoreVisibility: 'public' }));
     expect(page.text()).toContain(
@@ -283,11 +356,9 @@ describe('ListPage rating', () => {
       {},
       board,
     );
-    expect(page.findAll('.entry__title').map((title) => title.text())).toEqual([
-      'Wingspan',
-      'Root',
-      'Azul',
-    ]);
+    expect(
+      page.findAll('.entry__title-button > span:first-child').map((title) => title.text()),
+    ).toEqual(['Wingspan', 'Root', 'Azul']);
     expect(page.findAll('.entry__standing').map((standing) => standing.text())).toEqual([
       'Rank 1',
       'Needs 1 more vote for a place',
@@ -304,10 +375,9 @@ describe('ListPage rating', () => {
       {},
       { hidden: true, revealsAt: '2026-01-20T00:00:00.000Z' },
     );
-    expect(page.findAll('.entry__title').map((title) => title.text())).toEqual([
-      'Wingspan',
-      'Root',
-    ]);
+    expect(
+      page.findAll('.entry__title-button > span:first-child').map((title) => title.text()),
+    ).toEqual(['Wingspan', 'Root']);
     expect(page.findAll('.entry__standing')).toHaveLength(0);
   });
 

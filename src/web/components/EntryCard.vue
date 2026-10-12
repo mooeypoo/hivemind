@@ -11,7 +11,7 @@ const emit = defineEmits<{ open: [] }>();
     <button
       type="button"
       class="entry__art"
-      :aria-label="`Details for ${entry.item.title}`"
+      :aria-label="`Open full details for ${entry.item.title}`"
       @click="emit('open')"
     >
       <ItemArt
@@ -27,8 +27,24 @@ const emit = defineEmits<{ open: [] }>();
       >
     </button>
     <div class="entry__body">
-      <h3 class="entry__title">{{ entry.item.title }}</h3>
-      <p v-if="entry.item.subtitle !== null" class="entry__subtitle">{{ entry.item.subtitle }}</p>
+      <h3 class="entry__title">
+        <button
+          type="button"
+          class="entry__title-button"
+          :aria-label="`Open details for ${entry.item.title}`"
+          @click="emit('open')"
+        >
+          <span>{{ entry.item.title }}</span>
+          <span class="entry__info-icon" aria-hidden="true">i</span>
+        </button>
+      </h3>
+      <p v-if="entry.item.subtitle !== null || entry.item.director != null" class="entry__subtitle">
+        <span v-if="entry.item.subtitle !== null">{{ entry.item.subtitle }}</span>
+        <span v-if="entry.item.subtitle !== null && entry.item.director != null" aria-hidden="true">
+          ·
+        </span>
+        <span v-if="entry.item.director != null">Directed by {{ entry.item.director }}</span>
+      </p>
       <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
       <p v-else-if="entry.nominatedBy !== null" class="entry__meta">
         Nominated by {{ entry.nominatedBy }}

@@ -177,9 +177,15 @@ export const fakeTmdb = (url: URL): Response => {
   if (url.pathname === '/3/search/movie') {
     const query = (url.searchParams.get('query') ?? '').toLowerCase();
     return Response.json({
-      results: Object.values(TMDB_MOVIES).filter((movie) =>
-        movie.title.toLowerCase().includes(query),
-      ),
+      results: Object.values(TMDB_MOVIES)
+        .filter((movie) => movie.title.toLowerCase().includes(query))
+        .map(({ id, title, release_date, poster_path, overview }) => ({
+          id,
+          title,
+          release_date,
+          poster_path,
+          overview,
+        })),
     });
   }
   const movie = TMDB_MOVIES[url.pathname.replace('/3/movie/', '')];

@@ -11,6 +11,7 @@ import { formatDateTime } from '../lib/datetime.ts';
 import { clearDraft, loadDraft, saveDraft } from '../lib/drafts.ts';
 import AppDialog from './ui/AppDialog.vue';
 import ItemArt from './ui/ItemArt.vue';
+import MovieMetadata from './MovieMetadata.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 const props = defineProps<{ list: ListDetailDto }>();
@@ -46,9 +47,11 @@ const announcement = ref('');
 const query = ref('');
 const results = ref<readonly CatalogItemDto[]>([]);
 const selectedItem = ref<CatalogItemDto | null>(null);
+const reviewLoading = ref(false);
 const searched = ref(false);
 const searching = ref(false);
 let debounce: ReturnType<typeof setTimeout> | undefined;
+let reviewRequest = 0;
 
 const nominate = async (body: { externalId: string } | { title: string }) => {
   busy.value = true;
@@ -120,15 +123,30 @@ const submitTitle = async () => {
   }
 };
 
-const review = (item: CatalogItemDto) => {
+const closeReview = () => {
+  reviewRequest += 1;
+  selectedItem.value = null;
+  reviewLoading.value = false;
+};
+
+const review = async (item: CatalogItemDto) => {
+  const requestId = ++reviewRequest;
   selectedItem.value = item;
+  reviewLoading.value = true;
   error.value = null;
+  const result = await api.get<CatalogItemDto>(
+    `/api/lists/${encodeURIComponent(props.list.id)}/item?externalId=${encodeURIComponent(item.externalId)}`,
+  );
+  if (requestId !== reviewRequest) return;
+  reviewLoading.value = false;
+  if (result.ok) selectedItem.value = result.data;
+  else error.value = result.error;
 };
 
 const nominateSelected = async () => {
   const item = selectedItem.value;
   if (item !== null && (await nominate({ externalId: item.externalId }))) {
-    selectedItem.value = null;
+    closeReview();
   }
 };
 </script>
@@ -238,7 +256,7 @@ const nominateSelected = async () => {
     <AppDialog
       :open="selectedItem !== null"
       :title="selectedItem?.title ?? ''"
-      @close="selectedItem = null"
+      @close="closeReview"
     >
       <div v-if="selectedItem !== null" class="nomination-review">
         <ItemArt
@@ -249,35 +267,17 @@ const nominateSelected = async () => {
           size="large"
         />
         <div class="nomination-review__info">
-          <p v-if="selectedItem.subtitle !== null" class="entry-details__subtitle">
-            {{ selectedItem.subtitle }}
-          </p>
-          <p v-if="selectedItem.overview != null" class="nomination-review__overview">
-            {{ selectedItem.overview }}
-          </p>
-          <p v-else class="meta">No overview available.</p>
-          <dl
-            v-if="selectedItem.director != null || selectedItem.cast != null"
-            class="entry-details__credits"
-          >
-            <div v-if="selectedItem.director != null">
-              <dt>Director</dt>
-              <dd>{{ selectedItem.director }}</dd>
-            </div>
-            <div v-if="selectedItem.cast != null && selectedItem.cast.length > 0">
-              <dt>Starring</dt>
-              <dd>{{ selectedItem.cast.join(', ') }}</dd>
-            </div>
-          </dl>
+          <p v-if="reviewLoading" class="meta" role="status">Loading full movie details…</p>
+          <MovieMetadata :item="selectedItem" />
         </div>
       </div>
       <ErrorNotice :error="error" />
       <template #actions>
-        <button type="button" class="button" @click="selectedItem = null">Cancel</button>
+        <button type="button" class="button" @click="closeReview">Cancel</button>
         <button
           type="button"
           class="button button--primary"
-          :disabled="busy"
+          :disabled="busy || reviewLoading"
           @click="nominateSelected"
         >
           Nominate

@@ -6,6 +6,7 @@ import type {
   ListDetailDto,
   ListDto,
   ListsDto,
+  CatalogItemDto,
   RefreshMovieDetailsDto,
   SearchResultsDto,
 } from '../contracts.ts';
@@ -16,6 +17,7 @@ import {
   createListBody,
   editListBody,
   nominateBody,
+  resolveItemQuery,
   scheduleBody,
   searchQuery,
   scoreVisibilityBody,
@@ -102,6 +104,19 @@ export const searchForList = async (request: Request, app: App): Promise<Respons
       query: query.data.q,
     }),
     (items): SearchResultsDto => ({ items }),
+  );
+};
+
+/** `GET /api/lists/:list/item?externalId=` */
+export const resolveItemForList = async (request: Request, app: App): Promise<Response> => {
+  const query = parseWith(resolveItemQuery, queryOf(request));
+  if (!query.ok) return query.response;
+  return respond(
+    await app.lists.resolveItemForList(await actorOf(request, app), {
+      list: listParam(request),
+      externalId: query.data.externalId,
+    }),
+    (item): CatalogItemDto => item,
   );
 };
 

@@ -100,6 +100,8 @@ export const demoSignInBody = z.strictObject({ persona: z.string().min(1).max(40
 
 export const searchQuery = z.object({ q: z.string().max(200).default('') });
 
+export const resolveItemQuery = z.strictObject({ externalId: z.string().min(1).max(300) });
+
 // ---- Backups ----
 
 const isoString = z.iso.datetime({ offset: true });

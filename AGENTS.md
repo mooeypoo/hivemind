@@ -198,6 +198,8 @@ Each route is one file in `netlify/functions` (`export default handle(endpoint)`
 | `/api/admin/backup`                 | GET    | Admin: download a backup of every list, or `?list=<id or slug>` for one                      |
 | `/api/admin/backup`                 | POST   | Admin: import a backup file (up to 5 MB); returns what was restored                          |
 
+The member-only `GET /api/lists/:list/item?externalId=...` returns full details for one selected item while nominations are open. It uses the search rate limit.
+
 The Admin-only `POST /api/lists/:list/refresh-movie-details` fills missing TMDB synopses and available credits on active, unpurged entries, with at most 20 lookups per request.
 
 Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
@@ -229,7 +231,7 @@ Request bodies are JSON, at most 256 KB, validated by zod with unknown keys reje
 - **Secrets** live only in Netlify environment variables. Nothing secret goes in `VITE_*`.
 - **Headers** in `netlify.toml`: a strict CSP whose `img-src` allows only the image hosts of the integrations in use (the Discord avatar CDN `cdn.discordapp.com`, and the TMDB image host for `tmdb-movie`). A new adapter that serves images adds its host here, HSTS, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and `Permissions-Policy`.
 - **Header check.** `scripts/security-headers.ts` holds the rules; `test/netlify/headers.test.ts` checks `netlify.toml` against them, and the `deployed headers` GitHub Action runs `scripts/check-headers.ts` against every successful Netlify deploy, including no inline scripts or styles in the served HTML.
-- **Rate limiting** with Netlify's function-level `rateLimit`, per IP and domain over 60 seconds, defined once in `src/server/functions.ts`: mutations 30, search 60, sign-in (login, callback, demo) 10. `test/netlify/functions.test.ts` fails if any guarded function lacks its limit.
+- **Rate limiting** with Netlify's function-level `rateLimit`, per IP and domain over 60 seconds, defined once in `src/server/functions.ts`: mutations 30, search and selected item details 60, sign-in (login, callback, demo) 10. `test/netlify/functions.test.ts` fails if any guarded function lacks its limit.
 - **Demo mode** (pretend sign-in with sample data) runs only with `DEMO_MODE=true` **and** a non-production deploy context: two independent locks, and in production the use case refuses regardless. Demo personas have `demo-` ids that can never be Discord ids. Outside production every context uses deploy-scoped Blobs stores, so previews never touch real members, lists or votes. Operator actors (`operator-…`) exist only for scripts and scheduled jobs, never for a request.
 - **Logs** never contain tokens, cookies or request bodies.
 - **Retention.** The catalog sets how long each source's item details may be kept after a list is archived (`tmdb-movie`: 183 days; community content: no limit). A daily scheduled function removes expired details (title replaced, subtitle, image, synopsis and credits cleared; identity, scores and ranks kept) and deletes leaderboard caches older than a day. Keep TMDB attribution in the UI.

@@ -39,7 +39,7 @@ describe('Netlify functions', () => {
     const path = config.path ?? '';
     const expected = SIGN_IN.includes(path)
       ? rateLimits.signIn
-      : path.endsWith('/search')
+      : path.endsWith('/search') || path.endsWith('/item')
         ? rateLimits.search
         : config.method !== 'GET' || path.startsWith('/api/admin/backup')
           ? rateLimits.mutation
