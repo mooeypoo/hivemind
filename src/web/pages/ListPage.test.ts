@@ -182,7 +182,7 @@ describe('ListPage rating', () => {
           votesNeeded: 0,
         },
         {
-          rank: 2,
+          rank: null,
           entryId: 'a',
           item: entry('a', 'Root').item,
           score: 7.2,
@@ -215,7 +215,7 @@ describe('ListPage rating', () => {
     ]);
     expect(page.findAll('.entry__standing').map((standing) => standing.text())).toEqual([
       'Rank 1',
-      'Rank 2 Provisional',
+      'Needs 1 more vote for a place',
       'No votes yet',
     ]);
   });

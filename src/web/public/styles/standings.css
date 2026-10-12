@@ -131,12 +131,6 @@
   transform: translateX(-50%);
 }
 
-.podium__place--provisional .podium__medal {
-  border: 2px dashed var(--accent);
-  background: var(--surface);
-  color: var(--text);
-}
-
 .podium__place p {
   margin: 0.15rem 0 0;
 }
@@ -272,15 +266,19 @@
   }
 }
 
+.standings__provisional,
 .standings__unrated {
   margin-top: 1.75rem;
 }
 
+.standings__provisional h2,
+.standings__provisional h3,
 .standings__unrated h2,
 .standings__unrated h3 {
   font-size: 1.15rem;
 }
 
+.standings__provisional .ranking__rank,
 .standings__unrated .ranking__rank {
   color: var(--muted);
 }

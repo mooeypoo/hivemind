@@ -336,12 +336,6 @@
   text-align: center;
 }
 
-.rank-badge--provisional {
-  border: 2px dashed var(--accent);
-  background: var(--surface);
-  color: var(--text);
-}
-
 /* Item art: a poster, or a title card when there is none */
 
 .item-art {

@@ -103,17 +103,22 @@ const lists: ListDto[] = [
     schedule: { opensAt: at(-90 * day), nominationsCloseAt: null, closesAt: at(-60 * day) },
   },
 ];
-const scores = [8.6, 8.1, 7.4, 7.4, 6.2, null];
+// Leaderboard order: ranked entries, then one with too few votes (however high), then none.
+const order = [0, 1, 2, 4, 3, 5];
+const scores = [8.6, 8.1, 7.4, 9.1, 6.2, null];
 const votes = [7, 6, 5, 2, 4, 0];
+const ranks = [1, 2, 3, null, 4, null];
 const board: LeaderboardDto = {
   hidden: false,
   computedAt: new Date().toISOString(),
   minVotes: 3,
-  rows: entries.map((entry, index) => {
+  rows: order.flatMap((index) => {
+    const entry = entries[index];
+    if (entry === undefined) return [];
     const score = scores[index] ?? null;
     const count = votes[index] ?? 0;
     return {
-      rank: score === null ? null : ([1, 2, 3, 3, 5][index] ?? null),
+      rank: ranks[index] ?? null,
       entryId: entry.id,
       item: entry.item,
       score,

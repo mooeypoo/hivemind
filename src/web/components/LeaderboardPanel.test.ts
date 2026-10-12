@@ -49,6 +49,7 @@ const list = openTmdbList({
     entry('c', 'Azul'),
     entry('d', 'Catan'),
     entry('e', 'Carcassonne'),
+    entry('f', 'Cascadia'),
   ],
 });
 const board = (rows: LeaderboardRowDto[], minVotes = 2): LeaderboardDto => ({
@@ -89,27 +90,41 @@ afterEach(() => {
 });
 
 describe('LeaderboardPanel', () => {
-  test('puts the top three on a podium, provisional ones in place, then the rest', async () => {
+  test('ranks entries with enough votes; a high-scoring provisional one waits below', async () => {
     const panel = await mountWith(
       board([
-        row('a', 'Root', 1, 7.67, 2),
-        row('b', 'Wingspan', 2, 6.89, 1, true, 1),
+        row('a', 'Root', 1, 7.67, 3),
         row('d', 'Catan', 2, 6.89, 3),
-        row('e', 'Carcassonne', 4, 5.1, 4),
-        row('c', 'Azul', null, null, 0, true, 2),
+        row('e', 'Carcassonne', 2, 6.89, 4),
+        row('c', 'Azul', 4, 5.1, 4),
+        row('b', 'Wingspan', null, 9.2, 1, true, 1),
+        row('f', 'Cascadia', null, null, 0, true, 2),
       ]),
-      { a: 9, e: 6 },
+      { a: 9, c: 6 },
     );
     const podium = panel.findAll('.podium__place').map(placeText);
     expect(podium).toEqual([
-      '1 Root 7.7 · 2 votes · avg 8.2 You: 9',
-      '2 Wingspan 6.9 · 1 vote · avg 7.4 Provisional · needs 1 more vote',
+      '1 Root 7.7 · 3 votes · avg 8.2 You: 9',
       '2 Catan 6.9 · 3 votes · avg 7.4',
+      '2 Carcassonne 6.9 · 4 votes · avg 7.4',
     ]);
     const rest = panel.findAll('[aria-label="The rest of the ranking"] li');
-    expect(rest.map(cells)).toEqual(['4 | Carcassonne | 5.1 · 4 votes · avg 5.6 · you: 6']);
-    expect(panel.findAll('.standings__unrated li').map(cells)).toEqual(['– | Azul | No votes yet']);
+    expect(rest.map(cells)).toEqual(['4 | Azul | 5.1 · 4 votes · avg 5.6 · you: 6']);
+    expect(panel.get('.standings__provisional h3').text()).toBe('Not enough votes yet');
+    expect(panel.findAll('.standings__provisional li').map(cells)).toEqual([
+      '– | Wingspan, Needs 1 more vote | 9.2 · 1 vote · avg 9.7',
+    ]);
+    expect(panel.findAll('.standings__unrated li').map(cells)).toEqual([
+      '– | Cascadia | No votes yet',
+    ]);
     expect(panel.text()).toContain('Updated just now');
+  });
+
+  test('before anything has enough votes, there is no podium, only the waiting entries', async () => {
+    const panel = await mountWith(board([row('b', 'Wingspan', null, 9, 1, true, 1)]));
+    expect(panel.find('.podium').exists()).toBe(false);
+    expect(panel.text()).toContain('No entry has enough votes for a place yet.');
+    expect(panel.findAll('.standings__provisional li')).toHaveLength(1);
   });
 
   test('explains when results are sealed until the list closes', async () => {

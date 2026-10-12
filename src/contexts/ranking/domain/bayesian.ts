@@ -8,12 +8,12 @@ export interface RankingInput {
 
 export interface RankedRow {
   readonly entryId: string;
-  /** Null when the entry has no votes yet. Equal scores share a rank. */
+  /** Null until the entry has at least the list's minimum votes. Equal scores share a rank. */
   readonly rank: number | null;
   readonly score: number | null;
   readonly mean: number | null;
   readonly votes: number;
-  /** Fewer votes than the list's minimum: shown in place, but not yet confirmed. */
+  /** Fewer votes than the list's minimum: listed after every ranked entry, with no rank yet. */
   readonly provisional: boolean;
   readonly votesNeeded: number;
 }
@@ -21,7 +21,9 @@ export interface RankedRow {
 /**
  * The default strategy, a Bayesian average: (v/(v+m))·R + (m/(v+m))·C, where v is the
  * entry's vote count, R its mean, m the list's `minVotes` and C the mean of every score
- * in the list. Entries without votes are unranked and listed last.
+ * in the list. Only entries with at least m votes are ranked; provisional entries follow in
+ * score order without a rank, so a few early votes can't outrank broad agreement. Entries
+ * without votes come last.
  */
 export const bayesian = ({ entries, ballots, minVotes: m }: RankingInput): RankedRow[] => {
   const known = new Set(entries.map((entry) => entry.id));
@@ -53,8 +55,12 @@ export const bayesian = ({ entries, ballots, minVotes: m }: RankingInput): Ranke
     };
   });
 
+  // Ranked entries first, then provisional ones, then entries without votes.
+  const group = (row: { votes: number; provisional: boolean }) =>
+    row.votes === 0 ? 2 : row.provisional ? 1 : 0;
   rows.sort(
     (a, b) =>
+      group(a) - group(b) ||
       (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY) ||
       b.votes - a.votes ||
       a.entry.title.localeCompare(b.entry.title),
@@ -63,7 +69,7 @@ export const bayesian = ({ entries, ballots, minVotes: m }: RankingInput): Ranke
   let previous: { score: number; rank: number } | null = null;
   return rows.map((row, index) => {
     let rank: number | null = null;
-    if (row.score !== null) {
+    if (row.score !== null && !row.provisional) {
       // Equal within floating-point noise counts as a tie.
       rank =
         previous !== null && Math.abs(previous.score - row.score) < 1e-9

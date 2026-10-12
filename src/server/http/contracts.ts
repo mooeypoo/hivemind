@@ -198,7 +198,7 @@ export type PublicScoresDto =
 // ---- Ranking ----
 
 export interface LeaderboardRowDto {
-  /** Null while the entry has no votes. Equal scores share a rank. */
+  /** Null until the entry has the list's minimum votes. Equal scores share a rank. */
   readonly rank: number | null;
   readonly entryId: string;
   readonly item: CatalogItemDto;
@@ -207,7 +207,7 @@ export interface LeaderboardRowDto {
   /** The plain mean of its scores, rounded to 2 decimals. Null without votes. */
   readonly average: number | null;
   readonly votes: number;
-  /** Fewer votes than the list's minimum: shown in place, not yet confirmed. */
+  /** Fewer votes than the list's minimum: no rank yet, listed after every ranked entry. */
   readonly provisional: boolean;
   readonly votesNeeded: number;
 }

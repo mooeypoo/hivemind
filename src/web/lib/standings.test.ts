@@ -33,18 +33,34 @@ const row = (
 });
 
 describe('buildStandings', () => {
-  test('keeps provisional entries in their computed place, with shared ranks', () => {
+  test('ranks entries with enough votes; provisional ones wait in their own group', () => {
     const standings = buildStandings(
-      [row('a', 1, 5), row('b', 2, 1, true), row('c', 3, 4), row('d', 3, 3), row('e', null, 0)],
-      [entry('a', 'Ada'), entry('b'), entry('c'), entry('d'), entry('e')],
+      [
+        row('a', 1, 5),
+        row('c', 2, 4),
+        row('d', 2, 3),
+        row('f', 4, 3),
+        row('b', null, 1, true),
+        row('e', null, 0),
+      ],
+      [entry('a', 'Ada'), entry('b'), entry('c'), entry('d'), entry('e'), entry('f')],
     );
-    expect(standings.podium.map((r) => [r.entryId, r.rank, r.provisional, r.nominatedBy])).toEqual([
-      ['a', 1, false, 'Ada'],
-      ['b', 2, true, null],
-      ['c', 3, false, null],
+    expect(standings.podium.map((r) => [r.entryId, r.rank, r.nominatedBy])).toEqual([
+      ['a', 1, 'Ada'],
+      ['c', 2, null],
+      ['d', 2, null],
     ]);
-    expect(standings.rest.map((r) => [r.entryId, r.rank])).toEqual([['d', 3]]);
+    expect(standings.rest.map((r) => [r.entryId, r.rank])).toEqual([['f', 4]]);
+    expect(standings.provisional.map((r) => [r.entryId, r.votesNeeded])).toEqual([['b', 2]]);
     expect(standings.unrated.map((r) => r.entryId)).toEqual(['e']);
+  });
+
+  test('a provisional entry never reaches the podium, however high its score', () => {
+    // A board cached before provisional entries lost their rank still sorts correctly.
+    const top = { ...row('b', 1, 2, true), score: 9.9 };
+    const standings = buildStandings([top, row('a', 2, 9)], [entry('a'), entry('b')]);
+    expect(standings.podium.map((r) => r.entryId)).toEqual(['a']);
+    expect(standings.provisional.map((r) => r.entryId)).toEqual(['b']);
   });
 
   test('entries missing from the board count as not yet rated', () => {

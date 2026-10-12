@@ -193,7 +193,8 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
           </p>
           <p v-if="hasStandings">
             <template v-if="!resultsSealed">
-              Sorted by the current standings, provisional entries included in place.
+              Sorted by the current standings: ranked entries first, then ones that need more votes
+              for a place.
             </template>
             <template v-else
               >Not in ranking order: results are hidden until voting closes.</template

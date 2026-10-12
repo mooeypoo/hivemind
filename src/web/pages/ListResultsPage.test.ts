@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe('ListResultsPage', () => {
-  test('shows the same standings as the list: provisional entries in place, no personal scores', async () => {
+  test('shows the same standings as the list: provisional entries wait below the ranking, no personal scores', async () => {
     const page = await mountWith(games(), {
       hidden: false,
       computedAt: new Date().toISOString(),
@@ -77,16 +77,6 @@ describe('ListResultsPage', () => {
       rows: [
         {
           rank: 1,
-          entryId: 'b',
-          item: item('Wingspan'),
-          score: 8,
-          average: 9,
-          votes: 1,
-          provisional: true,
-          votesNeeded: 1,
-        },
-        {
-          rank: 2,
           entryId: 'a',
           item: item('Root'),
           score: 7.67,
@@ -94,6 +84,16 @@ describe('ListResultsPage', () => {
           votes: 2,
           provisional: false,
           votesNeeded: 0,
+        },
+        {
+          rank: null,
+          entryId: 'b',
+          item: item('Wingspan'),
+          score: 8,
+          average: 9,
+          votes: 1,
+          provisional: true,
+          votesNeeded: 1,
         },
         {
           rank: null,
@@ -108,8 +108,12 @@ describe('ListResultsPage', () => {
       ],
     });
     expect(page.findAll('.podium__place').map(placeText)).toEqual([
-      '1 Wingspan 8.0 · 1 vote · avg 9.0 Provisional · needs 1 more vote Nominated by Bob',
-      '2 Root 7.7 · 2 votes · avg 8.0 Nominated by Ada',
+      '1 Root 7.7 · 2 votes · avg 8.0 Nominated by Ada',
+    ]);
+    const cells = (row: { element: Element }) =>
+      [...row.element.children].map((cell) => squash(cell.textContent)).join(' | ');
+    expect(page.findAll('.standings__provisional li').map(cells)).toEqual([
+      '– | Wingspan, Needs 1 more vote Nominated by Bob | 8.0 · 1 vote · avg 9.0',
     ]);
     expect(
       page

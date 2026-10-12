@@ -22,7 +22,6 @@ const emit = defineEmits<{ open: [] }>();
       <span
         v-if="standing !== undefined && standing.rank !== null"
         class="rank-badge"
-        :class="{ 'rank-badge--provisional': standing.provisional }"
         aria-hidden="true"
         >#{{ standing.rank }}</span
       >
@@ -35,11 +34,14 @@ const emit = defineEmits<{ open: [] }>();
         Nominated by {{ entry.nominatedBy }}
       </p>
       <p v-if="standing !== undefined" class="entry__standing">
-        <template v-if="standing.rank === null">No votes yet</template>
-        <template v-else>
-          Rank {{ standing.rank }}
-          <span v-if="standing.provisional" class="tag">Provisional</span>
+        <template v-if="standing.votes === 0">No votes yet</template>
+        <template v-else-if="standing.rank === null">
+          <span class="tag"
+            >Needs {{ standing.votesNeeded }} more
+            {{ standing.votesNeeded === 1 ? 'vote' : 'votes' }} for a place</span
+          >
         </template>
+        <template v-else>Rank {{ standing.rank }}</template>
       </p>
     </div>
     <div class="entry__rate"><slot /></div>

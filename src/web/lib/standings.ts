@@ -1,7 +1,7 @@
 import type { CatalogItemDto, EntryDto, LeaderboardRowDto } from '../../server/http/contracts.ts';
 
 export interface StandingRow {
-  /** Equal scores share a rank (1, 2, 2, 4). Null without votes. */
+  /** Equal scores share a rank (1, 2, 2, 4). Null until the entry has enough votes. */
   readonly rank: number | null;
   readonly entryId: string;
   readonly item: CatalogItemDto;
@@ -10,16 +10,18 @@ export interface StandingRow {
   readonly score: number | null;
   readonly average: number | null;
   readonly votes: number;
-  /** Fewer votes than the list's minimum: shown in place, not yet confirmed. */
+  /** Fewer votes than the list's minimum: not ranked yet. */
   readonly provisional: boolean;
   readonly votesNeeded: number;
 }
 
 export interface Standings {
-  /** The first three ranked entries, provisional ones included in place. */
+  /** The first three ranked entries. */
   readonly podium: readonly StandingRow[];
   /** Every other ranked entry, in leaderboard order. */
   readonly rest: readonly StandingRow[];
+  /** Entries with votes, but fewer than the list's minimum: not ranked yet, best score first. */
+  readonly provisional: readonly StandingRow[];
   /** Entries nobody has rated yet, including any too new to be on the board. */
   readonly unrated: readonly StandingRow[];
 }
@@ -36,10 +38,16 @@ export const buildStandings = (
     ...row,
     nominatedBy: nominators.get(row.entryId) ?? null,
   });
-  const ranked = rows.filter((row) => row.rank !== null && row.votes > 0).map(toRow);
-  const onBoard = new Set(ranked.map((row) => row.entryId));
+  const ranked = rows
+    .filter((row) => row.rank !== null && !row.provisional && row.votes > 0)
+    .map(toRow);
+  const provisional = rows
+    .filter((row) => row.votes > 0 && (row.provisional || row.rank === null))
+    .map(toRow)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const placed = new Set([...ranked, ...provisional].map((row) => row.entryId));
   const unrated = [
-    ...rows.filter((row) => !onBoard.has(row.entryId)).map(toRow),
+    ...rows.filter((row) => !placed.has(row.entryId)).map(toRow),
     ...entries
       .filter((entry) => !rows.some((row) => row.entryId === entry.id))
       .map((entry): StandingRow => ({
@@ -57,6 +65,7 @@ export const buildStandings = (
   return {
     podium: ranked.slice(0, PODIUM_SIZE),
     rest: ranked.slice(PODIUM_SIZE),
+    provisional,
     unrated,
   };
 };

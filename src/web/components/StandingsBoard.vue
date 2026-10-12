@@ -21,7 +21,9 @@ const visible = computed(() => (props.board.hidden ? null : props.board));
 const standings = computed(() =>
   visible.value === null ? null : buildStandings(visible.value.rows, props.entries),
 );
-const anyVotes = computed(() => (standings.value?.podium.length ?? 0) > 0);
+const anyVotes = computed(
+  () => (standings.value?.podium.length ?? 0) + (standings.value?.provisional.length ?? 0) > 0,
+);
 const untilReveal = computed(() =>
   props.board.hidden && props.board.revealsAt !== null
     ? new Date(props.board.revealsAt).getTime() - Date.now()
@@ -34,7 +36,7 @@ const votesText = (votes: number) => `${String(votes)} ${votes === 1 ? 'vote' : 
 const averageText = (row: StandingRow) =>
   row.average === null ? '' : ` · avg ${row.average.toFixed(1)}`;
 const needsText = (row: StandingRow) =>
-  `Provisional · needs ${String(row.votesNeeded)} more ${row.votesNeeded === 1 ? 'vote' : 'votes'}`;
+  `Needs ${String(row.votesNeeded)} more ${row.votesNeeded === 1 ? 'vote' : 'votes'}`;
 const voters = (row: StandingRow) =>
   props.publicScores?.visible === true ? (props.publicScores.entries[row.entryId] ?? []) : null;
 </script>
@@ -58,12 +60,15 @@ const voters = (row: StandingRow) =>
     <p v-else-if="!anyVotes" class="empty">No votes yet.</p>
 
     <template v-else-if="standings !== null && visible !== null">
-      <ol class="podium" aria-label="Top three">
+      <p v-if="standings.podium.length === 0" class="empty">
+        No entry has enough votes for a place yet.
+      </p>
+      <ol v-else class="podium" aria-label="Top three">
         <li
           v-for="row in standings.podium"
           :key="row.entryId"
           class="podium__place"
-          :class="[`podium__place--${row.rank}`, { 'podium__place--provisional': row.provisional }]"
+          :class="`podium__place--${row.rank}`"
         >
           <div class="podium__art">
             <ItemArt
@@ -84,7 +89,6 @@ const voters = (row: StandingRow) =>
               }}{{ averageText(row) }}</span
             >
           </p>
-          <p v-if="row.provisional" class="tag">{{ needsText(row) }}</p>
           <p v-if="row.nominatedBy !== null" class="standing__nominator">
             Nominated by {{ row.nominatedBy }}
           </p>
@@ -96,17 +100,11 @@ const voters = (row: StandingRow) =>
       </ol>
 
       <ol v-if="standings.rest.length > 0" class="ranking" aria-label="The rest of the ranking">
-        <li
-          v-for="row in standings.rest"
-          :key="row.entryId"
-          class="ranking__row"
-          :class="{ 'ranking__row--provisional': row.provisional }"
-        >
+        <li v-for="row in standings.rest" :key="row.entryId" class="ranking__row">
           <span class="ranking__rank" :aria-label="`Rank ${String(row.rank)}`">{{ row.rank }}</span>
           <span class="ranking__title">
             <strong>{{ row.item.title }}</strong>
             <span v-if="row.item.subtitle !== null" class="meta"> {{ row.item.subtitle }}</span>
-            <span v-if="row.provisional" class="tag">{{ needsText(row) }}</span>
             <span v-if="row.nominatedBy !== null" class="standing__nominator">
               Nominated by {{ row.nominatedBy }}
             </span>
@@ -133,6 +131,43 @@ const voters = (row: StandingRow) =>
         </li>
       </ol>
 
+      <section v-if="standings.provisional.length > 0" class="standings__provisional">
+        <component :is="headingLevel ?? 'h3'">Not enough votes yet</component>
+        <p class="meta">
+          Entries get a place once at least {{ visible.minVotes }} people have rated them. Until
+          then they wait here, however high their score, so a few early votes can’t outrank broad
+          agreement.
+        </p>
+        <ul class="ranking">
+          <li
+            v-for="row in standings.provisional"
+            :key="row.entryId"
+            class="ranking__row ranking__row--provisional"
+          >
+            <span class="ranking__rank" aria-hidden="true">–</span>
+            <span class="ranking__title">
+              <strong>{{ row.item.title }}</strong>
+              <span v-if="row.item.subtitle !== null" class="meta"> {{ row.item.subtitle }}</span>
+              <span class="visually-hidden">, </span>
+              <span class="tag">{{ needsText(row) }}</span>
+              <span v-if="row.nominatedBy !== null" class="standing__nominator">
+                Nominated by {{ row.nominatedBy }}
+              </span>
+              <PublicScoreDisclosure v-if="voters(row) !== null" :scores="voters(row) ?? []" />
+            </span>
+            <span class="ranking__numbers">
+              <strong>{{ row.score?.toFixed(1) }}</strong>
+              <span class="meta">
+                · {{ votesText(row.votes) }}{{ averageText(row)
+                }}<template v-if="myScores?.[row.entryId] !== undefined">
+                  · you: {{ myScores[row.entryId] }}</template
+                >
+              </span>
+            </span>
+          </li>
+        </ul>
+      </section>
+
       <section v-if="standings.unrated.length > 0" class="standings__unrated">
         <component :is="headingLevel ?? 'h3'">Not rated yet</component>
         <ul class="ranking">
@@ -151,9 +186,9 @@ const voters = (row: StandingRow) =>
       </section>
 
       <p class="standings__note meta">
-        Scores are weighted: each entry’s average is balanced against how many people rated it, so a
-        couple of high votes don’t outrank broad agreement. Entries with fewer than
-        {{ visible.minVotes }} votes are provisional and keep their place until confirmed.
+        Scores are weighted: each entry’s average is balanced against how many people rated it.
+        Places stay live until voting closes, so entries can still move up or down as more votes
+        come in.
       </p>
     </template>
   </div>

@@ -80,7 +80,7 @@ afterEach(async () => {
 });
 
 describe('GET /api/lists/:list/leaderboard', () => {
-  test('ranks entries live, marking ones below the minimum votes as provisional', async () => {
+  test('ranks entries live; ones below the minimum votes are provisional, after them and unranked', async () => {
     await setUp('live');
     const result = await call<LeaderboardDto>(
       getLeaderboard,
@@ -103,7 +103,7 @@ describe('GET /api/lists/:list/leaderboard', () => {
       ]),
     ).toEqual([
       [1, 'Root', 7.67, 8, 2, false, 0],
-      [2, 'Wingspan', 6.89, 6, 1, true, 1],
+      [null, 'Wingspan', 6.89, 6, 1, true, 1],
     ]);
     expect(result.body.minVotes).toBe(2);
   });

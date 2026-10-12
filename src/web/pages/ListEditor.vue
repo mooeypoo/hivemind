@@ -532,8 +532,8 @@ const importCsv = async () => {
           aria-describedby="min-votes-hint"
         />
         <p id="min-votes-hint" class="meta">
-          Members can vote the whole time the list is open. Entries with fewer votes than this still
-          appear on the leaderboard, marked provisional, so one early 10 can’t top the list.
+          Members can vote the whole time the list is open. Entries with fewer votes than this don’t
+          get a place yet: they wait below the ranking, so a few early 10s can’t top the list.
         </p>
 
         <p class="meta">When can members see the results?</p>

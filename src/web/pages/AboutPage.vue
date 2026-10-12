@@ -19,8 +19,9 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
     <h2>How it works</h2>
     <p>
       Admins create lists and choose whether members nominate entries or rate a ready-made set.
-      Members can rate each entry while voting is open. The leaderboard combines those scores;
-      entries with too few votes are marked provisional until more members weigh in.
+      Members can rate each entry while voting is open. The leaderboard combines those scores, and
+      places keep changing until voting closes. An entry needs a minimum number of votes before it
+      gets a place; until then it waits below the ranking, however high its score.
     </p>
     <p>
       Scores are private unless a list says they are public. Public lists explain this before you

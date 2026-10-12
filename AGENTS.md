@@ -138,7 +138,7 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 
 **Ranking**
 
-- Ranking is a pure function. The default is a Bayesian average, `(v/(v+m))·R + (m/(v+m))·C`, and entries with `v < m` are flagged `provisional`. Provisional entries stay in their computed place on the leaderboard, tagged with how many more votes they need. `minVotes` never limits voting, which is open the whole time the list is.
+- Ranking is a pure function. The default is a Bayesian average, `(v/(v+m))·R + (m/(v+m))·C`, and entries with `v < m` are flagged `provisional`. Provisional entries have no rank: they are listed after every ranked entry (best score first), tagged with how many more votes they need, so a few early votes can't outrank broad agreement. Ranks are live until voting ends. `minVotes` never limits voting, which is open the whole time the list is.
 - Entries with no votes are unranked and listed last; with no votes at all, nothing is ranked. Equal scores share a rank (1, 2, 2, 4), ordered by votes, then title. Strategies are pure functions registered in `ranking/domain/strategies.ts`.
 - The leaderboard is cached per list and rebuilt when its TTL (`LEADERBOARD_TTL_SECONDS`, 2 minutes) expires or when a new entry is nominated (the cached board's entry ids differ from the list's). Scores alone do not invalidate it.
 - When `resultsVisibility = 'after-close'`, no aggregate numbers leave the server until voting has ended (closed or archived), for anyone, Admins included: the response is only `{ hidden: true, revealsAt }`, with `revealsAt` null for open-ended lists.

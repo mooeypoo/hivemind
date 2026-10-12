@@ -44,6 +44,32 @@ describe('Bayesian ranking', () => {
     expect(rows.map((row) => row.entryId)).toEqual(['a', 'b', 'c']);
   });
 
+  test('provisional entries have no rank and come after every ranked entry, whatever their score', () => {
+    // b: three 10s (provisional at m = 4). a: four 8s. c: four 6s. d: no votes.
+    const ballots = [
+      { a: 8, b: 10, c: 6 },
+      { a: 8, b: 10, c: 6 },
+      { a: 8, b: 10, c: 6 },
+      { a: 8, c: 6 },
+    ];
+    const rows = bayesian(input(['a', 'b', 'c', 'd'], ballots, 4));
+    expect(rows.map((row) => [row.entryId, row.rank, row.provisional])).toEqual([
+      ['a', 1, false],
+      ['c', 2, false],
+      ['b', null, true],
+      ['d', null, true],
+    ]);
+    expect(byId(rows).b?.score).toBeGreaterThan(byId(rows).a?.score ?? Infinity);
+  });
+
+  test('when nothing has enough votes yet, nothing is ranked', () => {
+    const rows = bayesian(input(['a', 'b'], [{ a: 9, b: 4 }], 3));
+    expect(rows.map((row) => [row.entryId, row.rank])).toEqual([
+      ['a', null],
+      ['b', null],
+    ]);
+  });
+
   test('entries without votes are unranked and listed last', () => {
     const rows = bayesian(input(['a', 'b', 'c'], [{ b: 2 }], 1));
     expect(rows.map((row) => [row.entryId, row.rank, row.score, row.votes])).toEqual([

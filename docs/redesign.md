@@ -233,16 +233,16 @@ Each phase leaves `npm run check` green and the site usable.
 
 ## Decisions
 
-| #   | Question                         | Decision                                                                                                                                      |
-| --- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Visual direction                 | **Night cinema**: dark-first, poster-led, neon accents; title cards for items without images                                                  |
-| Q2  | Fonts                            | **Self-host one OFL display face** (woff2 in `public/fonts`, no npm dependency; the CSP already allows `font-src 'self'`); system UI for body |
-| Q3  | Score input                      | **Tap chips** (a radio group); slider kept only for scales wider than 11 steps                                                                |
-| Q4  | Focus rating mode                | **Yes**, phase 3                                                                                                                              |
-| Q5  | Entry details sheet              | **Yes**, phase 3                                                                                                                              |
-| Q6  | Results page vs leaderboard (R1) | **Unify**: provisional entries in their computed place on both, from one shared component; weighted score first, raw average secondary        |
-| Q7  | Theme toggle                     | **Light / Dark / System**, stored only in `localStorage`; the privacy page says so                                                            |
-| Q8  | Real-browser layout tests        | **Yes**: `@playwright/test` as a dev dependency, a small overflow suite at 320/375/1280 px against the built app with a mocked API, run in CI |
+| #   | Question                         | Decision                                                                                                                                                                                                                                                                                       |
+| --- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Visual direction                 | **Night cinema**: dark-first, poster-led, neon accents; title cards for items without images                                                                                                                                                                                                   |
+| Q2  | Fonts                            | **Self-host one OFL display face** (woff2 in `public/fonts`, no npm dependency; the CSP already allows `font-src 'self'`); system UI for body                                                                                                                                                  |
+| Q3  | Score input                      | **Tap chips** (a radio group); slider kept only for scales wider than 11 steps                                                                                                                                                                                                                 |
+| Q4  | Focus rating mode                | **Yes**, phase 3                                                                                                                                                                                                                                                                               |
+| Q5  | Entry details sheet              | **Yes**, phase 3                                                                                                                                                                                                                                                                               |
+| Q6  | Results page vs leaderboard (R1) | **Unify** on one shared component; weighted score first, raw average secondary. _Revised after launch:_ provisional entries no longer keep a place. They get no rank and wait in their own section below the ranking, so a few early votes can't outrank broad agreement (AGENTS.md, Ranking). |
+| Q7  | Theme toggle                     | **Light / Dark / System**, stored only in `localStorage`; the privacy page says so                                                                                                                                                                                                             |
+| Q8  | Real-browser layout tests        | **Yes**: `@playwright/test` as a dev dependency, a small overflow suite at 320/375/1280 px against the built app with a mocked API, run in CI                                                                                                                                                  |
 
 ## Open questions
 

@@ -69,7 +69,7 @@ const leaderboard: LeaderboardDto = {
   computedAt: new Date().toISOString(),
   minVotes: 3,
   rows: list.entries.map((e, index) => ({
-    rank: index === 2 ? null : index + 1,
+    rank: index === 0 ? 1 : null,
     entryId: e.id,
     item: e.item,
     score: index === 2 ? null : 8.25 - index,

@@ -51,8 +51,8 @@ const emit = defineEmits<{ close: []; change: [value: number | null] }>();
           </div>
         </dl>
         <p v-if="standing?.provisional === true && standing.votes > 0" class="meta">
-          Provisional: needs {{ standing.votesNeeded }} more
-          {{ standing.votesNeeded === 1 ? 'vote' : 'votes' }} to confirm its place.
+          Not enough votes for a place yet: it needs {{ standing.votesNeeded }} more
+          {{ standing.votesNeeded === 1 ? 'vote' : 'votes' }} before it joins the ranking.
         </p>
         <PublicScoreDisclosure v-if="publicScores !== undefined" :scores="publicScores" />
       </div>
