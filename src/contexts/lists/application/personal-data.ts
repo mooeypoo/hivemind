@@ -5,7 +5,7 @@ import {
   type MemberId,
   type Result,
 } from '../../../shared/kernel/index.ts';
-import type { EntryId } from '../domain/entry.ts';
+import { isActiveEntry, type EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
 import type { ListId } from '../domain/list.ts';
 import type { EntryRepository, LedgerRepository } from './ports.ts';
@@ -28,7 +28,9 @@ export const makeListsPersonalData = (deps: ListsPersonalDataDeps) => ({
       ledgers.flatMap((ledger) =>
         ledger.entryIds.map(async (entryId) => {
           const entry = await deps.entries.get(ledger.listId, entryId);
-          return entry === null
+          return entry === null ||
+            !isActiveEntry(entry.value) ||
+            entry.value.nominatedBy?.memberId !== memberId
             ? null
             : {
                 listId: ledger.listId,
@@ -39,7 +41,10 @@ export const makeListsPersonalData = (deps: ListsPersonalDataDeps) => ({
         }),
       ),
     );
-    return { nominations: nominations.filter((nomination) => nomination !== null) };
+    return {
+      nominations: nominations.filter((nomination) => nomination !== null),
+      nominationRecords: ledgers,
+    };
   },
 
   async eraseFor(memberId: MemberId): Promise<Result<void, DomainError>> {

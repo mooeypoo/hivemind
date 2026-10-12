@@ -5,7 +5,7 @@ import {
   type DomainError,
   type Result,
 } from '../../../shared/kernel/index.ts';
-import type { EntryId, ItemSnapshot } from '../domain/entry.ts';
+import { isActiveEntry, type EntryId, type ItemSnapshot } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
 import { lifecycleOf, visibleTo, type ListId, type ResultsVisibility } from '../domain/list.ts';
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
@@ -58,4 +58,6 @@ export const makeRankingContext =
 export const makeEntriesForRanking =
   (deps: { readonly entries: EntryRepository }) =>
   async (listId: ListId): Promise<{ readonly id: EntryId; readonly item: ItemSnapshot }[]> =>
-    (await deps.entries.forList(listId)).map((entry) => ({ id: entry.id, item: entry.item }));
+    (await deps.entries.forList(listId))
+      .filter(isActiveEntry)
+      .map((entry) => ({ id: entry.id, item: entry.item }));

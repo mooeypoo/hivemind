@@ -1,5 +1,5 @@
 import type { MemberActor } from '../../../shared/kernel/index.ts';
-import type { Entry, EntryId, ItemSnapshot } from '../domain/entry.ts';
+import { nominationToken, type Entry, type EntryId, type ItemSnapshot } from '../domain/entry.ts';
 import {
   lifecycleOf,
   mayParticipate,
@@ -33,6 +33,7 @@ export interface EntryView {
   readonly nominatedBy: string | null;
   readonly isMine: boolean;
   readonly nominatedAt: Date;
+  readonly withdrawalToken: string | null;
 }
 
 export interface ListDetail extends ListView {
@@ -63,10 +64,19 @@ export const toListView = (
   };
 };
 
-export const toEntryView = (entry: Entry, list: List, actor: MemberActor): EntryView => ({
+export const toEntryView = (
+  entry: Entry,
+  list: List,
+  actor: MemberActor,
+  now: Date,
+): EntryView => ({
   id: entry.id,
   item: entry.item,
   nominatedBy: list.config.showNominators ? (entry.nominatedBy?.displayName ?? null) : null,
   isMine: entry.nominatedBy?.memberId === actor.memberId,
   nominatedAt: entry.nominatedAt,
+  withdrawalToken:
+    entry.nominatedBy?.memberId === actor.memberId && nominationsOpen(list, now)
+      ? nominationToken(entry)
+      : null,
 });

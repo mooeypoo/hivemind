@@ -52,6 +52,18 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       <li>Analytics, tracking, advertising, or your IP address.</li>
     </ul>
 
+    <h2>Withdrawing a nomination</h2>
+    <p>
+      While nominations are open, you can withdraw your own nomination. The item leaves the list and
+      no longer uses your nomination allowance. Your nominator name is removed from the item; a
+      reservation record may remain until your next nomination or data deletion and is included in
+      Download my data. The item and its withdrawal date are kept, along with earlier scores,
+      including names attached to public scores. Those scores are not shown in results or public
+      scores while the item is withdrawn. If you or another member nominates the same item in the
+      same list, its earlier scores return. Download my data includes your retained scores, and
+      Delete my data removes them.
+    </p>
+
     <h2>Shared links</h2>
     <p>
       Link previews can show the site and community names and the title of a published list. Draft

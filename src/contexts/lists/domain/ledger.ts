@@ -14,6 +14,7 @@ export interface NominationLedger {
   readonly memberId: MemberId;
   readonly listId: ListId;
   readonly entryIds: readonly EntryId[];
+  readonly claims?: Readonly<Record<string, string>>;
 }
 
 export const emptyLedger = (memberId: MemberId, listId: ListId): NominationLedger => ({
@@ -27,12 +28,29 @@ export const reserve = (
   entryId: EntryId,
   /** Null: unlimited. */
   cap: number | null,
+  claim?: string,
 ): Result<NominationLedger, DomainError> =>
-  cap !== null && ledger.entryIds.length >= cap
-    ? err(listsErrors.nominationCapReached)
-    : ok({ ...ledger, entryIds: [...ledger.entryIds, entryId] });
+  ledger.entryIds.includes(entryId)
+    ? err(listsErrors.alreadyNominated)
+    : cap !== null && ledger.entryIds.length >= cap
+      ? err(listsErrors.nominationCapReached)
+      : ok({
+          ...ledger,
+          entryIds: [...ledger.entryIds, entryId],
+          claims: { ...ledger.claims, ...(claim === undefined ? {} : { [entryId]: claim }) },
+        });
 
-export const release = (ledger: NominationLedger, entryId: EntryId): NominationLedger => ({
-  ...ledger,
-  entryIds: ledger.entryIds.filter((id) => id !== entryId),
-});
+export const release = (
+  ledger: NominationLedger,
+  entryId: EntryId,
+  claim?: string,
+): NominationLedger => {
+  if (claim !== undefined && ledger.claims?.[entryId] !== claim) return ledger;
+  return {
+    ...ledger,
+    entryIds: ledger.entryIds.filter((id) => id !== entryId),
+    claims: Object.fromEntries(
+      Object.entries(ledger.claims ?? {}).filter(([id]) => id !== entryId),
+    ),
+  };
+};

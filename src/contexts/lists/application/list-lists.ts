@@ -7,7 +7,8 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { visibleTo } from '../domain/list.ts';
-import type { LedgerRepository, ListRepository } from './ports.ts';
+import type { EntryRepository, LedgerRepository, ListRepository } from './ports.ts';
+import { activeLedger } from './nomination-ledger.ts';
 import { toListView, type ListView } from './views.ts';
 
 /** Every list the caller may see, newest first. Drafts and hidden lists only for Admins. */
@@ -15,6 +16,7 @@ export const makeListLists =
   (deps: {
     readonly lists: ListRepository;
     readonly ledgers: LedgerRepository;
+    readonly entries: EntryRepository;
     readonly clock: Clock;
   }) =>
   async (actor: Actor): Promise<Result<readonly ListView[], DomainError>> => {
@@ -25,7 +27,8 @@ export const makeListLists =
       deps.lists.all(),
       deps.ledgers.forMember(member.value.memberId),
     ]);
-    const used = new Map(ledgers.map((ledger) => [ledger.listId, ledger.entryIds.length]));
+    const active = await Promise.all(ledgers.map((ledger) => activeLedger(deps.entries, ledger)));
+    const used = new Map(active.map((ledger) => [ledger.listId, ledger.entryIds.length]));
     return ok(
       lists
         .filter((list) => visibleTo(list, member.value.isAdmin))

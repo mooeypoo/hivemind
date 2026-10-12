@@ -30,7 +30,7 @@ export interface EntryRepository {
   get(listId: ListId, entryId: EntryId): Promise<Versioned<Entry> | null>;
   save(entry: Entry, expectedVersion: string): Promise<boolean>;
   forList(listId: ListId): Promise<Entry[]>;
-  /** Entry ids only, without reading the entries. */
+  /** Active entry ids; withdrawn entries are excluded. */
   idsForList(listId: ListId): Promise<EntryId[]>;
 }
 

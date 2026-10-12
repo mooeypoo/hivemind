@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { App } from '../../composition.ts';
-import type { EntryDto, ErrorDto, ImportSummaryDto, ListDetailDto, ListDto } from '../contracts.ts';
+import type {
+  BallotDto,
+  EntryDto,
+  ErrorDto,
+  ImportSummaryDto,
+  ListDetailDto,
+  ListDto,
+} from '../contracts.ts';
 import { SESSION_COOKIE } from '../cookies.ts';
 import {
   request,
@@ -12,9 +19,16 @@ import {
   type Harness,
 } from '../testing/harness.ts';
 import { exportBackup, importBackup } from './backup.ts';
-import { createList, getList, nominate, scheduleList } from './lists.ts';
+import {
+  createList,
+  getList,
+  nominate,
+  scheduleList,
+  setVisibility,
+  withdrawNomination,
+} from './lists.ts';
 import { deleteMyData } from './me.ts';
-import { changeScore } from './voting.ts';
+import { changeScore, getMyBallot } from './voting.ts';
 
 type Endpoint = (request: Request, app: App) => Promise<Response>;
 
@@ -77,6 +91,30 @@ afterEach(async () => {
 });
 
 describe('backups', () => {
+  test('withdrawn items stay withdrawn after import and their sealed votes return on re-nomination', async () => {
+    const detail = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', ada);
+    const root = detail.body.entries.find((entry) => entry.item.title === 'Root');
+    if (root === undefined) throw new Error('fixture');
+    await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', ada, {
+      entryId: root.id,
+      token: root.withdrawalToken,
+    });
+    const file = (await call<unknown>(exportBackup, 'GET', '/api/admin/backup?list=games', admin))
+      .body;
+    expect((await call(importBackup, 'POST', '/api/admin/backup', admin, file)).status).toBe(200);
+    const copy = await call<ListDetailDto>(getList, 'GET', '/api/lists/games-2', admin);
+    expect(copy.body.entries.map((entry) => entry.item.title)).toEqual(['Azul']);
+    const restored = await call<EntryDto>(nominate, 'POST', '/api/lists/games-2/entries', admin, {
+      title: 'Root',
+    });
+    expect(restored.body.id).toBe(root.id);
+    await call(setVisibility, 'PUT', '/api/lists/games-2/visibility', admin, {
+      visibility: 'public',
+    });
+    const ballot = await call<BallotDto>(getMyBallot, 'GET', '/api/lists/games-2/ballot', ada);
+    expect(ballot.body.scores[root.id]).toBe(9);
+  });
+
   test('Admins download a file where votes are sealed', async () => {
     const result = await call(exportBackup, 'GET', '/api/admin/backup', admin);
     expect(result.status).toBe(200);

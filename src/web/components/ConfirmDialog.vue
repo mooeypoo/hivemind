@@ -7,6 +7,7 @@ const props = defineProps<{
   title: string;
   confirmLabel: string;
   danger?: boolean;
+  busy?: boolean;
   /**
    * For actions that can't be undone: the person must type this exactly before the confirm
    * button works.
@@ -31,7 +32,7 @@ watch(
 </script>
 
 <template>
-  <AppDialog :open="open" :title="title" @close="emit('cancel')">
+  <AppDialog :open="open" :title="title" @close="props.busy !== true && emit('cancel')">
     <slot />
     <div v-if="confirmText !== undefined" class="stack dialog__confirm">
       <label :for="inputId">
@@ -48,12 +49,14 @@ watch(
     </div>
     <template #actions>
       <!-- Focus starts on the safe choice. -->
-      <button type="button" class="button" autofocus @click="emit('cancel')">Cancel</button>
+      <button type="button" class="button" autofocus :disabled="busy" @click="emit('cancel')">
+        Cancel
+      </button>
       <button
         type="button"
         class="button"
         :class="danger === true ? 'button--danger' : 'button--primary'"
-        :disabled="!canConfirm"
+        :disabled="!canConfirm || busy"
         @click="emit('confirm')"
       >
         {{ confirmLabel }}

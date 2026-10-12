@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { anonymous, type Actor, type MemberId, type RoleId } from '../../../shared/kernel/index.ts';
 import { FixedClock, SequentialIds } from '../../../shared/kernel/testing/index.ts';
-import type { EntryId } from '../domain/entry.ts';
+import { nominationToken, type EntryId } from '../domain/entry.ts';
 import { DEFAULT_SCALE, type ListConfig, type Schedule } from '../domain/list.ts';
 import { FakeCatalog } from '../infrastructure/testing/fake-catalog.ts';
 import {
@@ -19,6 +19,7 @@ import { makeEditList } from './edit-list.ts';
 import { makeGetList, makeGetSharePreview } from './get-list.ts';
 import { makeListLists } from './list-lists.ts';
 import { makeNominate } from './nominate.ts';
+import { makeWithdrawNomination } from './withdraw-nomination.ts';
 import { makeListsPersonalData } from './personal-data.ts';
 import { makeScheduleList } from './schedule-list.ts';
 import { makeSearchForList } from './search-for-list.ts';
@@ -83,6 +84,14 @@ const scheduleIt = (list: string, s: Schedule = schedule) =>
   makeScheduleList(deps)(admin, { list, schedule: s });
 const nominate = (who: Actor, key: string, list = 'best-sci-fi') =>
   makeNominate(deps)(who, { list, key });
+
+const withdraw = async (who: Actor, entryId = 'tmdb-movie.78') => {
+  const list = await deps.slugs.lookup('best-sci-fi');
+  if (list === null) throw new Error('fixture');
+  const entry = await deps.entries.get(list, entryId as EntryId);
+  if (entry === null) throw new Error('fixture');
+  return makeWithdrawNomination(deps)(who, { list, entryId, token: nominationToken(entry.value) });
+};
 
 /** A published list, open for nominations. */
 const openList = async (patch: Partial<ListConfig> = {}) => {
@@ -202,6 +211,119 @@ describe('visibility', () => {
 });
 
 describe('nominating', () => {
+  test.each([1, null])(
+    'withdrawal refunds the allowance with cap %s, even after another member restores it',
+    async (cap) => {
+      const list = await openList({ maxNominationsPerMember: cap });
+      await nominate(ada, '78');
+      expect((await withdraw(ada)).ok).toBe(true);
+      expect((await nominate(bob, '78')).ok).toBe(true);
+      const detail = await makeGetList(deps)(ada, { list: list.id });
+      expect(detail.ok && detail.value.viewer.nominationsUsed).toBe(0);
+      const index = await makeListLists(deps)(ada);
+      expect(index.ok && index.value[0]?.viewer.nominationsUsed).toBe(0);
+      expect((await nominate(ada, '603')).ok).toBe(true);
+    },
+  );
+
+  test('only the original nominator can withdraw, including when names are hidden', async () => {
+    await openList({ showNominators: false });
+    await nominate(ada, '78');
+    expect((await withdraw(anonymous)).ok).toBe(false);
+    expect((await withdraw(bob)).ok).toBe(false);
+    expect((await withdraw(admin)).ok).toBe(false);
+    expect((await withdraw(ada)).ok).toBe(true);
+  });
+
+  test.each([9, 15, 20])(
+    'withdrawal is refused outside the nomination window, day %s',
+    async (day) => {
+      await openList();
+      await nominate(ada, '78');
+      clock.set(at(day));
+      const result = await withdraw(ada);
+      expect(!result.ok && result.error.code).toBe('lists.nominations-closed');
+    },
+  );
+
+  test('withdrawal is refused after archiving and does not require a participation role', async () => {
+    const list = await openList({ requiredRoleIds: ['r-film' as RoleId] });
+    await nominate(actor('ada', { roles: ['r-film'] }), '78');
+    expect((await withdraw(ada)).ok).toBe(true);
+    await nominate(actor('ada', { roles: ['r-film'] }), '78');
+    await makeArchiveList(deps)(admin, { list: list.id });
+    expect((await withdraw(ada)).ok).toBe(false);
+  });
+
+  test('retrying withdrawal is harmless but an old token cannot withdraw a re-nomination', async () => {
+    const list = await openList({ maxNominationsPerMember: 1 });
+    const first = await nominate(ada, '78');
+    if (!first.ok || first.value.withdrawalToken === null) throw new Error('fixture');
+    const input = { list: list.id, entryId: first.value.id, token: first.value.withdrawalToken };
+    expect((await makeWithdrawNomination(deps)(ada, input)).ok).toBe(true);
+    expect((await makeWithdrawNomination(deps)(ada, input)).ok).toBe(true);
+    expect((await nominate(ada, '78')).ok).toBe(true);
+    const stale = await makeWithdrawNomination(deps)(ada, input);
+    expect(!stale.ok && stale.error.code).toBe('lists.conflict');
+    const detail = await makeGetList(deps)(ada, { list: list.id });
+    expect(detail.ok && detail.value.viewer.nominationsUsed).toBe(1);
+  });
+
+  test('competing re-nominations have one winner and no loser loses a slot', async () => {
+    await openList({ maxNominationsPerMember: 1 });
+    await nominate(ada, '78');
+    await withdraw(ada);
+    const results = await Promise.all([nominate(ada, '78'), nominate(bob, '78')]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    const loser = results[0].ok ? bob : ada;
+    expect((await nominate(loser, '603')).ok).toBe(true);
+  });
+
+  test('withdrawal retries an entry write conflict once and reports a persistent conflict', async () => {
+    await openList();
+    await nominate(ada, '78');
+    const save = deps.entries.save;
+    let attempts = 0;
+    deps.entries.save = (...args) => (++attempts === 1 ? Promise.resolve(false) : save(...args));
+    expect((await withdraw(ada)).ok).toBe(true);
+    expect(attempts).toBe(2);
+    deps.entries.save = save;
+    await nominate(ada, '78');
+    deps.entries.save = () => Promise.resolve(false);
+    const refused = await withdraw(ada);
+    expect(!refused.ok && refused.error.code).toBe('lists.conflict');
+  });
+
+  test('withdrawal hides an entry, refunds the slot and allows re-nomination with the same id', async () => {
+    const list = await openList({ maxNominationsPerMember: 1 });
+    const nominated = await nominate(ada, '78');
+    if (!nominated.ok || nominated.value.withdrawalToken === null) throw new Error('fixture');
+    expect((await nominate(ada, '603')).ok).toBe(false);
+    expect(
+      (
+        await makeWithdrawNomination(deps)(ada, {
+          list: list.id,
+          entryId: nominated.value.id,
+          token: nominated.value.withdrawalToken,
+        })
+      ).ok,
+    ).toBe(true);
+    const detail = await makeGetList(deps)(ada, { list: list.id });
+    expect(detail.ok && detail.value.entries).toEqual([]);
+    expect(detail.ok && detail.value.viewer.nominationsUsed).toBe(0);
+    expect(await makeEntryExists(deps)(list.id, nominated.value.id)).toBe(false);
+    expect((await nominate(ada, '603')).ok).toBe(true);
+    const restored = await nominate(bob, '78');
+    expect(restored.ok && restored.value).toMatchObject({
+      id: nominated.value.id,
+      nominatedBy: 'Member bob',
+      isMine: true,
+    });
+    expect(await makeEntryExists(deps)(list.id, nominated.value.id)).toBe(true);
+    const oldOwner = await makeGetList(deps)(ada, { list: list.id });
+    expect(oldOwner.ok && oldOwner.value.viewer.nominationsUsed).toBe(1);
+  });
+
   test('snapshots the catalog item and the nominator', async () => {
     await openList();
     const result = await nominate(ada, '78');
@@ -361,6 +483,23 @@ describe('seeded lists', () => {
 describe('personal data', () => {
   const personalData = () => makeListsPersonalData(deps);
 
+  test('withdrawn reservation records remain exportable and erasure does not anonymise a new nominator', async () => {
+    const list = await openList();
+    await nominate(ada, '78');
+    await withdraw(ada);
+    await nominate(bob, '78');
+    const exported = await personalData().exportFor('ada' as MemberId);
+    expect(exported.nominations).toEqual([]);
+    expect(exported.nominationRecords[0]?.entryIds).toEqual(['tmdb-movie.78']);
+    expect((await personalData().eraseFor('ada' as MemberId)).ok).toBe(true);
+    const detail = await makeGetList(deps)(bob, { list: list.id });
+    expect(detail.ok && detail.value.entries[0]?.nominatedBy).toBe('Member bob');
+    expect(await personalData().exportFor('ada' as MemberId)).toEqual({
+      nominations: [],
+      nominationRecords: [],
+    });
+  });
+
   test('exports the member nominations', async () => {
     await openList();
     await nominate(ada, '78');
@@ -373,6 +512,7 @@ describe('personal data', () => {
           nominatedAt: at(12).toISOString(),
         },
       ],
+      nominationRecords: await deps.ledgers.forMember('ada' as MemberId),
     });
   });
 
@@ -389,7 +529,10 @@ describe('personal data', () => {
       ['Blade Runner', null],
       ['The Matrix', 'Member bob'],
     ]);
-    expect(await personalData().exportFor('ada' as MemberId)).toEqual({ nominations: [] });
+    expect(await personalData().exportFor('ada' as MemberId)).toEqual({
+      nominations: [],
+      nominationRecords: [],
+    });
   });
 });
 

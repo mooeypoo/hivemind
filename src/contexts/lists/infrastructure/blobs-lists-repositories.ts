@@ -7,7 +7,7 @@ import type {
   ListRepository,
   SlugIndex,
 } from '../application/ports.ts';
-import type { Entry, EntryId } from '../domain/entry.ts';
+import { isActiveEntry, type Entry, type EntryId } from '../domain/entry.ts';
 import type { NominationLedger } from '../domain/ledger.ts';
 import type { List, ListConfig, ListId, Phase, Schedule, Visibility } from '../domain/list.ts';
 
@@ -63,6 +63,9 @@ interface EntryRecordV1 {
   readonly nominatedAt: string;
   /** Optional: absent on entries written before retention existed. */
   readonly snapshotPurgedAt?: string | null;
+  readonly nominationId?: string | null;
+  readonly withdrawnAt?: string | null;
+  readonly withdrawnNominationIds?: readonly string[];
 }
 
 interface LedgerRecordV1 {
@@ -70,6 +73,7 @@ interface LedgerRecordV1 {
   readonly memberId: string;
   readonly listId: string;
   readonly entryIds: readonly string[];
+  readonly claims?: Readonly<Record<string, string>>;
 }
 
 /** Records this version can read. A newer or corrupt record is a deployment error, not user input. */
@@ -146,6 +150,13 @@ const entryToRecord = (entry: Entry): EntryRecordV1 => ({
   nominatedBy: entry.nominatedBy,
   nominatedAt: entry.nominatedAt.toISOString(),
   snapshotPurgedAt: entry.snapshotPurgedAt?.toISOString() ?? null,
+  ...(entry.nominationId === undefined ? {} : { nominationId: entry.nominationId }),
+  ...(entry.withdrawnAt === undefined
+    ? {}
+    : { withdrawnAt: entry.withdrawnAt?.toISOString() ?? null }),
+  ...(entry.withdrawnNominationIds === undefined
+    ? {}
+    : { withdrawnNominationIds: entry.withdrawnNominationIds }),
 });
 
 const entryFromRecord = (data: unknown): Entry => {
@@ -164,6 +175,13 @@ const entryFromRecord = (data: unknown): Entry => {
           },
     nominatedAt: new Date(record.nominatedAt),
     snapshotPurgedAt: record.snapshotPurgedAt == null ? null : new Date(record.snapshotPurgedAt),
+    ...(record.nominationId === undefined ? {} : { nominationId: record.nominationId }),
+    ...(record.withdrawnAt === undefined
+      ? {}
+      : { withdrawnAt: record.withdrawnAt === null ? null : new Date(record.withdrawnAt) }),
+    ...(record.withdrawnNominationIds === undefined
+      ? {}
+      : { withdrawnNominationIds: record.withdrawnNominationIds }),
   };
 };
 
@@ -174,6 +192,7 @@ const ledgerFromRecord = (data: unknown): NominationLedger => {
     memberId: record.memberId as MemberId,
     listId: record.listId as ListId,
     entryIds: record.entryIds as EntryId[],
+    ...(record.claims === undefined ? {} : { claims: record.claims }),
   };
 };
 
@@ -222,9 +241,9 @@ export const createBlobsEntryRepository = (store: Store): EntryRepository => ({
     ),
   forList: (listId) => readAll(store, `entry/${listId}/`, entryFromRecord),
   async idsForList(listId) {
-    const prefix = `entry/${listId}/`;
-    const { blobs } = await store.list({ prefix });
-    return blobs.map((blob) => blob.key.slice(prefix.length) as EntryId);
+    return (await readAll(store, `entry/${listId}/`, entryFromRecord))
+      .filter(isActiveEntry)
+      .map((entry) => entry.id);
   },
 });
 
@@ -234,7 +253,13 @@ export const createBlobsLedgerRepository = (store: Store): LedgerRepository => (
     writeVersioned(
       store,
       `nominator/${ledger.memberId}/${ledger.listId}`,
-      { v: 1, memberId: ledger.memberId, listId: ledger.listId, entryIds: ledger.entryIds },
+      {
+        v: 1,
+        memberId: ledger.memberId,
+        listId: ledger.listId,
+        entryIds: ledger.entryIds,
+        ...(ledger.claims === undefined ? {} : { claims: ledger.claims }),
+      },
       expectedVersion,
     ),
   forMember: (memberId) => readAll(store, `nominator/${memberId}/`, ledgerFromRecord),

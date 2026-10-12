@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue';
 import type {
   BallotDto,
+  EntryDto,
   LeaderboardDto,
   LeaderboardRowDto,
   ListDetailDto,
@@ -20,6 +21,8 @@ export const useListPage = (slug: () => string) => {
   const error = ref<ApiError | null>(null);
   const publicScores = ref<PublicScoresDto>({ visible: false });
   const leaderboard = ref<LeaderboardDto | null>(null);
+  const withdrawing = ref(false);
+  const withdrawalError = ref<ApiError | null>(null);
 
   const path = () => `/api/lists/${encodeURIComponent(slug())}`;
   const refreshPublicScores = async () => {
@@ -47,6 +50,26 @@ export const useListPage = (slug: () => string) => {
     if (attribution.ok) publicScores.value = attribution.data;
   };
   watch(slug, load, { immediate: true });
+
+  const withdraw = async (entry: EntryDto): Promise<boolean> => {
+    if (withdrawing.value || entry.withdrawalToken == null) return false;
+    withdrawing.value = true;
+    withdrawalError.value = null;
+    try {
+      const result = await api.post<undefined>(`${path()}/entries/withdraw`, {
+        entryId: entry.id,
+        token: entry.withdrawalToken,
+      });
+      if (!result.ok) {
+        withdrawalError.value = result.error;
+        return false;
+      }
+      await load();
+      return true;
+    } finally {
+      withdrawing.value = false;
+    }
+  };
 
   /** Called by the standings panel whenever it loads. */
   const onLeaderboard = (board: LeaderboardDto) => {
@@ -131,5 +154,8 @@ export const useListPage = (slug: () => string) => {
     resultsSealed,
     next,
     requiredRolesText,
+    withdraw,
+    withdrawing,
+    withdrawalError,
   };
 };

@@ -25,6 +25,9 @@ export interface Entry {
   /** Null for seeded entries, and after the nominator erased their data. */
   readonly nominatedBy: Nominator | null;
   readonly nominatedAt: Date;
+  readonly nominationId?: string | null;
+  readonly withdrawnAt?: Date | null;
+  readonly withdrawnNominationIds?: readonly string[];
   /** Set once the item's details were removed under its source's retention terms. */
   readonly snapshotPurgedAt: Date | null;
 }
@@ -35,6 +38,11 @@ export interface Entry {
  */
 export const entryIdFor = (item: Pick<ItemSnapshot, 'source' | 'externalId'>): EntryId =>
   `${item.source}.${encodeURIComponent(item.externalId)}` as EntryId;
+
+export const isActiveEntry = (entry: Entry): boolean => entry.withdrawnAt == null;
+
+export const nominationToken = (entry: Entry): string =>
+  entry.nominationId ?? entry.nominatedAt.toISOString();
 
 export const PURGED_TITLE = 'Details removed (archived over 6 months ago)';
 

@@ -75,6 +75,11 @@ export const nominateBody = z.union([
   z.strictObject({ title: z.string().min(1).max(500) }),
 ]);
 
+export const withdrawNominationBody = z.strictObject({
+  entryId: z.string().min(1).max(700),
+  token: z.string().min(1).max(200),
+});
+
 /** About 200 rows of 2 × 200 characters, with room for quoting. */
 export const importPresetBody = z.strictObject({ csv: z.string().min(1).max(100_000) });
 
@@ -133,6 +138,7 @@ const backupListPart = z.object({
           .nullable(),
         nominatedAt: isoString,
         snapshotPurgedAt: isoString.nullable(),
+        withdrawnAt: isoString.nullable().optional(),
       }),
     )
     .max(2000),

@@ -26,6 +26,7 @@ export {
   getList,
   listLists,
   nominate,
+  withdrawNomination,
   scheduleList,
   searchForList,
   setVisibility,

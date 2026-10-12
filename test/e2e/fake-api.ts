@@ -32,6 +32,7 @@ const entry = (id: string, title: string, subtitle: string | null): EntryDto => 
   nominatedBy: 'Someone With A Long Name',
   isMine: id === 'b',
   nominatedAt: '2026-01-01T00:00:00.000Z',
+  withdrawalToken: id === 'b' ? 'claim-b' : null,
 });
 
 export const list: ListDetailDto = {
@@ -105,6 +106,24 @@ export const fakeApi = async (page: Page, me: MeDto | null) => {
   const routes = responses(me);
   await page.route('**/api/**', (route: Route) => {
     const url = new URL(route.request().url());
+    if (
+      route.request().method() === 'POST' &&
+      url.pathname === '/api/lists/films/entries/withdraw'
+    ) {
+      const input = route.request().postDataJSON() as { entryId: string; token: string };
+      if (input.entryId !== 'b' || input.token !== 'claim-b')
+        return route.fulfill({ status: 409, json: notFound });
+      routes['GET /api/lists/films'] = {
+        ...list,
+        entries: list.entries.filter((item) => item.id !== 'b'),
+        viewer: { ...list.viewer, nominationsUsed: 0 },
+      };
+      routes['GET /api/lists/films/leaderboard'] = {
+        ...leaderboard,
+        rows: leaderboard.rows.filter((row) => row.entryId !== 'b'),
+      };
+      return route.fulfill({ status: 204 });
+    }
     const body = routes[`${route.request().method()} ${url.pathname}`];
     if (body === null) return route.fulfill({ status: 401, json: notFound });
     if (body === undefined) return route.fulfill({ status: 404, json: notFound });

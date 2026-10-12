@@ -16,6 +16,8 @@ import type {
   SlugIndex,
 } from './ports.ts';
 import { toEntryView, toListView, type ListDetail } from './views.ts';
+import { isActiveEntry } from '../domain/entry.ts';
+import { activeLedger } from './nomination-ledger.ts';
 
 export interface GetListDeps {
   readonly lists: ListRepository;
@@ -52,15 +54,21 @@ export const makeGetList =
       deps.ledgers.get(member.value.memberId, list.id),
     ]);
     return ok({
-      ...toListView(list, member.value, deps.clock.now(), ledger?.value.entryIds.length ?? 0),
+      ...toListView(
+        list,
+        member.value,
+        deps.clock.now(),
+        ledger === null ? 0 : (await activeLedger(deps.entries, ledger.value)).entryIds.length,
+      ),
       snapshotsExpireAt: expiry(list, deps.catalog),
       entries: entries
+        .filter(isActiveEntry)
         .sort(
           (a, b) =>
             a.nominatedAt.getTime() - b.nominatedAt.getTime() ||
             a.item.title.localeCompare(b.item.title),
         )
-        .map((entry) => toEntryView(entry, list, member.value)),
+        .map((entry) => toEntryView(entry, list, member.value, deps.clock.now())),
     });
   };
 

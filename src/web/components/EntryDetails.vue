@@ -15,7 +15,11 @@ defineProps<{
   /** The viewer's final score on a closed list. */
   finalScore?: number | undefined;
 }>();
-const emit = defineEmits<{ close: []; change: [value: number | null] }>();
+const emit = defineEmits<{
+  close: [];
+  change: [value: number | null];
+  withdraw: [entry: EntryDto];
+}>();
 </script>
 
 <template>
@@ -72,6 +76,14 @@ const emit = defineEmits<{ close: []; change: [value: number | null] }>();
       </p>
     </div>
     <template #actions>
+      <button
+        v-if="entry?.withdrawalToken != null"
+        type="button"
+        class="button button--danger"
+        @click="emit('withdraw', entry)"
+      >
+        Withdraw nomination
+      </button>
       <button type="button" class="button" @click="emit('close')">Close</button>
     </template>
   </AppDialog>

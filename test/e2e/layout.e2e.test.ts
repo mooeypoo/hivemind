@@ -61,6 +61,33 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`withdrawing a nomination at ${String(width)} px fits and refreshes the list`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.goto('/lists/films');
+        await page.getByRole('button', { name: /^Details for Dr\. Strangelove/ }).click();
+        await page.getByRole('button', { name: 'Withdraw nomination', exact: true }).click();
+        const confirmation = page.getByRole('dialog', { name: /^Withdraw Dr\. Strangelove/ });
+        await expect(confirmation).toBeVisible();
+        await expect(confirmation.getByRole('button', { name: 'Cancel' })).toBeFocused();
+        const box = await confirmation.boundingBox();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+        await expectNoSidewaysScroll(page);
+        await confirmation.getByRole('button', { name: 'Cancel' }).click();
+        await page.getByRole('button', { name: 'Withdraw nomination', exact: true }).click();
+        await confirmation
+          .getByRole('button', { name: 'Withdraw nomination', exact: true })
+          .click();
+        await expect(confirmation).not.toBeVisible();
+        await expect(
+          page.getByRole('button', { name: /^Details for Dr\. Strangelove/ }),
+        ).toHaveCount(0);
+        await expect(page.getByRole('tab', { name: 'Rate 2', exact: true })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
       for (const path of memberRoutes) {
         test(`${path} at ${String(width)} px fits`, async ({ page }) => {
           await page.setViewportSize({ width, height: 800 });

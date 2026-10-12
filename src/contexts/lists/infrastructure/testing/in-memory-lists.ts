@@ -6,7 +6,7 @@ import type {
   SlugIndex,
   Versioned,
 } from '../../application/ports.ts';
-import type { Entry, EntryId } from '../../domain/entry.ts';
+import { isActiveEntry, type Entry, type EntryId } from '../../domain/entry.ts';
 import type { NominationLedger } from '../../domain/ledger.ts';
 import type { List, ListId } from '../../domain/list.ts';
 
@@ -62,7 +62,12 @@ export class InMemoryEntryRepository implements EntryRepository {
     this.table.save(this.key(entry.listId, entry.id), entry, expectedVersion);
   forList = (listId: ListId) => Promise.resolve(this.table.values(`${listId}/`));
   idsForList = (listId: ListId) =>
-    Promise.resolve(this.table.values(`${listId}/`).map((entry) => entry.id));
+    Promise.resolve(
+      this.table
+        .values(`${listId}/`)
+        .filter(isActiveEntry)
+        .map((entry) => entry.id),
+    );
 }
 
 export class InMemoryLedgerRepository implements LedgerRepository {

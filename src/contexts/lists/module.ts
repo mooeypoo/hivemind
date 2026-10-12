@@ -8,6 +8,7 @@ import { makeEditList } from './application/edit-list.ts';
 import { makeGetList, makeGetSharePreview } from './application/get-list.ts';
 import { makeListLists } from './application/list-lists.ts';
 import { makeNominate } from './application/nominate.ts';
+import { makeWithdrawNomination } from './application/withdraw-nomination.ts';
 import { makeListsPersonalData } from './application/personal-data.ts';
 import { makeScheduleList } from './application/schedule-list.ts';
 import { makeSearchForList } from './application/search-for-list.ts';
@@ -57,7 +58,8 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     getList: makeGetList(shared),
     getSharePreview: makeGetSharePreview(shared),
     searchForList: makeSearchForList(shared),
-    nominate: makeNominate(shared),
+    nominate: makeNominate({ ...shared, ids: deps.ids }),
+    withdrawNomination: makeWithdrawNomination(shared),
     personalData: makeListsPersonalData(repositories),
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),

@@ -9,6 +9,7 @@ import { usePageTitle } from '../lib/page-title.ts';
 import { session } from '../state/session.ts';
 import EntryCard from '../components/EntryCard.vue';
 import EntryDetails from '../components/EntryDetails.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import EventCountdown from '../components/EventCountdown.vue';
 import LeaderboardPanel from '../components/LeaderboardPanel.vue';
@@ -30,6 +31,7 @@ const { list, error, ballot, entries, standings, publicScores, canVote, hasStand
 const { canNominateHere, isClosed, resultsSealed, unrated, ratedCount, next, requiredRolesText } =
   page;
 const { scores, saving, errors } = ballot;
+const { withdrawing, withdrawalError } = page;
 usePageTitle(() => list.value?.title ?? null);
 
 // Tabs, kept in the address (?tab=standings) so they can be linked to.
@@ -78,6 +80,27 @@ const scoreState = (entryId: string) => ({
 });
 const onDetailsChange = (value: number | null) => {
   if (selected.value !== null) ballot.set(selected.value.id, value);
+};
+
+const withdrawalEntry = ref<EntryDto | null>(null);
+const beginWithdrawal = (entry: EntryDto) => {
+  withdrawalEntry.value = entry;
+  withdrawalError.value = null;
+  selectedId.value = null;
+};
+const cancelWithdrawal = () => {
+  selectedId.value = withdrawalEntry.value?.id ?? null;
+  withdrawalEntry.value = null;
+};
+const confirmWithdrawal = async () => {
+  const entry = withdrawalEntry.value;
+  if (entry === null) return;
+  if (await page.withdraw(entry)) {
+    withdrawalEntry.value = null;
+    queue.value = [];
+    rating.value = false;
+    toast.show('Nomination withdrawn.', 'success');
+  }
 };
 
 const copyMemberLink = async () => {
@@ -289,7 +312,24 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
       :final-score="selected !== null && isClosed ? scores[selected.id] : undefined"
       @close="selectedId = null"
       @change="onDetailsChange"
+      @withdraw="beginWithdrawal"
     />
+    <ConfirmDialog
+      :open="withdrawalEntry !== null"
+      :title="`Withdraw ${withdrawalEntry?.item.title ?? 'nomination'}?`"
+      :confirm-label="withdrawing ? 'Withdrawing...' : 'Withdraw nomination'"
+      :busy="withdrawing"
+      danger
+      @cancel="cancelWithdrawal"
+      @confirm="confirmWithdrawal"
+    >
+      <p>
+        This removes the item from the list and frees your nomination slot. To bring it back, you or
+        another member must nominate it again while nominations are open. Any earlier ratings will
+        return with it.
+      </p>
+      <ErrorNotice :error="withdrawalError" />
+    </ConfirmDialog>
     <RateOneByOne
       v-if="canVote"
       :open="rating"
