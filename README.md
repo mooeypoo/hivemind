@@ -4,6 +4,8 @@ hivemind is a platform for members of a Discord community to create ranked lists
 
 Each list ranks itself. One deployment serves one Discord community. To run hivemind for your own community, fork the repository and deploy your fork. Nothing community-specific lives in the code.
 
+![The welcome page](docs/screenshots/landing.jpg)
+
 | Lists                                          | A list                                               |
 | ---------------------------------------------- | ---------------------------------------------------- |
 | ![The lists index](docs/screenshots/lists.jpg) | ![A list open for rating](docs/screenshots/list.jpg) |
