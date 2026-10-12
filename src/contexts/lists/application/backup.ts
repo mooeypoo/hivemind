@@ -9,7 +9,13 @@ import {
   type Result,
   type RoleId,
 } from '../../../shared/kernel/index.ts';
-import { entryIdFor, type Entry, type EntryId, type ItemSnapshot } from '../domain/entry.ts';
+import {
+  entryIdFor,
+  isActiveEntry,
+  type Entry,
+  type EntryId,
+  type ItemSnapshot,
+} from '../domain/entry.ts';
 import {
   validateConfig,
   type ItemSourceRef,
@@ -42,6 +48,7 @@ export interface ListBackup {
     readonly nominatedBy: { readonly memberId: string; readonly displayName: string } | null;
     readonly nominatedAt: string;
     readonly snapshotPurgedAt: string | null;
+    readonly withdrawnAt?: string | null;
   }[];
   readonly nominators: readonly {
     readonly memberId: string;
@@ -96,8 +103,21 @@ const toBackup = async (deps: BackupDeps, list: List): Promise<ListBackup> => {
       nominatedBy: entry.nominatedBy,
       nominatedAt: entry.nominatedAt.toISOString(),
       snapshotPurgedAt: iso(entry.snapshotPurgedAt),
+      withdrawnAt: iso(entry.withdrawnAt ?? null),
     })),
-    nominators: ledgers.map((ledger) => ({ memberId: ledger.memberId, entryIds: ledger.entryIds })),
+    nominators: ledgers
+      .map((ledger) => ({
+        memberId: ledger.memberId,
+        entryIds: ledger.entryIds.filter((id) =>
+          entries.some(
+            (entry) =>
+              entry.id === id &&
+              isActiveEntry(entry) &&
+              entry.nominatedBy?.memberId === ledger.memberId,
+          ),
+        ),
+      }))
+      .filter((ledger) => ledger.entryIds.length > 0),
   };
 };
 
@@ -222,6 +242,7 @@ export const makeRestoreFromBackup =
             : null,
         nominatedAt: new Date(saved.nominatedAt),
         snapshotPurgedAt: saved.snapshotPurgedAt === null ? null : new Date(saved.snapshotPurgedAt),
+        withdrawnAt: saved.withdrawnAt == null ? null : new Date(saved.withdrawnAt),
       };
       if (await deps.entries.create(entry)) entryIds.add(entry.id);
     }

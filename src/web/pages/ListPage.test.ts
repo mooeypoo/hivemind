@@ -67,6 +67,81 @@ afterEach(() => {
 });
 
 describe('ListPage rating', () => {
+  test('withdrawal asks for confirmation, supports cancel, and refreshes entries and allowance', async () => {
+    const owned = { ...entry('a', 'Root'), isMine: true, withdrawalToken: 'claim-a' };
+    let detail = games({
+      entries: [owned, entry('b', 'Wingspan')],
+      viewer: { canParticipate: true, canNominate: false, nominationsUsed: 1 },
+      maxNominationsPerMember: 1,
+    });
+    const page = await mountWith(detail, { a: 7 }, undefined, true);
+    const original = globalThis.fetch;
+    const mutations: unknown[] = [];
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) => {
+      if (input.endsWith('/entries/withdraw')) {
+        mutations.push(JSON.parse(init.body as string));
+        detail = {
+          ...detail,
+          entries: [entry('b', 'Wingspan')],
+          viewer: { canParticipate: true, canNominate: true, nominationsUsed: 0 },
+        };
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (input === '/api/lists/games') return Promise.resolve(Response.json(detail));
+      return original(input, init);
+    });
+    await page.get('.entry__art').trigger('click');
+    await page.get('dialog[open] .button--danger').trigger('click');
+    expect(page.get('dialog[open]').text()).toContain('Any earlier ratings will return with it.');
+    expect(mutations).toEqual([]);
+    await page.get('dialog[open] .dialog__actions button').trigger('click');
+    expect(page.get('dialog[open]').text()).toContain('Root');
+    await page.get('dialog[open] .button--danger').trigger('click');
+    await page.get('dialog[open] .button--danger').trigger('click');
+    await flushPromises();
+    expect(mutations).toEqual([{ entryId: 'a', token: 'claim-a' }]);
+    expect(page.findAll('.entry__title').map((title) => title.text())).toEqual(['Wingspan']);
+    expect(page.find('dialog[open]').exists()).toBe(false);
+    expect(useToast().toasts.value.at(-1)?.message).toBe('Nomination withdrawn.');
+    page.unmount();
+  });
+
+  test('a failed withdrawal keeps the confirmation open and announces the error', async () => {
+    const page = await mountWith(
+      games({ entries: [{ ...entry('a', 'Root'), isMine: true, withdrawalToken: 'claim-a' }] }),
+      {},
+      undefined,
+      true,
+    );
+    const original = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) =>
+      input.endsWith('/entries/withdraw')
+        ? Promise.resolve(
+            Response.json(
+              { error: { code: 'lists.conflict', message: 'Please reload and try again.' } },
+              { status: 409 },
+            ),
+          )
+        : original(input, init),
+    );
+    await page.get('.entry__art').trigger('click');
+    await page.get('dialog[open] .button--danger').trigger('click');
+    await page.get('dialog[open] .button--danger').trigger('click');
+    await flushPromises();
+    expect(page.get('dialog[open] [role="alert"]').text()).toContain(
+      'Please reload and try again.',
+    );
+    expect(page.findAll('.entry__title')).toHaveLength(1);
+    page.unmount();
+  });
+
+  test('entries without a withdrawal token have no withdrawal action', async () => {
+    const page = await mountWith(games({}), {}, undefined, true);
+    await page.get('.entry__art').trigger('click');
+    expect(page.get('dialog[open]').text()).not.toContain('Withdraw nomination');
+    page.unmount();
+  });
+
   test('an open list shows score chips per entry and how many you have rated', async () => {
     const page = await mountWith(games({}), { a: 4 });
     expect(page.get('#entries-heading').text()).toContain('All community nominations');

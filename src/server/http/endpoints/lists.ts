@@ -14,6 +14,7 @@ import {
   searchQuery,
   scoreVisibilityBody,
   visibilityBody,
+  withdrawNominationBody,
 } from '../schemas.ts';
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
@@ -112,6 +113,20 @@ export const nominate = async (request: Request, app: App): Promise<Response> =>
     entryDto,
     201,
   );
+};
+
+export const withdrawNomination = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, withdrawNominationBody);
+  if (!body.ok) return body.response;
+  const result = await app.lists.withdrawNomination(await actorOf(request, app), {
+    list: listParam(request),
+    ...body.data,
+  });
+  return result.ok
+    ? new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
+    : domainErrorResponse(result.error);
 };
 
 /** `POST /api/lists/:list/close` */

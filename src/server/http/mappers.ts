@@ -36,6 +36,7 @@ export const entryDto = (entry: EntryView): EntryDto => ({
   nominatedBy: entry.nominatedBy,
   isMine: entry.isMine,
   nominatedAt: entry.nominatedAt.toISOString(),
+  withdrawalToken: entry.withdrawalToken,
 });
 
 export const listDetailDto = (detail: ListDetail): ListDetailDto => ({

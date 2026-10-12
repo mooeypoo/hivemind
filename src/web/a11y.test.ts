@@ -13,8 +13,9 @@ const entry = (id: string, title: string, imageUrl: string | null = null) => ({
   id,
   item: { source: 'freeform', externalId: id, title, subtitle: '1982', imageUrl },
   nominatedBy: 'ada',
-  isMine: false,
+  isMine: id === 'a',
   nominatedAt: '2026-01-01T00:00:00.000Z',
+  withdrawalToken: id === 'a' ? 'claim-a' : null,
 });
 const list = (overrides: Partial<ListDetailDto> = {}): ListDetailDto =>
   openTmdbList({
@@ -230,6 +231,30 @@ describe('the menu', () => {
 });
 
 describe('list page dialogs', () => {
+  test('withdrawal confirmation and its error pass automated accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('.entry__art').trigger('click');
+    await wrapper.get('dialog[open] .button--danger').trigger('click');
+    await flushPromises();
+    await expectAccessible(document.body);
+    const original = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) =>
+      input.endsWith('/entries/withdraw')
+        ? Promise.resolve(
+            Response.json(
+              { error: { code: 'lists.conflict', message: 'Reload and try again.' } },
+              { status: 409 },
+            ),
+          )
+        : original(input, init),
+    );
+    await wrapper.get('dialog[open] .button--danger').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('dialog[open] [role="alert"]').text()).toContain('Reload and try again.');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
   test('entry details pass automated accessibility checks', async () => {
     const wrapper = await renderAt('/lists/best-sci-fi', true);
     await wrapper.get('.entry__art').trigger('click');
@@ -383,6 +408,7 @@ describe('site-wide content', () => {
     expect(headings).toEqual([
       'What we store about you',
       'What we never store',
+      'Withdrawing a nomination',
       'Shared links',
       'Cookies and browser storage',
       'Download my data',

@@ -131,6 +131,8 @@ export interface EntryDto {
   readonly nominatedBy: string | null;
   readonly isMine: boolean;
   readonly nominatedAt: string;
+  /** Present only for the caller's own nomination while withdrawal is allowed. */
+  readonly withdrawalToken?: string | null;
 }
 
 /** `GET /api/lists` */

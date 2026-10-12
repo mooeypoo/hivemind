@@ -6,6 +6,7 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import type { BallotRepository, ListReader } from './ports.ts';
+import type { BallotEntryId } from '../domain/ballot.ts';
 
 export interface PublicScore {
   readonly displayName: string;
@@ -41,5 +42,10 @@ export const makeGetPublicScores =
     for (const scores of Object.values(entries)) {
       scores.sort((a, b) => b.score - a.score || a.displayName.localeCompare(b.displayName));
     }
-    return ok({ visible: true, entries });
+    const activeEntries: Record<string, PublicScore[]> = {};
+    for (const [entryId, scores] of Object.entries(entries)) {
+      if (await deps.lists.entryExists(rules.value.listId, entryId as BallotEntryId))
+        activeEntries[entryId] = scores;
+    }
+    return ok({ visible: true, entries: activeEntries });
   };

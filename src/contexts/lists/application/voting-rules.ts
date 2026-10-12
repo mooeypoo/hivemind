@@ -5,7 +5,7 @@ import {
   type DomainError,
   type Result,
 } from '../../../shared/kernel/index.ts';
-import type { EntryId } from '../domain/entry.ts';
+import { isActiveEntry, type EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
 import { lifecycleOf, visibleTo, type ListId, type Scale } from '../domain/list.ts';
 import type { RoleId } from '../../../shared/kernel/index.ts';
@@ -57,5 +57,7 @@ export const makeRulesForVoting =
 /** Whether an entry exists in a list. A service for other contexts. */
 export const makeEntryExists =
   (deps: { readonly entries: EntryRepository }) =>
-  async (listId: ListId, entryId: EntryId): Promise<boolean> =>
-    (await deps.entries.get(listId, entryId)) !== null;
+  async (listId: ListId, entryId: EntryId): Promise<boolean> => {
+    const entry = await deps.entries.get(listId, entryId);
+    return entry !== null && isActiveEntry(entry.value);
+  };
