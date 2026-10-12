@@ -20,8 +20,23 @@ export const netlifyPlatform = (context: DeployContext): Platform => ({
   clock: { now: () => new Date() },
   ids: { next: () => crypto.randomUUID() },
   store: (name) =>
-    context === 'production' || context === 'dev'
-      ? getStore({ name, consistency: 'strong' })
-      : getDeployStore({ name, consistency: 'strong' }),
+    freshPerCall(() =>
+      context === 'production' || context === 'dev'
+        ? getStore({ name, consistency: 'strong' })
+        : getDeployStore({ name, consistency: 'strong' }),
+    ),
   fetch: globalThis.fetch.bind(globalThis),
 });
+
+/**
+ * A store keeps the Blobs token of the invocation that created it, and that token expires.
+ * The app outlives invocations, so each operation opens the store with the current token.
+ */
+const freshPerCall = (open: () => Store): Store =>
+  new Proxy({} as Store, {
+    get: (_target, property): unknown => {
+      const store = open();
+      const value: unknown = Reflect.get(store, property);
+      return typeof value === 'function' ? (value.bind(store) as unknown) : value;
+    },
+  });
