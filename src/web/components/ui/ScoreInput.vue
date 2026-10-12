@@ -27,6 +27,11 @@ const status = computed(() => {
   if (props.saving) return 'Saving…';
   return '';
 });
+/** 0 at the lowest score to 4 at the highest: chips glow brighter as scores rise. */
+const level = (option: number) =>
+  Math.round(((option - props.scale.min) / (props.scale.max - props.scale.min)) * 4);
+const endName = (option: number) =>
+  option === props.scale.min ? ' (lowest)' : option === props.scale.max ? ' (highest)' : '';
 
 const onSlide = (event: Event) => {
   emit('change', Number((event.currentTarget as HTMLInputElement).value));
@@ -40,7 +45,9 @@ const onSlide = (event: Event) => {
     :aria-describedby="`${id}-status`"
   >
     <legend class="score-input__legend">
-      Your score<span class="visually-hidden"> for {{ itemTitle }}</span>
+      Your score<span class="visually-hidden">
+        for {{ itemTitle }}, from {{ scale.min }} (lowest) to {{ scale.max }} (highest)</span
+      >
       <span v-if="value === null" class="score-input__unrated">Not rated</span>
     </legend>
 
@@ -49,7 +56,7 @@ const onSlide = (event: Event) => {
         v-for="option in values"
         :key="option"
         class="score-chip"
-        :class="{ 'score-chip--on': value === option }"
+        :class="[`score-chip--level-${level(option)}`, { 'score-chip--on': value === option }]"
       >
         <input
           type="radio"
@@ -58,7 +65,9 @@ const onSlide = (event: Event) => {
           :checked="value === option"
           @change="emit('change', option)"
         />
-        <span>{{ option }}</span>
+        <span
+          >{{ option }}<span class="visually-hidden">{{ endName(option) }}</span></span
+        >
       </label>
     </div>
 
@@ -70,11 +79,18 @@ const onSlide = (event: Event) => {
         :max="scale.max"
         step="1"
         :value="value ?? scale.min"
-        :aria-label="`Your score for ${itemTitle}`"
+        :aria-label="`Your score for ${itemTitle}, from ${String(scale.min)} (lowest) to ${String(scale.max)} (highest)`"
         :aria-valuetext="value === null ? 'Not rated' : String(value)"
         @change="onSlide"
       />
       <output :for="`${id}-range`" class="score-input__value">{{ value ?? '–' }}</output>
+    </div>
+
+    <!-- The direction of the scale, shown once under the chips or slider. -->
+    <div class="score-scale" aria-hidden="true">
+      <span class="score-scale__end">{{ scale.min }} lowest</span>
+      <span class="score-scale__ramp"></span>
+      <span class="score-scale__end score-scale__end--high">highest {{ scale.max }}</span>
     </div>
 
     <div class="score-input__footer">

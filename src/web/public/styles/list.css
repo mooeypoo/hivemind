@@ -529,6 +529,23 @@
   outline-offset: 2px;
 }
 
+/* Chips warm up toward the top of the scale, so "higher is better" reads at a glance. */
+.score-chip--level-1 {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.score-chip--level-2 {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.score-chip--level-3 {
+  background: color-mix(in srgb, var(--accent) 21%, transparent);
+}
+
+.score-chip--level-4 {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 .score-chip--on {
   border-color: var(--accent);
   background: var(--accent);
@@ -568,6 +585,38 @@
   font-size: 1.4rem;
   font-weight: 800;
   text-align: right;
+}
+
+.score-scale {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.score-scale__ramp {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--surface-2), var(--accent));
+}
+
+/* An arrowhead at the high end. */
+.score-scale__ramp::after {
+  content: '';
+  float: right;
+  width: 0;
+  height: 0;
+  margin: -3px -2px 0 0;
+  border-block: 5px solid transparent;
+  border-left: 7px solid var(--accent);
+}
+
+.score-scale__end--high {
+  color: var(--accent);
 }
 
 .score-input__footer {
