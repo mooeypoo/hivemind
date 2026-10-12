@@ -26,6 +26,7 @@ export {
   getList,
   listLists,
   nominate,
+  refreshMovieDetails,
   withdrawNomination,
   scheduleList,
   searchForList,

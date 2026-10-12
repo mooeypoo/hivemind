@@ -7,6 +7,7 @@ import type {
   ListDetailDto,
   ListDto,
   PresetImportedDto,
+  RefreshMovieDetailsDto,
   RoleLabelDto,
   RoleLabelsDto,
   SourcesDto,
@@ -343,6 +344,27 @@ const makeScoresPrivate = async () => {
     existing.value = list;
     form.scoreVisibility = 'private';
   }
+};
+
+const refreshMovieDetails = async () => {
+  const list = existing.value;
+  if (list === null) return;
+  busy.value = true;
+  error.value = null;
+  status.value = '';
+  const result = await api.post<RefreshMovieDetailsDto>(
+    `/api/lists/${encodeURIComponent(list.id)}/refresh-movie-details`,
+  );
+  busy.value = false;
+  if (!result.ok) {
+    error.value = result.error;
+    return;
+  }
+  const { eligible, updated, skipped, failed } = result.data;
+  status.value =
+    eligible === 0
+      ? 'No active, unpurged movie entries were found.'
+      : `Movie details refreshed: ${String(updated)} updated, ${String(skipped)} already had a synopsis, ${String(failed)} could not be refreshed.${result.data.remaining > 0 ? ` ${String(result.data.remaining)} still need attention; run refresh again to continue.` : ''}`;
 };
 
 const readCsvFile = async (event: Event) => {
@@ -770,6 +792,21 @@ const importCsv = async () => {
           @click="confirming = 'private-scores'"
         >
           Make scores private
+        </button>
+      </div>
+      <div v-if="existing.itemSource.kind === 'tmdb-movie'" class="stack">
+        <p class="meta">
+          Fill missing TMDB synopses for active entries, along with any available credits. Entries
+          with a synopsis, withdrawn entries, and details removed under TMDB retention are skipped.
+        </p>
+        <button
+          v-if="existing.lifecycle !== 'archived'"
+          type="button"
+          class="button"
+          :disabled="busy"
+          @click="refreshMovieDetails"
+        >
+          Refresh missing movie details
         </button>
       </div>
       <fieldset class="stack">

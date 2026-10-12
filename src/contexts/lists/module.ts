@@ -9,6 +9,7 @@ import { makeGetList, makeGetSharePreview } from './application/get-list.ts';
 import { makeListLists } from './application/list-lists.ts';
 import { makeNominate } from './application/nominate.ts';
 import { makeWithdrawNomination } from './application/withdraw-nomination.ts';
+import { makeRefreshMovieDetails } from './application/refresh-movie-details.ts';
 import { makeListsPersonalData } from './application/personal-data.ts';
 import { makeScheduleList } from './application/schedule-list.ts';
 import { makeSearchForList } from './application/search-for-list.ts';
@@ -60,6 +61,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     searchForList: makeSearchForList(shared),
     nominate: makeNominate({ ...shared, ids: deps.ids }),
     withdrawNomination: makeWithdrawNomination(shared),
+    refreshMovieDetails: makeRefreshMovieDetails(shared),
     personalData: makeListsPersonalData(repositories),
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),

@@ -2,7 +2,13 @@ import type { DomainError, Result } from '../../../shared/kernel/index.ts';
 import type { App } from '../../composition.ts';
 import { actorOf } from '../auth.ts';
 import { defined, listParam, parseWith, queryOf, readJson } from '../body.ts';
-import type { ListDetailDto, ListDto, ListsDto, SearchResultsDto } from '../contracts.ts';
+import type {
+  ListDetailDto,
+  ListDto,
+  ListsDto,
+  RefreshMovieDetailsDto,
+  SearchResultsDto,
+} from '../contracts.ts';
 import { entryDto, listDetailDto, listDto } from '../mappers.ts';
 import { rejectForeignOrigin } from '../origin.ts';
 import { domainErrorResponse, json } from '../respond.ts';
@@ -127,6 +133,18 @@ export const withdrawNomination = async (request: Request, app: App): Promise<Re
   return result.ok
     ? new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
     : domainErrorResponse(result.error);
+};
+
+/** `POST /api/lists/:list/refresh-movie-details` */
+export const refreshMovieDetails = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  return respond(
+    await app.lists.refreshMovieDetails(await actorOf(request, app), {
+      list: listParam(request),
+    }),
+    (result): RefreshMovieDetailsDto => result,
+  );
 };
 
 /** `POST /api/lists/:list/close` */

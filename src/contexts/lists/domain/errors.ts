@@ -25,6 +25,16 @@ export const listsErrors = {
     'lists.scores-private-only',
     'Scores can only be made public before the list is published.',
   ),
+  notMovieList: domainError(
+    'invalid',
+    'lists.not-movie-list',
+    'Only lists using TMDB movies can refresh movie details.',
+  ),
+  movieDetailsNotPublished: domainError(
+    'invalid',
+    'lists.movie-details-not-published',
+    'Movie details can only be refreshed on a published, unarchived list.',
+  ),
   notOpen: domainError(
     'invalid',
     'lists.not-open',

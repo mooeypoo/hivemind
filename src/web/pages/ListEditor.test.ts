@@ -215,4 +215,27 @@ describe('ListEditor', () => {
     await flushPromises();
     expect(calls.some((call) => call.url.endsWith('/close'))).toBe(true);
   });
+
+  test('refreshes missing movie details and reports the result', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList()),
+      'POST /api/lists/list-1/refresh-movie-details': () =>
+        Response.json({ eligible: 4, updated: 2, skipped: 1, failed: 1, remaining: 1 }),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+
+    const refresh = editor
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Refresh missing movie details');
+    await refresh?.trigger('click');
+    await flushPromises();
+
+    expect(calls.find((call) => call.url.endsWith('/refresh-movie-details'))?.method).toBe('POST');
+    expect(editor.text()).toContain(
+      '2 updated, 1 already had a synopsis, 1 could not be refreshed.',
+    );
+    expect(editor.text()).toContain('1 still need attention; run refresh again to continue.');
+  });
 });
