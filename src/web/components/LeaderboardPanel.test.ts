@@ -238,4 +238,76 @@ describe('LeaderboardPanel', () => {
     panel.find('.public-scores summary').element.dispatchEvent(new Event('click'));
     expect(panel.text()).toContain('Ada: 9');
   });
+
+  test('allows rating an unrated entry directly from StandingsBoard', async () => {
+    const panel = mount(StandingsBoard, {
+      props: {
+        board: board([row('a', 'Root', 1, 9, 2), row('b', 'Wingspan', 2, 8, 2)]),
+        entries: [entry('a', 'Root'), entry('b', 'Wingspan')],
+        scale: { min: 1, max: 10 },
+        myScores: { a: 9 },
+        canVote: true,
+        scoreState: (id: string) => ({
+          value: id === 'a' ? 9 : null,
+          saving: false,
+          error: null,
+        }),
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const rateButton = panel
+        .findAll('.standing__rate-button')
+        .find((btn) => btn.text() === '+ Rate');
+      expect(rateButton).toBeDefined();
+      await rateButton?.trigger('click');
+
+      const dialog = panel.get('dialog');
+      expect(dialog.element.open).toBe(true);
+      expect(dialog.find('.score-input').exists()).toBe(true);
+
+      const radio = dialog.get('.score-chip input[type=radio][value="8"]');
+      await radio.setValue();
+      expect(panel.emitted('rate')).toEqual([[{ entryId: 'b', score: 8 }]]);
+    } finally {
+      panel.unmount();
+    }
+  });
+
+  test('allows changing a previously rated entry directly from StandingsBoard', async () => {
+    const panel = mount(StandingsBoard, {
+      props: {
+        board: board([row('a', 'Root', 1, 9, 2)]),
+        entries: [entry('a', 'Root')],
+        scale: { min: 1, max: 10 },
+        myScores: { a: 9 },
+        canVote: true,
+        scoreState: () => ({
+          value: 9,
+          saving: false,
+          error: null,
+        }),
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const mineButton = panel
+        .findAll('.standing__mine-button')
+        .find((btn) => btn.text().includes('You: 9') || btn.text().includes('you: 9'));
+      expect(mineButton).toBeDefined();
+      await mineButton?.trigger('click');
+
+      const dialog = panel.get('dialog');
+      expect(dialog.element.open).toBe(true);
+      expect(dialog.find('.score-input').exists()).toBe(true);
+
+      const radio = dialog.get('.score-chip input[type=radio][value="7"]');
+      await radio.setValue();
+      expect(panel.emitted('rate')).toEqual([[{ entryId: 'a', score: 7 }]]);
+    } finally {
+      panel.unmount();
+    }
+  });
 });

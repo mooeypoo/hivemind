@@ -284,7 +284,10 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
         :list="list"
         :my-scores="scores"
         :public-scores="publicScores"
+        :can-vote="canVote"
+        :score-state="canVote ? scoreState : undefined"
         @loaded="page.onLeaderboard"
+        @rate="ballot.set"
       />
     </section>
 
@@ -294,7 +297,12 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
       v-bind="panelProps('nominate')"
       class="list-nominate"
     >
-      <NominatePanel :list="list" @nominated="page.load" />
+      <NominatePanel
+        :list="list"
+        :score-state="canVote ? scoreState : undefined"
+        @nominated="page.load"
+        @rate="ballot.set"
+      />
     </section>
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />

@@ -26,6 +26,8 @@ const mountWith = async (list: ListDetailDto, board: LeaderboardDto) => {
   stubApi({
     'GET /api/lists/games': () => Response.json(list),
     'GET /api/lists/games/leaderboard': () => Response.json(board),
+    'GET /api/lists/games/ballot': () => Response.json({ listId: list.id, scores: {} }),
+    'GET /api/lists/games/scores': () => Response.json({ visible: false }),
   });
   const router = createRouter({
     history: createMemoryHistory(),
@@ -105,7 +107,7 @@ describe('ListResultsPage', () => {
       ],
     });
     expect(page.findAll('.podium__place').map(placeText)).toEqual([
-      '1 Root 7.7 · 2 votes Nominated by Ada',
+      '1 Root 7.7 · 2 votes Nominated by Ada + Rate',
     ]);
     const cells = (row: { element: Element }) =>
       [...row.element.children]
@@ -113,11 +115,11 @@ describe('ListResultsPage', () => {
         .map((cell) => squash(cell.textContent))
         .join(' | ');
     expect(page.findAll('.standings__provisional li').map(cells)).toEqual([
-      '– | Wingspan, Needs 1 more vote Nominated by Bob | 8.0 · 1 vote',
+      '– | Wingspan, Needs 1 more vote Nominated by Bob | 8.0 · 1 vote + Rate',
     ]);
     expect(page.findAll('.standings__unrated li').map(cells)).toEqual([
-      '– | Azul | No votes yet',
-      '– | Catan Nominated by Ada | No votes yet',
+      '– | Azul | No votes yet + Rate',
+      '– | Catan Nominated by Ada | No votes yet + Rate',
     ]);
     expect(page.find('input').exists()).toBe(false);
     expect(page.text()).not.toMatch(/you:/i);
@@ -130,6 +132,74 @@ describe('ListResultsPage', () => {
     });
     expect(page.text()).toContain('Results are revealed when voting closes');
     expect(page.find('.podium').exists()).toBe(false);
+  });
+
+  test('allows rating an unrated entry directly from results page', async () => {
+    vi.useFakeTimers();
+    const calls: unknown[] = [];
+    stubApi({
+      'GET /api/lists/games': () => Response.json(games()),
+      'GET /api/lists/games/leaderboard': () =>
+        Response.json({
+          hidden: false,
+          computedAt: new Date().toISOString(),
+          minVotes: 2,
+          rows: [
+            {
+              rank: 1,
+              entryId: 'a',
+              item: item('Root'),
+              score: 7.67,
+              votes: 2,
+              provisional: false,
+              votesNeeded: 0,
+            },
+          ],
+        }),
+      'GET /api/lists/games/ballot': () => Response.json({ listId: 'games', scores: {} }),
+      'GET /api/lists/games/scores': () => Response.json({ visible: false }),
+    });
+    const original = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) => {
+      if (init.method === 'PUT') {
+        calls.push(JSON.parse(init.body as string));
+        return Promise.resolve(Response.json({ listId: 'games', scores: { a: 8 } }));
+      }
+      return original(input, init);
+    });
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/lists/:slug', name: 'list', component: Blank },
+        { path: '/lists/:slug/results', name: 'list-results', component: ListResultsPage },
+      ],
+    });
+    await router.push('/lists/games/results');
+    await router.isReady();
+    const page = mount(ListResultsPage, {
+      global: { plugins: [router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    try {
+      const rateButton = page.get('.standing__rate-button');
+      await rateButton.trigger('click');
+
+      const dialog = page.get('dialog');
+      expect(dialog.element.open).toBe(true);
+      expect(dialog.find('.score-input').exists()).toBe(true);
+
+      await dialog.get('.score-input input[value="8"]').setValue(true);
+      await vi.advanceTimersByTimeAsync(250);
+      await flushPromises();
+
+      expect(calls).toEqual([{ entryId: 'a', score: 8 }]);
+    } finally {
+      vi.useRealTimers();
+      page.unmount();
+    }
   });
 
   test('calls closed lists final', async () => {

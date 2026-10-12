@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import type { LeaderboardDto, ListDetailDto } from '../../server/http/contracts.ts';
+import type {
+  BallotDto,
+  LeaderboardDto,
+  ListDetailDto,
+  PublicScoresDto,
+} from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
+import { useBallot } from '../composables/ballot.ts';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StandingsBoard from '../components/StandingsBoard.vue';
 import StatusBadge from '../components/StatusBadge.vue';
@@ -12,13 +18,31 @@ import { usePageTitle } from '../lib/page-title.ts';
 const route = useRoute();
 const list = ref<ListDetailDto | null>(null);
 const board = ref<LeaderboardDto | null>(null);
+const publicScores = ref<PublicScoresDto>({ visible: false });
 const error = ref<ApiError | null>(null);
+
+const path = () => `/api/lists/${encodeURIComponent(String(route.params.slug))}`;
+const refreshPublicScores = async () => {
+  const result = await api.get<PublicScoresDto>(`${path()}/scores`);
+  if (result.ok) publicScores.value = result.data;
+};
+const ballot = useBallot(() => list.value?.slug ?? String(route.params.slug), {
+  onSaved: () => void refreshPublicScores(),
+});
+const { scores, saving, errors } = ballot;
+const scoreState = (entryId: string) => ({
+  value: scores.value[entryId] ?? null,
+  saving: saving.value[entryId] === true,
+  error: errors.value[entryId] ?? null,
+});
 
 const load = async () => {
   const slug = encodeURIComponent(String(route.params.slug));
-  const [detail, leaderboard] = await Promise.all([
+  const [detail, leaderboard, own, attribution] = await Promise.all([
     api.get<ListDetailDto>(`/api/lists/${slug}`),
     api.get<LeaderboardDto>(`/api/lists/${slug}/leaderboard`),
+    api.get<BallotDto>(`/api/lists/${slug}/ballot`),
+    api.get<PublicScoresDto>(`/api/lists/${slug}/scores`),
   ]);
   if (!detail.ok) {
     error.value = detail.error;
@@ -31,6 +55,8 @@ const load = async () => {
   } else {
     error.value = leaderboard.error;
   }
+  if (own.ok) ballot.load(own.data.scores);
+  if (attribution.ok) publicScores.value = attribution.data;
 };
 watch(() => route.params.slug, load, { immediate: true });
 usePageTitle(() => (list.value === null ? null : `${list.value.title}: results`));
@@ -86,7 +112,12 @@ const canNominate = computed(
       :board="board"
       :entries="list.entries"
       :scale="list.scale"
+      :my-scores="scores"
+      :public-scores="publicScores"
+      :can-vote="canRate"
+      :score-state="canRate ? scoreState : undefined"
       heading-level="h2"
+      @rate="ballot.set($event.entryId, $event.score)"
     />
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />

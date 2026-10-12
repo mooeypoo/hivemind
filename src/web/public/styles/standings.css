@@ -169,6 +169,64 @@
   font-weight: 700;
 }
 
+.standing__mine-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-start: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  min-height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--surface-raised, var(--surface));
+  color: var(--highlight);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color var(--transition, 0.15s ease),
+    color var(--transition, 0.15s ease);
+}
+
+.standing__mine-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.standing__mine-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.standing__rate-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-start: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  min-height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--surface-raised, var(--surface));
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color var(--transition, 0.15s ease),
+    color var(--transition, 0.15s ease);
+}
+
+.standing__rate-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.standing__rate-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* The rest of the ranking */
 
 .ranking {

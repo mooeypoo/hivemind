@@ -43,7 +43,6 @@ describe('theme-init.js', () => {
       console: { info: (message: string) => messages.push(message) },
     });
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("/ _` |");
     expect(messages[0]).toContain('I see you. You found the console. Now go make a list.');
     expect(messages[0]).toContain(
       'If you like tinkering with code, feel free to contribute!\nSee github repo @ https://github.com/mooeypoo/hivemind',

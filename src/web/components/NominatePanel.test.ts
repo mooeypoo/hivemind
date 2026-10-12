@@ -73,6 +73,45 @@ describe('NominatePanel', () => {
     expect((panel.get('input[type=search]').element as HTMLInputElement).value).toBe('');
     expect(panel.find('.results').exists()).toBe(false);
     expect(panel.get('[role=status]').text()).toContain('Nominated Blade Runner');
+    expect(panel.find('.just-nominated').exists()).toBe(true);
+  });
+
+  test('offers rating immediately on the just nominated card', async () => {
+    stubApi({
+      'POST /api/lists/list-1/entries': () =>
+        Response.json(
+          {
+            id: 'freeform.inception',
+            item: {
+              source: 'freeform',
+              externalId: 'inception',
+              title: 'Inception',
+              subtitle: null,
+              imageUrl: null,
+            },
+            nominatedBy: 'ada',
+            isMine: true,
+            nominatedAt: '',
+          },
+          { status: 201 },
+        ),
+    });
+    const panel = mount(NominatePanel, {
+      props: {
+        list: openTmdbList({ itemSource: { kind: 'freeform' } }),
+        scoreState: () => ({ value: null, saving: false, error: null }),
+      },
+    });
+
+    await panel.get('input#nominate-title').setValue('Inception');
+    await panel.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(panel.find('.just-nominated').exists()).toBe(true);
+    expect(panel.find('.just-nominated__rating').exists()).toBe(true);
+    const radio = panel.get('.just-nominated__rating input[type=radio][value="8"]');
+    await radio.setValue();
+    expect(panel.emitted('rate')).toEqual([['freeform.inception', 8]]);
   });
 
   test('canceling a reviewed movie does not nominate it', async () => {
