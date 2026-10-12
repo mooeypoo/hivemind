@@ -10,6 +10,9 @@ import type {
   PresetImportedDto,
   SearchResultsDto,
   SourcesDto,
+  BallotDto,
+  LeaderboardDto,
+  PublicScoresDto,
 } from '../contracts.ts';
 import { SESSION_COOKIE } from '../cookies.ts';
 import {
@@ -29,12 +32,15 @@ import {
   getList,
   listLists,
   nominate,
+  withdrawNomination,
   scheduleList,
   searchForList,
   setScoreVisibility,
   setVisibility,
 } from './lists.ts';
 import { deleteMyData, exportMyData } from './me.ts';
+import { changeScore, getMyBallot, getPublicScores } from './voting.ts';
+import { getLeaderboard } from './ranking.ts';
 
 type Endpoint = (request: Request, app: App) => Promise<Response>;
 
@@ -188,6 +194,155 @@ describe('a TMDB movie list, end to end', () => {
 });
 
 describe('a free-text list', () => {
+  test('withdrawal hides a rated item and its public scores, refunds its slot, and restores earlier votes', async () => {
+    await openList({
+      title: 'Games',
+      slug: 'games',
+      itemSource: { kind: 'freeform' },
+      maxNominationsPerMember: 1,
+      scoreVisibility: 'public',
+      ranking: { strategy: 'bayesian', minVotes: 1 },
+    });
+    const first = await call<EntryDto>(nominate, 'POST', '/api/lists/games/entries', ada, {
+      title: 'Root',
+    });
+    const input = { entryId: first.body.id, token: first.body.withdrawalToken };
+    await call(changeScore, 'PUT', '/api/lists/games/ballot', ada, {
+      entryId: first.body.id,
+      score: 7,
+    });
+    await call(changeScore, 'PUT', '/api/lists/games/ballot', bob, {
+      entryId: first.body.id,
+      score: 9,
+    });
+    const before = await call<LeaderboardDto>(
+      getLeaderboard,
+      'GET',
+      '/api/lists/games/leaderboard',
+      ada,
+    );
+    expect(!before.body.hidden && before.body.rows[0]?.votes).toBe(2);
+    expect(
+      (await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', bob, input))
+        .status,
+    ).toBe(403);
+    expect(
+      (await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', ada, input))
+        .status,
+    ).toBe(204);
+    const detail = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', ada);
+    expect(detail.body.entries).toEqual([]);
+    expect(detail.body.viewer.nominationsUsed).toBe(0);
+    const hidden = await call<LeaderboardDto>(
+      getLeaderboard,
+      'GET',
+      '/api/lists/games/leaderboard',
+      ada,
+    );
+    expect(!hidden.body.hidden && hidden.body.rows).toEqual([]);
+    expect(
+      (await call<PublicScoresDto>(getPublicScores, 'GET', '/api/lists/games/scores', ada)).body,
+    ).toEqual({ visible: true, entries: {} });
+    expect(
+      (
+        await call(changeScore, 'PUT', '/api/lists/games/ballot', bob, {
+          entryId: first.body.id,
+          score: 5,
+        })
+      ).status,
+    ).toBe(404);
+    const restored = await call<EntryDto>(nominate, 'POST', '/api/lists/games/entries', bob, {
+      title: 'root',
+    });
+    expect(restored.status).toBe(201);
+    expect(restored.body.id).toBe(first.body.id);
+    expect(restored.body.nominatedBy).toBe('bob');
+    const board = await call<LeaderboardDto>(
+      getLeaderboard,
+      'GET',
+      '/api/lists/games/leaderboard',
+      ada,
+    );
+    expect(!board.body.hidden && board.body.rows[0]).toMatchObject({ votes: 2, average: 8 });
+    expect(
+      (await call<BallotDto>(getMyBallot, 'GET', '/api/lists/games/ballot', ada)).body.scores[
+        first.body.id
+      ],
+    ).toBe(7);
+    const own = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', ada);
+    expect(own.body.viewer.nominationsUsed).toBe(0);
+    expect(
+      (await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', ada, input))
+        .status,
+    ).toBe(409);
+  });
+
+  test('withdrawal reveals no voting information on an after-close list, and erasure deletes retained scores', async () => {
+    await openList({
+      title: 'Games',
+      slug: 'games',
+      itemSource: { kind: 'freeform' },
+      resultsVisibility: 'after-close',
+    });
+    const first = await call<EntryDto>(nominate, 'POST', '/api/lists/games/entries', ada, {
+      title: 'Root',
+    });
+    await call(changeScore, 'PUT', '/api/lists/games/ballot', bob, {
+      entryId: first.body.id,
+      score: 9,
+    });
+    const input = { entryId: first.body.id, token: first.body.withdrawalToken };
+    expect(
+      (await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', ada, input))
+        .status,
+    ).toBe(204);
+    expect(
+      (await call<LeaderboardDto>(getLeaderboard, 'GET', '/api/lists/games/leaderboard', admin))
+        .body,
+    ).toEqual({ hidden: true, revealsAt: CLOSES });
+    const data = await call<MyDataExportDto>(exportMyData, 'GET', '/api/me/export', bob);
+    expect(JSON.stringify(data.body)).toContain(first.body.id);
+    await call(deleteMyData, 'DELETE', '/api/me', bob);
+    await call(nominate, 'POST', '/api/lists/games/entries', ada, { title: 'Root' });
+    await call(closeVoting, 'POST', '/api/lists/games/close', admin);
+    const board = await call<LeaderboardDto>(
+      getLeaderboard,
+      'GET',
+      '/api/lists/games/leaderboard',
+      ada,
+    );
+    expect(!board.body.hidden && board.body.rows[0]?.votes).toBe(0);
+  });
+
+  test('withdrawal rejects foreign origins, anonymous callers and malformed input', async () => {
+    await openList({ title: 'Games', slug: 'games', itemSource: { kind: 'freeform' } });
+    const first = await call<EntryDto>(nominate, 'POST', '/api/lists/games/entries', ada, {
+      title: 'Root',
+    });
+    const input = { entryId: first.body.id, token: first.body.withdrawalToken };
+    expect(
+      (await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', null, input))
+        .status,
+    ).toBe(401);
+    expect(
+      (
+        await call(withdrawNomination, 'POST', '/api/lists/games/entries/withdraw', ada, {
+          ...input,
+          extra: true,
+        })
+      ).status,
+    ).toBe(422);
+    const foreign = await withdrawNomination(
+      request('POST', '/api/lists/games/entries/withdraw', {
+        cookies: { [SESSION_COOKIE]: ada },
+        origin: 'https://evil.example',
+        body: input,
+      }),
+      h.app,
+    );
+    expect(foreign.status).toBe(403);
+  });
+
   test('takes typed titles and catches duplicates however they are typed', async () => {
     await openList({ title: 'Best Board Games', slug: 'games', itemSource: { kind: 'freeform' } });
     const first = await call<EntryDto>(nominate, 'POST', '/api/lists/games/entries', ada, {
