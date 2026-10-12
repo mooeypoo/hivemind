@@ -41,6 +41,8 @@ const expected: Record<string, string[]> = {
   'src/web/bad-value-import.ts': ['web-contracts-type-only'],
   'src/web/bad-server.ts': ['web-only-contracts'],
   'src/web/bad-node.ts': ['web-no-node'],
+  'src/web/components/ui/bad-service.ts': ['web-ui-primitives-dumb'],
+  'src/web/composables/bad-component.ts': ['web-composables-headless'],
 };
 
 let actual: Record<string, string[]>;

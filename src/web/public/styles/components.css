@@ -1,0 +1,129 @@
+/* UI primitives (src/web/components/ui). Role tokens only: no colour literals here. */
+
+/* Dialog */
+
+.dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-raised);
+}
+
+.dialog[open] {
+  animation: dialog-in var(--duration) var(--ease-out);
+}
+
+.dialog::backdrop {
+  background: var(--backdrop);
+}
+
+.dialog__content {
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.dialog__title {
+  font-size: 1.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+}
+
+.dialog__body ul {
+  padding-left: 1.25rem;
+}
+
+.dialog__confirm {
+  margin: 0.75rem 0;
+}
+
+.danger-text {
+  color: var(--danger);
+  font-size: 1.05rem;
+}
+
+/* Toasts */
+
+.toasts {
+  position: fixed;
+  inset: auto 0 max(1rem, env(safe-area-inset-bottom)) 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(32rem, 100%);
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-raised);
+  pointer-events: auto;
+}
+
+.toast--success {
+  border-left-color: var(--success);
+}
+
+.toast--error {
+  border-left-color: var(--danger);
+}
+
+.toast__message {
+  flex: 1;
+}
+
+.toast__dismiss {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.toast__dismiss:hover {
+  color: var(--text);
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(0.75rem);
+}

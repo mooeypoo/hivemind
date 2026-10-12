@@ -60,7 +60,7 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       keep a preview after a list is hidden.
     </p>
 
-    <h2>Cookies</h2>
+    <h2>Cookies and browser storage</h2>
     <ul>
       <li>
         <strong>A session cookie</strong> keeps you signed in for 12 hours. It holds your user ID,
@@ -69,6 +69,16 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       <li>
         <strong>Two short-lived sign-in cookies</strong> (10 minutes) protect the sign-in itself and
         remember which page to return you to.
+      </li>
+      <li>
+        <strong>Your Appearance choice</strong>, only if you pick Light or Dark. It is one word
+        (<code>light</code> or <code>dark</code>) in this browser’s local storage, read before the
+        page appears so it doesn’t flash the other theme. It is never sent to the server, and
+        choosing System removes it. Nothing else is kept in local storage.
+      </li>
+      <li>
+        <strong>Unsaved form input</strong> is kept in this tab’s session storage so a sign-in
+        interruption loses nothing. It is never sent anywhere and is gone when the tab closes.
       </li>
       <li>No third-party cookies.</li>
     </ul>

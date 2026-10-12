@@ -53,18 +53,23 @@ const games = (overrides: Partial<ListDetailDto> = {}) =>
     ],
     ...overrides,
   });
-
-const text = (node: { element: Element }) =>
-  [...node.element.children]
-    .map((child) => child.textContent.replace(/\s+/g, ' ').trim())
-    .join(' | ');
+const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
+const placeText = (place: { element: Element }) =>
+  [...place.element.children]
+    .map((child) =>
+      child.classList.contains('podium__art')
+        ? (child.querySelector('.podium__medal')?.textContent ?? '')
+        : child.textContent,
+    )
+    .map(squash)
+    .join(' ');
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('ListResultsPage', () => {
-  test('ranks confirmed entries, then provisional, then unrated, with no personal scores', async () => {
+  test('shows the same standings as the list: provisional entries in place, no personal scores', async () => {
     const page = await mountWith(games(), {
       hidden: false,
       computedAt: new Date().toISOString(),
@@ -102,19 +107,19 @@ describe('ListResultsPage', () => {
         },
       ],
     });
-    const ranked = page.findAll('[aria-labelledby="ranked-heading"] li').map(text);
-    expect(ranked).toEqual(['1 | Root Nominated by Ada | 2 people voted · average 8.0']);
-    const provisional = page.findAll('[aria-labelledby="provisional-heading"] li').map(text);
-    expect(provisional).toEqual([
-      '– | Wingspan Provisional · needs 1 more vote Nominated by Bob | 1 person voted · average 9.0',
+    expect(page.findAll('.podium__place').map(placeText)).toEqual([
+      '1 Wingspan 8.0 · 1 vote · avg 9.0 Provisional · needs 1 more vote Nominated by Bob',
+      '2 Root 7.7 · 2 votes · avg 8.0 Nominated by Ada',
     ]);
-    const unrated = page.findAll('[aria-labelledby="unrated-heading"] li').map(text);
-    expect(unrated).toEqual([
-      '– | Azul | No votes yet',
-      '– | Catan Nominated by Ada | No votes yet',
-    ]);
+    expect(
+      page
+        .findAll('.standings__unrated li')
+        .map((row) =>
+          [...row.element.children].map((cell) => squash(cell.textContent)).join(' | '),
+        ),
+    ).toEqual(['– | Azul | No votes yet', '– | Catan Nominated by Ada | No votes yet']);
     expect(page.find('input').exists()).toBe(false);
-    expect(page.text()).not.toContain('you:');
+    expect(page.text()).not.toMatch(/you:/i);
   });
 
   test('reveals nothing while results wait for the close', async () => {
@@ -123,7 +128,7 @@ describe('ListResultsPage', () => {
       revealsAt: '2026-01-20T00:00:00.000Z',
     });
     expect(page.text()).toContain('Results are revealed when voting closes');
-    expect(page.find('.ranking').exists()).toBe(false);
+    expect(page.find('.podium').exists()).toBe(false);
   });
 
   test('calls closed lists final', async () => {

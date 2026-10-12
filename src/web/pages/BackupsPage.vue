@@ -61,8 +61,11 @@ const importFile = async () => {
 </script>
 
 <template>
-  <div class="stack prose">
-    <h1>Backups</h1>
+  <div class="stack prose admin-page">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h1>Backups</h1>
+    </div>
 
     <p v-if="site.info?.backups !== true" class="notice">
       Backups aren’t set up on this site. To turn them on, set a <code>BACKUP_KEY</code> (at least

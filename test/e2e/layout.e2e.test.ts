@@ -1,0 +1,88 @@
+import { expect, test, type Page } from '@playwright/test';
+import { admin, fakeApi } from './fake-api.ts';
+
+/**
+ * Real-browser layout checks that happy-dom can't make: no page scrolls sideways, down to the
+ * 320 px minimum in AGENTS.md, in either colour scheme.
+ */
+const widths = [320, 375, 1280];
+const memberRoutes = [
+  '/',
+  '/lists/films',
+  '/lists/films/results',
+  '/admin/lists/new',
+  '/admin/lists/films',
+  '/admin/roles',
+  '/admin/backups',
+  '/about',
+  '/privacy',
+  '/no-such-page',
+];
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test.describe(`${colorScheme} mode`, () => {
+    test.use({ colorScheme });
+
+    for (const width of widths) {
+      test(`signed out, ${String(width)} px: the welcome page fits`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, null);
+        await page.goto('/');
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
+      test(`the open menu at ${String(width)} px fits on screen`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.goto('/');
+        await page.getByRole('button', { name: /^Menu/ }).click();
+        const menu = page.getByRole('dialog', { name: 'Menu' });
+        await expect(menu.getByRole('link', { name: 'Backups' })).toBeVisible();
+        const box = await menu.boundingBox();
+        expect(box).not.toBeNull();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+        await expectNoSidewaysScroll(page);
+      });
+
+      test(`list dialogs at ${String(width)} px fit on screen`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.goto('/lists/films');
+        await page.getByRole('button', { name: /^Details for Alien/ }).click();
+        const details = page.getByRole('dialog', { name: 'Alien' });
+        await expect(details.getByText('Your score')).toBeVisible();
+        const box = await details.boundingBox();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+        await expectNoSidewaysScroll(page);
+        await details.getByRole('button', { name: 'Close' }).click();
+        await page.getByRole('button', { name: 'Rate one by one' }).click();
+        await expect(page.getByRole('dialog', { name: 'Rate one by one' })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
+      for (const path of memberRoutes) {
+        test(`${path} at ${String(width)} px fits`, async ({ page }) => {
+          await page.setViewportSize({ width, height: 800 });
+          await fakeApi(page, admin);
+          await page.goto(path);
+          await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+          await expectNoSidewaysScroll(page);
+        });
+      }
+    }
+  });
+}
+
+const expectNoSidewaysScroll = async (page: Page) => {
+  const overflow = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const culprits = [...document.querySelectorAll('body *')]
+      .filter((element) => element.getBoundingClientRect().right > width + 1)
+      .slice(0, 5)
+      .map((element) => `${element.tagName.toLowerCase()}.${element.className}`);
+    return { extra: document.documentElement.scrollWidth - width, culprits };
+  });
+  // Culprits only explain a failure: elements inside a scrolling strip may extend past the edge.
+  expect(overflow.extra, `page scrolls sideways; widest: ${overflow.culprits.join(', ')}`).toBe(0);
+};

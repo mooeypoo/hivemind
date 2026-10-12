@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import type { LeaderboardDto, ListDetailDto } from '../../server/http/contracts.ts';
+import { useToast } from '../composables/toast.ts';
 import { openTmdbList, stubApi } from '../testing/fixtures.ts';
 import ListPage from './ListPage.vue';
 
@@ -19,6 +20,7 @@ const mountWith = async (
   list: ListDetailDto,
   scores: Record<string, number> = {},
   board: LeaderboardDto = { hidden: true, revealsAt: null },
+  attach = false,
 ) => {
   stubApi({
     'GET /api/lists/games': () => Response.json(list),
@@ -44,7 +46,10 @@ const mountWith = async (
   });
   await router.push('/lists/games');
   await router.isReady();
-  const page = mount(ListPage, { global: { plugins: [router] } });
+  const page = mount(ListPage, {
+    global: { plugins: [router] },
+    ...(attach ? { attachTo: document.body } : {}),
+  });
   await flushPromises();
   return page;
 };
@@ -62,22 +67,68 @@ afterEach(() => {
 });
 
 describe('ListPage rating', () => {
-  test('an open list shows a score picker per entry and how many you have rated', async () => {
+  test('an open list shows score chips per entry and how many you have rated', async () => {
     const page = await mountWith(games({}), { a: 4 });
     expect(page.get('#entries-heading').text()).toContain('All community nominations');
     expect(page.text()).toContain('including entries nominated by other members');
     expect(page.text()).toContain('You can rate any entry while voting is open.');
-    expect(page.findAll('input[type="range"]')).toHaveLength(2);
+    expect(page.findAll('.score-input')).toHaveLength(2);
+    expect(page.findAll('.score-input')[0]?.findAll('input[type="radio"]')).toHaveLength(10);
     expect(page.text()).toContain('1 of 2 rated');
     expect(page.text()).toContain('Your scores are private');
   });
 
-  test('shows the list before actions and keeps nomination collapsed initially', async () => {
+  test('an unrated entry has no score selected, rather than looking like the lowest score', async () => {
+    const page = await mountWith(games({}), { a: 4 });
+    const [rated, unrated] = page.findAll('.score-input');
+    expect(rated?.find<HTMLInputElement>('input:checked').element.value).toBe('4');
+    expect(unrated?.find('input:checked').exists()).toBe(false);
+    expect(unrated?.text()).toContain('Not rated');
+  });
+
+  test('sections are tabs, with Rate first and the others hidden', async () => {
     const page = await mountWith(games({}));
-    const entries = page.get('.list-entries').element;
-    const sidebar = page.get('.list-sidebar').element;
-    expect(entries.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-    expect((page.get('.sidebar-disclosure').element as HTMLDetailsElement).open).toBe(false);
+    expect(page.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
+      'Rate 2',
+      'Standings',
+      'Nominate',
+    ]);
+    expect(page.get('[role="tab"][aria-selected="true"]').text()).toContain('Rate');
+    expect((page.get('.list-nominate').element as HTMLElement).style.display).toBe('none');
+    await page.findAll('[role="tab"]')[2]?.trigger('click');
+    await flushPromises();
+    expect((page.get('.list-nominate').element as HTMLElement).style.display).toBe('');
+  });
+
+  test('choosing a score saves it to your ballot', async () => {
+    vi.useFakeTimers();
+    const page = await mountWith(games({}));
+    const calls: unknown[] = [];
+    const fetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) => {
+      if (init.method === 'PUT') {
+        calls.push(JSON.parse(init.body as string));
+        return Promise.resolve(Response.json({ listId: 'list-1', scores: { a: 8 } }));
+      }
+      return fetch(input, init);
+    });
+    await page.get('.score-input input[value="8"]').setValue(true);
+    expect(page.text()).toContain('1 of 2 rated');
+    await vi.advanceTimersByTimeAsync(250);
+    await flushPromises();
+    expect(calls).toEqual([{ entryId: 'a', score: 8 }]);
+    vi.useRealTimers();
+  });
+
+  test('rate one by one walks through the unrated entries', async () => {
+    const page = await mountWith(games({}), { a: 4 }, undefined, true);
+    await page.get('.ballot-bar .button--primary').trigger('click');
+    const stage = page.get('.dialog--stage');
+    expect(stage.text()).toContain('1 of 1');
+    expect(stage.get('.one-by-one__title').text()).toBe('Wingspan');
+    await stage.findAll('.dialog__actions button').at(-1)?.trigger('click');
+    expect(stage.text()).toContain('You rated 0 of 1 entry.');
+    page.unmount();
   });
 
   test('a public list warns before rating and shows attribution when results are visible', async () => {
@@ -99,18 +150,18 @@ describe('ListPage rating', () => {
     const page = await mountWith(
       games({ viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 } }),
     );
-    expect(page.findAll('input[type="range"]')).toHaveLength(0);
+    expect(page.findAll('.score-input')).toHaveLength(0);
     expect(page.text()).toContain('so you can’t rate it');
   });
 
-  test('a scheduled list has no pickers yet', async () => {
+  test('a scheduled list has no score inputs yet', async () => {
     const page = await mountWith(games({ lifecycle: 'scheduled' }));
-    expect(page.findAll('input[type="range"]')).toHaveLength(0);
+    expect(page.findAll('.score-input')).toHaveLength(0);
   });
 
   test('a closed list shows your final scores, read-only', async () => {
     const page = await mountWith(games({ lifecycle: 'closed' }), { b: 2 });
-    expect(page.findAll('input[type="range"]')).toHaveLength(0);
+    expect(page.findAll('.score-input')).toHaveLength(0);
     expect(page.text()).toContain('Your score: 2');
   });
 
@@ -163,9 +214,9 @@ describe('ListPage rating', () => {
       'Azul',
     ]);
     expect(page.findAll('.entry__standing').map((standing) => standing.text())).toEqual([
-      'Rank 1 · 8.4 · 5 votes',
-      'Rank 2 · 7.2 · 2 votes Provisional',
-      'Pending · no votes yet',
+      'Rank 1',
+      'Rank 2 Provisional',
+      'No votes yet',
     ]);
   });
 
@@ -192,6 +243,6 @@ describe('ListPage rating', () => {
     await page.get('.share-link').trigger('click');
     await flushPromises();
     expect(writeText).toHaveBeenCalledWith('http://localhost:3000/lists/games');
-    expect(page.get('.share-status').text()).toContain('Sign-in is required');
+    expect(useToast().toasts.value.at(-1)?.message).toContain('Sign-in is required');
   });
 });

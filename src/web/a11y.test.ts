@@ -174,34 +174,79 @@ describe('demo mode', () => {
   });
 });
 
-describe('admin menu', () => {
-  test('Admins get links to Roles and Backups', async () => {
-    const wrapper = await renderAt('/', true);
-    const items = [...document.querySelectorAll('.menu:not(.site-menu) .menu__item')].map((item) =>
+describe('the menu', () => {
+  const menuDialog = () =>
+    [...document.querySelectorAll('dialog')].find((dialog) => dialog.querySelector('nav.menu'));
+  const menuLinks = () =>
+    [...(menuDialog()?.querySelectorAll('.menu__item') ?? [])].map((item) =>
       item.textContent.trim(),
     );
-    expect(items.slice(0, 2)).toEqual(['Roles', 'Backups']);
+
+  test('is one menu: site links, Admin tools, your data, appearance and sign out', async () => {
+    const wrapper = await renderAt('/', true);
+    expect(document.querySelectorAll('details')).toHaveLength(0);
+    expect(menuLinks()).toEqual([
+      'Lists',
+      'About',
+      'New list',
+      'Roles',
+      'Backups',
+      'Privacy',
+      'Download my data',
+      'Delete my data',
+    ]);
+    expect(menuDialog()?.textContent).toContain('Appearance');
+    expect(menuDialog()?.textContent).toContain('Sign out');
     wrapper.unmount();
   });
 
-  test('the site menu links to Lists, About and Privacy', async () => {
+  test('signed out, it offers the site links, privacy and sign-in', async () => {
     const wrapper = await renderAt('/', false);
-    const menu = document.querySelector('details.site-menu');
-    expect(menu).not.toBeNull();
-    const items = menu === null ? [] : [...menu.querySelectorAll('a')];
-    expect(items.map((link) => link.innerText.trim())).toEqual(['Lists', 'About', 'Privacy']);
+    expect(menuLinks()).toEqual(['Lists', 'About', 'Privacy']);
+    expect(menuDialog()?.textContent).toContain('Sign in with Discord');
     wrapper.unmount();
   });
 
-  test('the site menu closes after following a navigation link', async () => {
+  test('opens from the header and closes after following a link', async () => {
     const wrapper = await renderAt('/', false);
-    const menu = document.querySelector<HTMLDetailsElement>('details.site-menu');
-    await wrapper.get('details.site-menu summary').trigger('click');
-    expect(menu?.open).toBe(true);
-    await wrapper.get('details.site-menu a[href="/about"]').trigger('click');
+    await wrapper.get('.menu-trigger').trigger('click');
+    expect(menuDialog()?.open).toBe(true);
+    expect(wrapper.get('.menu-trigger').attributes('aria-expanded')).toBe('true');
+    await wrapper.get('nav.menu a[href="/about"]').trigger('click');
     await flushPromises();
-    expect(menu?.open).toBe(false);
+    expect(menuDialog()?.open).toBe(false);
     expect(document.querySelector('main h1')?.textContent).toContain('About');
+    wrapper.unmount();
+  });
+
+  test('the appearance switch applies the chosen theme', async () => {
+    const wrapper = await renderAt('/', true);
+    await wrapper.get('.segmented input[value="dark"]').trigger('change');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    await wrapper.get('.segmented input[value="system"]').trigger('change');
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    wrapper.unmount();
+  });
+});
+
+describe('list page dialogs', () => {
+  test('entry details pass automated accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('.entry__art').trigger('click');
+    await flushPromises();
+    const details = [...document.querySelectorAll('dialog')].find((d) => d.open);
+    expect(details?.textContent).toContain('Blade Runner');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
+  test('rating one by one passes automated accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('.ballot-bar .button--primary').trigger('click');
+    await flushPromises();
+    const stage = document.querySelector('dialog.dialog--stage');
+    expect(stage?.textContent).toContain('Alien');
+    await expectAccessible(document.body);
     wrapper.unmount();
   });
 });
@@ -234,13 +279,13 @@ describe('score visibility editor', () => {
     draft.unmount();
 
     const published = await renderAt('/admin/lists/best-sci-fi', true);
-    const ratingFieldset = [
-      ...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset'),
-    ].find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Rating');
-    expect(ratingFieldset?.disabled).toBe(false);
-    expect(ratingFieldset?.querySelector<HTMLFieldSetElement>('fieldset.stack')?.disabled).toBe(
-      true,
-    );
+    const section = (legend: string) =>
+      [...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset')].find(
+        (fieldset) => fieldset.querySelector('legend')?.textContent === legend,
+      );
+    expect(section('Rating')?.disabled).toBe(true);
+    expect(section('Scores')?.disabled).toBe(true);
+    expect(section('Nominations')?.disabled).toBe(false);
     const unlimited = document.querySelector<HTMLInputElement>('#unlimited');
     expect(unlimited?.disabled).toBe(false);
     unlimited?.click();
@@ -263,9 +308,12 @@ describe('score visibility editor', () => {
     expect(button).not.toBeUndefined();
     button?.click();
     await flushPromises();
-    expect(
-      document.querySelector('dialog[aria-label="Make scores private?"]')?.textContent,
-    ).toContain(
+    const dialog = [...document.querySelectorAll('dialog')].find(
+      (item) =>
+        document.getElementById(item.getAttribute('aria-labelledby') ?? '')?.textContent ===
+        'Make scores private?',
+    );
+    expect(dialog?.textContent).toContain(
       'Members will no longer see who gave what score. This setting can’t be changed back.',
     );
     wrapper.unmount();
@@ -310,7 +358,7 @@ describe('site-wide content', () => {
 
   test('the welcome page names the community and offers to join it', async () => {
     const wrapper = await renderAt('/', false);
-    expect(document.querySelector('.hero')?.textContent).toContain('For members of Film Club');
+    expect(document.querySelector('.landing')?.textContent).toContain('For members of Film Club');
     expect(document.querySelector('a[href="https://discord.gg/x"]')?.textContent.trim()).toBe(
       'Join the server',
     );
@@ -319,12 +367,12 @@ describe('site-wide content', () => {
 
   test('the privacy page explains storage, cookies, and download and delete', async () => {
     const wrapper = await renderAt('/privacy', false);
-    const headings = [...document.querySelectorAll('h2')].map((h) => h.textContent);
+    const headings = [...document.querySelectorAll('main h2')].map((h) => h.textContent);
     expect(headings).toEqual([
       'What we store about you',
       'What we never store',
       'Shared links',
-      'Cookies',
+      'Cookies and browser storage',
       'Download my data',
       'Delete my data',
       'Backups',

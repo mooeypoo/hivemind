@@ -1,0 +1,98 @@
+/*
+ * Night cinema: the default theme. This file is the whole reskin surface: every colour, font,
+ * radius, shadow and duration the stylesheets use is a token here. Each colour is
+ * light-dark(light, dark); test/web/contrast.test.ts checks every pair in both modes.
+ */
+
+/* Bricolage Grotesque, SIL Open Font License 1.1 (fonts/OFL.txt). */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('fonts/bricolage-grotesque-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('fonts/bricolage-grotesque-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* Page and surfaces */
+  --bg: light-dark(#f7f4ee, #0c0e14);
+  --surface: light-dark(#ffffff, #161a24);
+  --surface-2: light-dark(#efe9de, #212736);
+  --text: light-dark(#17181e, #f4f1ea);
+  --muted: light-dark(#545967, #aab1c2);
+  --border: light-dark(#ddd6c8, #2b3243);
+  /* Boundaries of inputs and buttons: at least 3:1 against the page (WCAG 1.4.11). */
+  --control-border: light-dark(#7b8090, #737d93);
+
+  /* Marquee gold: primary actions, scores, links */
+  --accent: light-dark(#9a4600, #ffc94d);
+  --accent-text: light-dark(#ffffff, #1a1405);
+  --accent-soft: light-dark(#f6e7c8, #2a2516);
+  /* Neon: what is yours (your score, your nomination) */
+  --highlight: light-dark(#b8125a, #ff6fae);
+
+  --danger: light-dark(#b3261e, #ff8a80);
+  --success: light-dark(#1d6b45, #6fe3a5);
+  --focus: light-dark(#0b6aa2, #5ad1ff);
+  --backdrop: light-dark(rgb(23 24 30 / 45%), rgb(0 0 0 / 70%));
+  --shadow-color: light-dark(rgb(23 24 30 / 14%), rgb(0 0 0 / 55%));
+  --shadow-raised: 0 8px 28px var(--shadow-color);
+
+  /* Title cards: stand-ins for posters, one of six per title, light text on deep colour */
+  --title-card-text: light-dark(#fdf6e3, #fdf6e3);
+  --title-card-1: light-dark(#3b1d5c, #3b1d5c);
+  --title-card-2: light-dark(#0f3d4a, #0f3d4a);
+  --title-card-3: light-dark(#5a1f2b, #5a1f2b);
+  --title-card-4: light-dark(#1f3d2a, #1f3d2a);
+  --title-card-5: light-dark(#4a3410, #4a3410);
+  --title-card-6: light-dark(#1d2a5c, #1d2a5c);
+
+  /* Shape and rhythm */
+  --radius: 10px;
+  --radius-lg: 16px;
+  --space: 1.125rem;
+
+  /* Type */
+  --font-display:
+    'Bricolage Grotesque', ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue',
+    sans-serif;
+  --font-body: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+
+  /* Motion: zeroed under prefers-reduced-motion */
+  --duration-fast: 120ms;
+  --duration: 220ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* A member's choice of Light or Dark (data-theme on <html>) overrides the system setting. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration: 0ms;
+  }
+}

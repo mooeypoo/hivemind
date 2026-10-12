@@ -1,0 +1,452 @@
+/* The app shell: header, menu, footer, demo banner. Role tokens only: no colour literals here. */
+
+/* Header */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.75rem;
+  padding: 0.5rem clamp(0.75rem, 3vw, 2.5rem);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  min-height: 44px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Without a community icon, a marquee bulb stands in as the mark. */
+.site-header__brand:not(:has(.community))::before {
+  content: '';
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.site-header__name {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-nav {
+  display: none;
+}
+
+.site-header__end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+@media (min-width: 40rem) {
+  .site-nav {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: 1.25rem;
+  }
+}
+
+.site-nav__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    color var(--duration-fast),
+    background var(--duration-fast);
+}
+
+.site-nav__link:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.site-nav__link[aria-current='page'] {
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.site-header__sign-in {
+  white-space: nowrap;
+}
+
+/* Menu trigger: the avatar when signed in, three lines when not */
+
+.menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.25rem;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--duration-fast);
+}
+
+.menu-trigger:hover {
+  border-color: var(--accent);
+}
+
+.menu-trigger__name {
+  display: none;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .menu-trigger:has(.avatar) {
+    padding-right: 0.9rem;
+  }
+
+  .menu-trigger__name {
+    display: inline;
+  }
+}
+
+.menu-trigger__icon {
+  position: relative;
+  width: 1.1rem;
+  height: 2px;
+  margin: 0 auto;
+  background: currentcolor;
+}
+
+.menu-trigger__icon::before,
+.menu-trigger__icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: currentcolor;
+}
+
+.menu-trigger__icon::before {
+  top: -6px;
+}
+
+.menu-trigger__icon::after {
+  top: 6px;
+}
+
+.avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.avatar--large {
+  width: 48px;
+  height: 48px;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* The menu sheet (AppDialog variant="sheet") */
+
+.dialog--sheet {
+  width: 100%;
+  max-width: 100%;
+  max-height: 85dvh;
+  margin: auto 0 0;
+  border-width: 1px 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dialog--sheet[open] {
+  animation: sheet-up var(--duration) var(--ease-out);
+}
+
+.dialog--sheet .dialog__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .dialog--sheet {
+    width: 20rem;
+    margin: 4rem clamp(0.75rem, 3vw, 2.5rem) auto auto;
+    border-width: 1px;
+    border-radius: var(--radius-lg);
+  }
+
+  .dialog--sheet[open] {
+    animation-name: dialog-in;
+  }
+
+  .dialog--sheet::backdrop {
+    background: transparent;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.menu-identity p {
+  margin: 0;
+}
+
+.menu-identity__name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.menu__heading {
+  margin: 1rem 0 0.25rem;
+  padding: 0 0.75rem;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.menu__group {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu__item:hover {
+  background: var(--surface-2);
+}
+
+.menu__item[aria-current='page'] {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.menu__item--danger {
+  color: var(--danger);
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Segmented control: radio buttons that look like one switch */
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented > legend {
+  float: left;
+  width: 100%;
+}
+
+.segmented__option {
+  position: relative;
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented__option input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented__option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.segmented__option:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Page area */
+
+.page {
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(0.4rem);
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
+/* Community badge */
+
+.community {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  vertical-align: middle;
+}
+
+.community__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.community__name {
+  font-weight: 600;
+}
+
+/* Footer */
+
+.site-footer {
+  width: 100%;
+  max-width: 82rem;
+  margin: 0 auto;
+  padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.site-footer__community {
+  margin: 0;
+  color: var(--text);
+}
+
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+}
+
+.site-footer__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.site-footer__fine {
+  max-width: 48rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* Demo mode banner */
+
+.demo-banner {
+  padding: 0.3rem var(--space);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.demo-banner strong {
+  color: var(--highlight);
+}

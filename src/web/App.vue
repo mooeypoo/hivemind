@@ -3,9 +3,12 @@ import { nextTick, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import AppFooter from './components/AppFooter.vue';
 import AppHeader from './components/AppHeader.vue';
+import AppToasts from './components/ui/AppToasts.vue';
+import { useToast } from './composables/toast.ts';
 import { loadSite, site } from './state/site.ts';
 
 const router = useRouter();
+const { toasts, dismiss } = useToast();
 onMounted(() => {
   void loadSite();
   // After in-app navigation, move focus to the new page so keyboard and screen-reader
@@ -22,11 +25,18 @@ onMounted(() => {
 <template>
   <a class="skip-link" href="#main">Skip to content</a>
   <aside v-if="site.info?.demo === true" class="demo-banner" aria-label="Demo mode">
-    Demo mode: sample data and pretend accounts. Nothing here is real.
+    <strong>Demo mode</strong> · sample data and pretend accounts, nothing here is real
   </aside>
   <AppHeader />
   <main id="main" tabindex="-1" class="page">
-    <RouterView />
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="page" mode="out-in">
+        <div :key="route.path" class="page__view">
+          <component :is="Component" />
+        </div>
+      </Transition>
+    </RouterView>
   </main>
   <AppFooter />
+  <AppToasts :toasts="toasts" @dismiss="dismiss" />
 </template>

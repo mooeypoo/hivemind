@@ -57,37 +57,60 @@ onMounted(async () => {
 <template>
   <p v-if="loginNotice !== null" class="notice" role="alert">{{ loginNotice }}</p>
 
-  <section v-if="session.me === null" class="hero">
-    <h1>{{ siteName }}</h1>
-    <p>
-      Make ranked lists together: nominate your favourites, rate everyone’s picks, and see what the
-      community loves most.
-    </p>
-    <p v-if="site.info?.community != null" class="hero__community">
-      For members of <CommunityBadge :community="site.info.community" />
-    </p>
-    <p>Sign in with the Discord account you use in this community.</p>
-    <div class="actions actions--center">
-      <a class="button button--primary button--large" :href="loginUrl('/')">Sign in with Discord</a>
-      <a
-        v-if="site.info?.community?.inviteUrl != null"
-        class="button button--large"
-        :href="site.info.community.inviteUrl"
-        rel="noopener"
-      >
-        Join the server
-      </a>
+  <section v-if="session.me === null" class="landing" aria-labelledby="landing-heading">
+    <div class="landing__marquee">
+      <p v-if="site.info?.community != null" class="landing__community">
+        For members of <CommunityBadge :community="site.info.community" />
+      </p>
+      <h1 id="landing-heading">{{ siteName }}</h1>
+      <p class="landing__pitch">
+        Make ranked lists together: nominate your favourites, rate everyone’s picks, and see what
+        the community loves most.
+      </p>
+      <div class="landing__actions">
+        <a class="button button--primary button--large" :href="loginUrl('/')"
+          >Sign in with Discord</a
+        >
+        <a
+          v-if="site.info?.community?.inviteUrl != null"
+          class="button button--large"
+          :href="site.info.community.inviteUrl"
+          rel="noopener"
+        >
+          Join the server
+        </a>
+      </div>
+      <p class="meta">
+        Sign in with the Discord account you use in this community.
+        <RouterLink :to="{ name: 'privacy' }">What we store, and what we don’t</RouterLink>
+      </p>
     </div>
-    <p class="meta">
-      <RouterLink :to="{ name: 'privacy' }">What we store, and what we don’t</RouterLink>
-    </p>
+
+    <ol class="landing__steps">
+      <li class="landing__step">
+        <span class="landing__step-number" aria-hidden="true">1</span>
+        <h2>Nominate</h2>
+        <p>Add the things you love to a list.</p>
+      </li>
+      <li class="landing__step">
+        <span class="landing__step-number" aria-hidden="true">2</span>
+        <h2>Rate</h2>
+        <p>Score everyone’s picks. Your scores stay private unless a list says otherwise.</p>
+      </li>
+      <li class="landing__step">
+        <span class="landing__step-number" aria-hidden="true">3</span>
+        <h2>Rank</h2>
+        <p>Watch the standings settle as the community votes.</p>
+      </li>
+    </ol>
+
     <DemoSignIn v-if="site.info?.demo === true" />
   </section>
 
   <template v-else>
-    <div class="page-header lists-heading">
+    <header class="index-head">
       <div>
-        <p class="eyebrow">Community index</p>
+        <p class="eyebrow">{{ site.info?.community?.name ?? 'Community lists' }}</p>
         <h1>Lists</h1>
       </div>
       <RouterLink
@@ -97,7 +120,7 @@ onMounted(async () => {
       >
         New list
       </RouterLink>
-    </div>
+    </header>
 
     <ErrorNotice :error="error" />
     <p v-if="lists === null && error === null" class="meta" aria-live="polite">Loading lists…</p>
@@ -116,13 +139,12 @@ onMounted(async () => {
         :aria-labelledby="`group-${group.id}`"
       >
         <h2 :id="`group-${group.id}`">{{ group.title }}</h2>
-        <div class="grid">
+        <div class="list-grid">
           <ListCard
-            v-for="(list, index) in group.lists"
+            v-for="list in group.lists"
             :key="list.id"
             :list="list"
             :can-edit="session.me.isAdmin"
-            :index="index + 1"
           />
         </div>
       </section>

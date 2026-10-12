@@ -15,5 +15,5 @@
     "*.config.ts",
     ".dependency-cruiser.mts"
   ],
-  "exclude": ["test/boundaries/fixture"]
+  "exclude": ["test/boundaries/fixture", "test/e2e", "scripts/screenshots.ts"]
 }

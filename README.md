@@ -4,6 +4,18 @@ hivemind is a platform for members of a Discord community to create ranked lists
 
 Each list ranks itself. One deployment serves one Discord community. To run hivemind for your own community, fork the repository and deploy your fork. Nothing community-specific lives in the code.
 
+![The welcome page](docs/screenshots/landing.jpg)
+
+| Lists                                          | A list                                               |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| ![The lists index](docs/screenshots/lists.jpg) | ![A list open for rating](docs/screenshots/list.jpg) |
+
+| Rating on a phone                                            | Standings                                                         | One menu                                           |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------- |
+| ![Score chips on a phone](docs/screenshots/rating-phone.jpg) | ![The podium and standings](docs/screenshots/standings-phone.jpg) | ![The menu sheet](docs/screenshots/menu-phone.jpg) |
+
+Screenshots use sample data (`npm run screenshots` retakes them). The look is a theme you can replace: see [docs/theming.md](docs/theming.md).
+
 ## Deploy your own
 
 1. **Discord application.** Follow [docs/discord-setup.md](docs/discord-setup.md) to register the app, choose your `SITE_URL`, and collect your server and admin role IDs.

@@ -5,5 +5,7 @@ dist/
 .env
 .env.*
 coverage/
+test-results/
+playwright-report/
 !test/boundaries/fixture/node_modules/
 !.env.example
