@@ -8,7 +8,6 @@ export interface StandingRow {
   readonly nominatedBy: string | null;
   /** The weighted ranking score; null without votes. */
   readonly score: number | null;
-  readonly average: number | null;
   readonly votes: number;
   /** Fewer votes than the list's minimum: not ranked yet. */
   readonly provisional: boolean;
@@ -56,7 +55,6 @@ export const buildStandings = (
         item: entry.item,
         nominatedBy: entry.nominatedBy,
         score: null,
-        average: null,
         votes: 0,
         provisional: true,
         votesNeeded: 0,

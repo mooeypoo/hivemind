@@ -20,7 +20,6 @@ describe('Bayesian ranking', () => {
     const C = 26 / 3;
     expect(rows.a?.score).toBeCloseTo((2 / 4) * 10 + (2 / 4) * C, 10);
     expect(rows.b?.score).toBeCloseTo((1 / 3) * 6 + (2 / 3) * C, 10);
-    expect(rows.a?.mean).toBe(10);
     expect(rows.b?.votes).toBe(1);
   });
 
@@ -104,7 +103,7 @@ describe('Bayesian ranking', () => {
   test('ignores scores for entries that are not in the list', () => {
     const rows = bayesian(input(['a'], [{ a: 4, gone: 10 }], 0));
     expect(rows).toEqual([
-      { entryId: 'a', rank: 1, score: 4, mean: 4, votes: 1, provisional: false, votesNeeded: 0 },
+      { entryId: 'a', rank: 1, score: 4, votes: 1, provisional: false, votesNeeded: 0 },
     ]);
   });
 

@@ -80,7 +80,6 @@ describe('ListResultsPage', () => {
           entryId: 'a',
           item: item('Root'),
           score: 7.67,
-          average: 8,
           votes: 2,
           provisional: false,
           votesNeeded: 0,
@@ -90,7 +89,6 @@ describe('ListResultsPage', () => {
           entryId: 'b',
           item: item('Wingspan'),
           score: 8,
-          average: 9,
           votes: 1,
           provisional: true,
           votesNeeded: 1,
@@ -100,7 +98,6 @@ describe('ListResultsPage', () => {
           entryId: 'c',
           item: item('Azul'),
           score: null,
-          average: null,
           votes: 0,
           provisional: true,
           votesNeeded: 2,
@@ -108,7 +105,7 @@ describe('ListResultsPage', () => {
       ],
     });
     expect(page.findAll('.podium__place').map(placeText)).toEqual([
-      '1 Root 7.7 · 2 votes · avg 8.0 Nominated by Ada',
+      '1 Root 7.7 · 2 votes Nominated by Ada',
     ]);
     const cells = (row: { element: Element }) =>
       [...row.element.children]
@@ -116,7 +113,7 @@ describe('ListResultsPage', () => {
         .map((cell) => squash(cell.textContent))
         .join(' | ');
     expect(page.findAll('.standings__provisional li').map(cells)).toEqual([
-      '– | Wingspan, Needs 1 more vote Nominated by Bob | 8.0 · 1 vote · avg 9.0',
+      '– | Wingspan, Needs 1 more vote Nominated by Bob | 8.0 · 1 vote',
     ]);
     expect(page.findAll('.standings__unrated li').map(cells)).toEqual([
       '– | Azul | No votes yet',

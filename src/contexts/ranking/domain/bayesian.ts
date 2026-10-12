@@ -11,7 +11,6 @@ export interface RankedRow {
   /** Null until the entry has at least the list's minimum votes. Equal scores share a rank. */
   readonly rank: number | null;
   readonly score: number | null;
-  readonly mean: number | null;
   readonly votes: number;
   /** Fewer votes than the list's minimum: listed after every ranked entry, with no rank yet. */
   readonly provisional: boolean;
@@ -48,7 +47,6 @@ export const bayesian = ({ entries, ballots, minVotes: m }: RankingInput): Ranke
     return {
       entry,
       votes: v,
-      mean: R,
       score: R === null ? null : (v / (v + m)) * R + (m / (v + m)) * C,
       provisional: v < m,
       votesNeeded: Math.max(0, m - v),
@@ -81,7 +79,6 @@ export const bayesian = ({ entries, ballots, minVotes: m }: RankingInput): Ranke
       entryId: row.entry.id,
       rank,
       score: row.score,
-      mean: row.mean,
       votes: row.votes,
       provisional: row.provisional,
       votesNeeded: row.votesNeeded,

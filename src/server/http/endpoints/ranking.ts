@@ -25,7 +25,6 @@ export const getLeaderboard = async (request: Request, app: App): Promise<Respon
           entryId: row.entryId,
           item: row.item,
           score: round2(row.score),
-          average: round2(row.mean),
           votes: row.votes,
           provisional: row.provisional,
           votesNeeded: row.votesNeeded,

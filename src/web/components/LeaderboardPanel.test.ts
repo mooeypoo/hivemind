@@ -37,7 +37,6 @@ const row = (
   entryId,
   item: item(title),
   score,
-  average: score === null ? null : score + 0.5,
   votes,
   provisional,
   votesNeeded,
@@ -115,7 +114,7 @@ describe('LeaderboardPanel', () => {
         ...row('movie', movie.item.title, state === 'podium' ? 1 : 4, 8, 4),
         item: movie.item,
         ...(state === 'provisional' ? { rank: null, provisional: true, votesNeeded: 1 } : {}),
-        ...(state === 'unrated' ? { rank: null, score: null, average: null, votes: 0 } : {}),
+        ...(state === 'unrated' ? { rank: null, score: null, votes: 0 } : {}),
       };
       const panel = mount(StandingsBoard, {
         props: {
@@ -184,19 +183,23 @@ describe('LeaderboardPanel', () => {
     );
     const podium = panel.findAll('.podium__place').map(placeText);
     expect(podium).toEqual([
-      '1 Root 7.7 · 3 votes · avg 8.2 You: 9',
-      '2 Catan 6.9 · 3 votes · avg 7.4',
-      '2 Carcassonne 6.9 · 4 votes · avg 7.4',
+      '1 Root 7.7 · 3 votes You: 9',
+      '2 Catan 6.9 · 3 votes',
+      '2 Carcassonne 6.9 · 4 votes',
     ]);
     const rest = panel.findAll('[aria-label="The rest of the ranking"] li');
-    expect(rest.map(cells)).toEqual(['4 | Azul | 5.1 · 4 votes · avg 5.6 · you: 6']);
+    expect(rest.map(cells)).toEqual(['4 | Azul | 5.1 · 4 votes · you: 6']);
     expect(panel.get('.standings__provisional h3').text()).toBe('Not enough votes yet');
     expect(panel.findAll('.standings__provisional li').map(cells)).toEqual([
-      '– | Wingspan, Needs 1 more vote | 9.2 · 1 vote · avg 9.7',
+      '– | Wingspan, Needs 1 more vote | 9.2 · 1 vote',
     ]);
     expect(panel.findAll('.standings__unrated li').map(cells)).toEqual([
       '– | Cascadia | No votes yet',
     ]);
+    expect(panel.text()).toContain(
+      'Each score blends an entry’s average rating with the average across all ratings.',
+    );
+    expect(panel.text()).not.toContain('avg ');
     expect(panel.text()).toContain('Updated just now');
   });
 

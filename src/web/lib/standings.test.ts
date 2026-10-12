@@ -26,7 +26,6 @@ const row = (
   entryId,
   item: item(entryId),
   score: rank === null ? null : 10 - rank,
-  average: rank === null ? null : 10 - rank,
   votes,
   provisional,
   votesNeeded: provisional ? 3 - votes : 0,

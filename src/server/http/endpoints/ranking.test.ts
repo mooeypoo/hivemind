@@ -96,14 +96,13 @@ describe('GET /api/lists/:list/leaderboard', () => {
         row.rank,
         row.item.title,
         row.score,
-        row.average,
         row.votes,
         row.provisional,
         row.votesNeeded,
       ]),
     ).toEqual([
-      [1, 'Root', 7.67, 8, 2, false, 0],
-      [null, 'Wingspan', 6.89, 6, 1, true, 1],
+      [1, 'Root', 7.67, 2, false, 0],
+      [null, 'Wingspan', 6.89, 1, true, 1],
     ]);
     expect(result.body.minVotes).toBe(2);
   });

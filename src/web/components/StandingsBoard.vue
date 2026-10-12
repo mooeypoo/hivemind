@@ -47,8 +47,6 @@ const untilReveal = computed(() =>
 const percent = (row: StandingRow) =>
   row.score === null ? 0 : scalePercent(row.score, props.scale);
 const votesText = (votes: number) => `${String(votes)} ${votes === 1 ? 'vote' : 'votes'}`;
-const averageText = (row: StandingRow) =>
-  row.average === null ? '' : ` · avg ${row.average.toFixed(1)}`;
 const needsText = (row: StandingRow) =>
   `Needs ${String(row.votesNeeded)} more ${row.votesNeeded === 1 ? 'vote' : 'votes'}`;
 const voters = (row: StandingRow) =>
@@ -109,10 +107,7 @@ const voters = (row: StandingRow) =>
           <p v-if="row.item.subtitle !== null" class="podium__subtitle">{{ row.item.subtitle }}</p>
           <p class="podium__score">
             <strong>{{ row.score?.toFixed(1) }}</strong>
-            <span
-              ><span class="visually-hidden"> · </span>{{ votesText(row.votes)
-              }}{{ averageText(row) }}</span
-            >
+            <span><span class="visually-hidden"> · </span>{{ votesText(row.votes) }}</span>
           </p>
           <p v-if="row.nominatedBy !== null" class="standing__nominator">
             Nominated by {{ row.nominatedBy }}
@@ -160,7 +155,7 @@ const voters = (row: StandingRow) =>
           <span class="ranking__numbers">
             <strong>{{ row.score?.toFixed(1) }}</strong>
             <span class="meta">
-              · {{ votesText(row.votes) }}{{ averageText(row)
+              · {{ votesText(row.votes)
               }}<template v-if="myScores?.[row.entryId] !== undefined">
                 · you: {{ myScores[row.entryId] }}</template
               >
@@ -231,7 +226,7 @@ const voters = (row: StandingRow) =>
             <span class="ranking__numbers">
               <strong>{{ row.score?.toFixed(1) }}</strong>
               <span class="meta">
-                · {{ votesText(row.votes) }}{{ averageText(row)
+                · {{ votesText(row.votes)
                 }}<template v-if="myScores?.[row.entryId] !== undefined">
                   · you: {{ myScores[row.entryId] }}</template
                 >
@@ -285,9 +280,9 @@ const voters = (row: StandingRow) =>
       </section>
 
       <p class="standings__note meta">
-        Scores are weighted: each entry’s average is balanced against how many people rated it.
-        Places stay live until voting closes, so entries can still move up or down as more votes
-        come in.
+        Each score blends an entry’s average rating with the average across all ratings. As more
+        people rate an entry, its own average has more influence. An entry needs at least
+        {{ visible.minVotes }} votes to get a place; scores can change until voting closes.
       </p>
     </template>
     <EntryDetails

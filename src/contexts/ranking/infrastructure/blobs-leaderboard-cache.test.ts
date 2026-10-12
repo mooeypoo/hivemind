@@ -23,7 +23,6 @@ const board: Leaderboard = {
       entryId: 'a',
       rank: 1,
       score: 4,
-      mean: 4,
       votes: 1,
       provisional: false,
       votesNeeded: 0,

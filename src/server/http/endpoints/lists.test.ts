@@ -263,7 +263,7 @@ describe('a free-text list', () => {
       '/api/lists/games/leaderboard',
       ada,
     );
-    expect(!board.body.hidden && board.body.rows[0]).toMatchObject({ votes: 2, average: 8 });
+    expect(!board.body.hidden && board.body.rows[0]).toMatchObject({ votes: 2 });
     expect(
       (await call<BallotDto>(getMyBallot, 'GET', '/api/lists/games/ballot', ada)).body.scores[
         first.body.id
