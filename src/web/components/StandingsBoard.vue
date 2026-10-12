@@ -119,13 +119,23 @@ const voters = (row: StandingRow) =>
           <p v-if="row.nominatedBy !== null" class="standing__nominator">
             Nominated by {{ row.nominatedBy }}
           </p>
-          <p v-if="myScores?.[row.entryId] !== undefined" class="standing__mine">
+          <button
+            v-if="canVote && myScores?.[row.entryId] !== undefined"
+            type="button"
+            class="standing__mine-button"
+            :aria-label="`Change your rating for ${row.item.title}, currently ${myScores[row.entryId]}`"
+            @click="selectedId = row.entryId"
+          >
+            You: {{ myScores[row.entryId] }} (edit)
+          </button>
+          <p v-else-if="!canVote && myScores?.[row.entryId] !== undefined" class="standing__mine">
             You: {{ myScores[row.entryId] }}
           </p>
           <button
             v-else-if="canVote"
             type="button"
             class="standing__rate-button"
+            :aria-label="`Rate ${row.item.title}`"
             @click="selectedId = row.entryId"
           >
             + Rate
@@ -170,15 +180,25 @@ const voters = (row: StandingRow) =>
           <span class="ranking__numbers">
             <strong>{{ row.score?.toFixed(1) }}</strong>
             <span class="meta">
-              · {{ votesText(row.votes)
-              }}<template v-if="myScores?.[row.entryId] !== undefined">
-                · you: {{ myScores[row.entryId] }}</template
-              >
+              · {{ votesText(row.votes) }}
+              <template v-if="!canVote && myScores?.[row.entryId] !== undefined">
+                · you: {{ myScores[row.entryId] }}
+              </template>
             </span>
             <button
-              v-if="canVote && myScores?.[row.entryId] === undefined"
+              v-if="canVote && myScores?.[row.entryId] !== undefined"
+              type="button"
+              class="standing__mine-button"
+              :aria-label="`Change your rating for ${row.item.title}, currently ${myScores[row.entryId]}`"
+              @click="selectedId = row.entryId"
+            >
+              you: {{ myScores[row.entryId] }} (edit)
+            </button>
+            <button
+              v-else-if="canVote"
               type="button"
               class="standing__rate-button"
+              :aria-label="`Rate ${row.item.title}`"
               @click="selectedId = row.entryId"
             >
               + Rate
@@ -249,15 +269,25 @@ const voters = (row: StandingRow) =>
             <span class="ranking__numbers">
               <strong>{{ row.score?.toFixed(1) }}</strong>
               <span class="meta">
-                · {{ votesText(row.votes)
-                }}<template v-if="myScores?.[row.entryId] !== undefined">
-                  · you: {{ myScores[row.entryId] }}</template
-                >
+                · {{ votesText(row.votes) }}
+                <template v-if="!canVote && myScores?.[row.entryId] !== undefined">
+                  · you: {{ myScores[row.entryId] }}
+                </template>
               </span>
               <button
-                v-if="canVote && myScores?.[row.entryId] === undefined"
+                v-if="canVote && myScores?.[row.entryId] !== undefined"
+                type="button"
+                class="standing__mine-button"
+                :aria-label="`Change your rating for ${row.item.title}, currently ${myScores[row.entryId]}`"
+                @click="selectedId = row.entryId"
+              >
+                you: {{ myScores[row.entryId] }} (edit)
+              </button>
+              <button
+                v-else-if="canVote"
                 type="button"
                 class="standing__rate-button"
+                :aria-label="`Rate ${row.item.title}`"
                 @click="selectedId = row.entryId"
               >
                 + Rate
@@ -308,9 +338,19 @@ const voters = (row: StandingRow) =>
             <span class="ranking__numbers meta">
               No votes yet
               <button
-                v-if="canVote && myScores?.[row.entryId] === undefined"
+                v-if="canVote && myScores?.[row.entryId] !== undefined"
+                type="button"
+                class="standing__mine-button"
+                :aria-label="`Change your rating for ${row.item.title}, currently ${myScores[row.entryId]}`"
+                @click="selectedId = row.entryId"
+              >
+                you: {{ myScores[row.entryId] }} (edit)
+              </button>
+              <button
+                v-else-if="canVote"
                 type="button"
                 class="standing__rate-button"
+                :aria-label="`Rate ${row.item.title}`"
                 @click="selectedId = row.entryId"
               >
                 + Rate
