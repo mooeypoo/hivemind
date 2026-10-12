@@ -35,6 +35,21 @@ describe('theme-init.js', () => {
     expect(run('dark', true)).toBeUndefined();
   });
 
+  test('greets people who open the console', () => {
+    const messages: string[] = [];
+    runInNewContext(script, {
+      localStorage: { getItem: () => null },
+      document: { documentElement: { dataset: {} } },
+      console: { info: (message: string) => messages.push(message) },
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("/ _` |");
+    expect(messages[0]).toContain('I see you. You found the console. Now go make a list.');
+    expect(messages[0]).toContain(
+      'If you like tinkering with code, feel free to contribute!\nSee github repo @ https://github.com/mooeypoo/hivemind',
+    );
+  });
+
   test('loads render-blocking in <head>, before the stylesheet', () => {
     const html = read('index.html');
     const tag = /<script src="\/theme-init\.js"><\/script>/.exec(html);
