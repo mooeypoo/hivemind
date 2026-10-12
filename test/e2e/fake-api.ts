@@ -105,18 +105,22 @@ const responses = (me: MeDto | null): Record<string, unknown> => ({
 export const fakeApi = async (
   page: Page,
   me: MeDto | null,
-  options: { readonly movieSearch?: boolean; readonly movieDetails?: boolean } = {},
+  options: {
+    readonly movieSearch?: boolean;
+    readonly movieDetails?: boolean;
+    readonly movieStandings?: boolean;
+  } = {},
 ) => {
   const routes = responses(me);
-  if (options.movieDetails === true) {
+  if (options.movieDetails === true || options.movieStandings === true) {
     const movie: EntryDto = {
-      ...entry('a', 'Blade Runner', '1982'),
+      ...entry(options.movieStandings === true ? 'd' : 'a', 'Blade Runner', '1982'),
       item: {
         source: 'tmdb-movie',
         externalId: '78',
         title: 'Blade Runner',
         subtitle: '1982',
-        imageUrl: null,
+        imageUrl: options.movieStandings === true ? '/favicon.svg' : null,
         overview:
           'A blade runner must pursue replicants in a future Los Angeles where the line between human and machine is uncertain.',
         director: 'Ridley Scott',
@@ -135,6 +139,27 @@ export const fakeApi = async (
         .filter((row) => row.entryId === movie.id)
         .map((row) => ({ ...row, item: movie.item })),
     };
+    if (options.movieStandings === true) {
+      const entries = [...list.entries, movie];
+      routes['GET /api/lists/films'] = {
+        ...list,
+        itemSource: { kind: 'tmdb-movie' },
+        entries,
+      };
+      routes['GET /api/lists/films/leaderboard'] = {
+        ...leaderboard,
+        rows: entries.map((entry, index) => ({
+          rank: index + 1,
+          entryId: entry.id,
+          item: entry.item,
+          score: 9 - index,
+          average: 9 - index,
+          votes: 4,
+          provisional: false,
+          votesNeeded: 0,
+        })),
+      };
+    }
   }
   if (options.movieSearch === true) {
     routes['GET /api/lists/films'] = { ...list, itemSource: { kind: 'tmdb-movie' } };

@@ -111,17 +111,17 @@ describe('ListResultsPage', () => {
       '1 Root 7.7 · 2 votes · avg 8.0 Nominated by Ada',
     ]);
     const cells = (row: { element: Element }) =>
-      [...row.element.children].map((cell) => squash(cell.textContent)).join(' | ');
+      [...row.element.children]
+        .filter((cell) => !cell.classList.contains('ranking__art'))
+        .map((cell) => squash(cell.textContent))
+        .join(' | ');
     expect(page.findAll('.standings__provisional li').map(cells)).toEqual([
       '– | Wingspan, Needs 1 more vote Nominated by Bob | 8.0 · 1 vote · avg 9.0',
     ]);
-    expect(
-      page
-        .findAll('.standings__unrated li')
-        .map((row) =>
-          [...row.element.children].map((cell) => squash(cell.textContent)).join(' | '),
-        ),
-    ).toEqual(['– | Azul | No votes yet', '– | Catan Nominated by Ada | No votes yet']);
+    expect(page.findAll('.standings__unrated li').map(cells)).toEqual([
+      '– | Azul | No votes yet',
+      '– | Catan Nominated by Ada | No votes yet',
+    ]);
     expect(page.find('input').exists()).toBe(false);
     expect(page.text()).not.toMatch(/you:/i);
   });

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { EntryDto, LeaderboardDto, PublicScoresDto } from '../../server/http/contracts.ts';
 import { durationText, formatDateTime } from '../lib/datetime.ts';
 import { buildStandings, scalePercent, type StandingRow } from '../lib/standings.ts';
 import PublicScoreDisclosure from './PublicScoreDisclosure.vue';
+import EntryDetails from './EntryDetails.vue';
 import ItemArt from './ui/ItemArt.vue';
 
 const props = defineProps<{
@@ -18,6 +19,19 @@ const props = defineProps<{
 }>();
 
 const visible = computed(() => (props.board.hidden ? null : props.board));
+const selectedId = ref<string | null>(null);
+const selectedEntry = computed(() => {
+  const entry = props.entries.find((entry) => entry.id === selectedId.value);
+  return entry === undefined ? null : { ...entry, withdrawalToken: null };
+});
+const selectedStanding = computed(() =>
+  visible.value?.rows.find((row) => row.entryId === selectedId.value),
+);
+const selectedVoters = computed(() =>
+  props.publicScores?.visible === true && selectedId.value !== null
+    ? (props.publicScores.entries[selectedId.value] ?? [])
+    : undefined,
+);
 const standings = computed(() =>
   visible.value === null ? null : buildStandings(visible.value.rows, props.entries),
 );
@@ -71,16 +85,27 @@ const voters = (row: StandingRow) =>
           :class="`podium__place--${row.rank}`"
         >
           <div class="podium__art">
-            <ItemArt
-              :title="row.item.title"
-              :subtitle="row.item.subtitle"
-              :image-url="row.item.imageUrl"
-            />
+            <button
+              type="button"
+              class="standing__art-button"
+              :aria-label="`Open full details for ${row.item.title}`"
+              @click="selectedId = row.entryId"
+            >
+              <ItemArt
+                :title="row.item.title"
+                :subtitle="row.item.subtitle"
+                :image-url="row.item.imageUrl"
+              />
+            </button>
             <span class="podium__medal" :aria-label="`Rank ${String(row.rank)}`">{{
               row.rank
             }}</span>
           </div>
-          <p class="podium__title">{{ row.item.title }}</p>
+          <p class="podium__title">
+            <button type="button" class="standing__title-button" @click="selectedId = row.entryId">
+              {{ row.item.title }}
+            </button>
+          </p>
           <p v-if="row.item.subtitle !== null" class="podium__subtitle">{{ row.item.subtitle }}</p>
           <p class="podium__score">
             <strong>{{ row.score?.toFixed(1) }}</strong>
@@ -102,9 +127,31 @@ const voters = (row: StandingRow) =>
       <ol v-if="standings.rest.length > 0" class="ranking" aria-label="The rest of the ranking">
         <li v-for="row in standings.rest" :key="row.entryId" class="ranking__row">
           <span class="ranking__rank" :aria-label="`Rank ${String(row.rank)}`">{{ row.rank }}</span>
+          <button
+            type="button"
+            class="standing__art-button ranking__art"
+            :aria-label="`Open full details for ${row.item.title}`"
+            @click="selectedId = row.entryId"
+          >
+            <ItemArt :title="row.item.title" :image-url="row.item.imageUrl" size="small" />
+          </button>
           <span class="ranking__title">
-            <strong>{{ row.item.title }}</strong>
-            <span v-if="row.item.subtitle !== null" class="meta"> {{ row.item.subtitle }}</span>
+            <button type="button" class="standing__title-button" @click="selectedId = row.entryId">
+              {{ row.item.title }}
+            </button>
+            <span
+              v-if="row.item.subtitle !== null || row.item.director != null"
+              class="ranking__metadata meta"
+            >
+              <span v-if="row.item.subtitle !== null">{{ row.item.subtitle }}</span>
+              <span
+                v-if="row.item.subtitle !== null && row.item.director != null"
+                aria-hidden="true"
+              >
+                ·
+              </span>
+              <span v-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+            </span>
             <span v-if="row.nominatedBy !== null" class="standing__nominator">
               Nominated by {{ row.nominatedBy }}
             </span>
@@ -145,9 +192,35 @@ const voters = (row: StandingRow) =>
             class="ranking__row ranking__row--provisional"
           >
             <span class="ranking__rank" aria-hidden="true">–</span>
+            <button
+              type="button"
+              class="standing__art-button ranking__art"
+              :aria-label="`Open full details for ${row.item.title}`"
+              @click="selectedId = row.entryId"
+            >
+              <ItemArt :title="row.item.title" :image-url="row.item.imageUrl" size="small" />
+            </button>
             <span class="ranking__title">
-              <strong>{{ row.item.title }}</strong>
-              <span v-if="row.item.subtitle !== null" class="meta"> {{ row.item.subtitle }}</span>
+              <button
+                type="button"
+                class="standing__title-button"
+                @click="selectedId = row.entryId"
+              >
+                {{ row.item.title }}
+              </button>
+              <span
+                v-if="row.item.subtitle !== null || row.item.director != null"
+                class="ranking__metadata meta"
+              >
+                <span v-if="row.item.subtitle !== null">{{ row.item.subtitle }}</span>
+                <span
+                  v-if="row.item.subtitle !== null && row.item.director != null"
+                  aria-hidden="true"
+                >
+                  ·
+                </span>
+                <span v-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+              </span>
               <span class="visually-hidden">, </span>
               <span class="tag">{{ needsText(row) }}</span>
               <span v-if="row.nominatedBy !== null" class="standing__nominator">
@@ -173,9 +246,35 @@ const voters = (row: StandingRow) =>
         <ul class="ranking">
           <li v-for="row in standings.unrated" :key="row.entryId" class="ranking__row">
             <span class="ranking__rank" aria-hidden="true">–</span>
+            <button
+              type="button"
+              class="standing__art-button ranking__art"
+              :aria-label="`Open full details for ${row.item.title}`"
+              @click="selectedId = row.entryId"
+            >
+              <ItemArt :title="row.item.title" :image-url="row.item.imageUrl" size="small" />
+            </button>
             <span class="ranking__title">
-              <strong>{{ row.item.title }}</strong>
-              <span v-if="row.item.subtitle !== null" class="meta"> {{ row.item.subtitle }}</span>
+              <button
+                type="button"
+                class="standing__title-button"
+                @click="selectedId = row.entryId"
+              >
+                {{ row.item.title }}
+              </button>
+              <span
+                v-if="row.item.subtitle !== null || row.item.director != null"
+                class="ranking__metadata meta"
+              >
+                <span v-if="row.item.subtitle !== null">{{ row.item.subtitle }}</span>
+                <span
+                  v-if="row.item.subtitle !== null && row.item.director != null"
+                  aria-hidden="true"
+                >
+                  ·
+                </span>
+                <span v-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+              </span>
               <span v-if="row.nominatedBy !== null" class="standing__nominator">
                 Nominated by {{ row.nominatedBy }}
               </span>
@@ -191,5 +290,13 @@ const voters = (row: StandingRow) =>
         come in.
       </p>
     </template>
+    <EntryDetails
+      :entry="selectedEntry"
+      :scale="scale"
+      :standing="selectedStanding"
+      :public-scores="selectedVoters"
+      :final-score="selectedId === null ? undefined : myScores?.[selectedId]"
+      @close="selectedId = null"
+    />
   </div>
 </template>

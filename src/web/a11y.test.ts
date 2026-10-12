@@ -263,6 +263,18 @@ describe('the menu', () => {
 });
 
 describe('list page dialogs', () => {
+  test('standings thumbnails and their details dialog pass accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('#list-tab-standings').trigger('click');
+    await flushPromises();
+    await expectAccessible(document.body);
+    await wrapper.get('.ranking__art').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('dialog[open]').text()).toContain('Alien');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
   test('withdrawal confirmation and its error pass automated accessibility checks', async () => {
     const wrapper = await renderAt('/lists/best-sci-fi', true);
     await wrapper.get('.entry__art').trigger('click');

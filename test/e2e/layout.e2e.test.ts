@@ -77,6 +77,38 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`compact movie standings at ${String(width)} px fit and open details`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin, { movieStandings: true });
+        for (const path of ['/lists/films', '/lists/films/results']) {
+          await page.goto(path);
+          if (path === '/lists/films') await page.getByRole('tab', { name: 'Standings' }).click();
+          const row = page.locator('.ranking__row').filter({ hasText: 'Blade Runner' });
+          await expect(row.locator('.ranking__metadata')).toHaveText(
+            '1982 · Directed by Ridley Scott',
+          );
+          await expect(row.locator('img')).toBeVisible();
+          expect(
+            await row.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth),
+          ).toBeGreaterThan(0);
+          await expectNoSidewaysScroll(page);
+          for (const trigger of [
+            row.getByRole('button', { name: 'Blade Runner', exact: true }),
+            row.getByRole('button', { name: 'Open full details for Blade Runner' }),
+          ]) {
+            await trigger.click();
+            const details = page.getByRole('dialog', { name: 'Blade Runner' });
+            await expect(details.getByText('Ridley Scott')).toBeVisible();
+            await expect(details.getByText(/A blade runner must pursue replicants/)).toBeVisible();
+            await expectNoSidewaysScroll(page);
+            await details.getByRole('button', { name: 'Close', exact: true }).click();
+            await expect(trigger).toBeFocused();
+          }
+        }
+      });
+
       test(`movie nomination review at ${String(width)} px fits on screen`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await fakeApi(page, admin, { movieSearch: true });

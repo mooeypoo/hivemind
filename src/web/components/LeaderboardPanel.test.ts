@@ -8,6 +8,7 @@ import type {
 } from '../../server/http/contracts.ts';
 import { openTmdbList, stubApi } from '../testing/fixtures.ts';
 import LeaderboardPanel from './LeaderboardPanel.vue';
+import StandingsBoard from './StandingsBoard.vue';
 
 const item = (title: string) => ({
   source: 'freeform',
@@ -73,7 +74,10 @@ const mountWith = async (
 };
 const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
 const cells = (row: { element: Element }) =>
-  [...row.element.children].map((cell) => squash(cell.textContent)).join(' | ');
+  [...row.element.children]
+    .filter((cell) => !cell.classList.contains('ranking__art'))
+    .map((cell) => squash(cell.textContent))
+    .join(' | ');
 /** A podium place as read: medal, then each line, skipping the decorative art. */
 const placeText = (place: { element: Element }) =>
   [...place.element.children]
@@ -90,6 +94,82 @@ afterEach(() => {
 });
 
 describe('LeaderboardPanel', () => {
+  test.each(['ranked', 'provisional', 'unrated', 'podium'] as const)(
+    '%s entries open read-only movie details from their title and art',
+    async (state) => {
+      const movie = {
+        ...entry('movie', 'Blade Runner'),
+        withdrawalToken: 'claim-movie',
+        item: {
+          source: 'tmdb-movie',
+          externalId: '78',
+          title: 'Blade Runner',
+          subtitle: '1982',
+          imageUrl: 'https://image.tmdb.org/t/p/w342/poster.jpg',
+          director: 'Ridley Scott',
+          overview: 'A blade runner must pursue replicants.',
+          cast: ['Harrison Ford', 'Rutger Hauer'],
+        },
+      };
+      const movieRow = {
+        ...row('movie', movie.item.title, state === 'podium' ? 1 : 4, 8, 4),
+        item: movie.item,
+        ...(state === 'provisional' ? { rank: null, provisional: true, votesNeeded: 1 } : {}),
+        ...(state === 'unrated' ? { rank: null, score: null, average: null, votes: 0 } : {}),
+      };
+      const panel = mount(StandingsBoard, {
+        props: {
+          board: board([
+            ...(state === 'unrated' ? [row('a', 'Root', 1, 9, 4)] : []),
+            ...(state === 'ranked'
+              ? [
+                  row('a', 'Root', 1, 9, 4),
+                  row('b', 'Wingspan', 2, 9, 4),
+                  row('c', 'Azul', 3, 9, 4),
+                ]
+              : []),
+            movieRow,
+          ]),
+          entries: [movie],
+          scale: { min: 1, max: 10 },
+          myScores: { movie: 7 },
+          publicScores: { visible: true, entries: { movie: [{ displayName: 'Ada', score: 9 }] } },
+        },
+        attachTo: document.body,
+      });
+      try {
+        if (state !== 'podium') {
+          expect(panel.get('.ranking__art img').attributes('src')).toBe(movie.item.imageUrl);
+          expect(panel.get('.ranking__metadata').text()).toBe('1982 · Directed by Ridley Scott');
+        }
+        for (const selector of ['.standing__title-button', '.standing__art-button']) {
+          const trigger = panel
+            .findAll(selector)
+            .find(
+              (button) =>
+                button.text() === movie.item.title ||
+                button.attributes('aria-label')?.endsWith(movie.item.title),
+            );
+          expect(trigger).toBeDefined();
+          await trigger?.trigger('click');
+          const dialog = panel.get('dialog');
+          expect(dialog.element.open).toBe(true);
+          expect(dialog.text()).toContain(movie.item.overview);
+          expect(dialog.text()).toContain(movie.item.director);
+          expect(dialog.text()).toContain('Harrison Ford, Rutger Hauer');
+          expect(dialog.text()).toContain('Ada: 9');
+          expect(dialog.text()).toContain('Your score: 7');
+          expect(dialog.text()).not.toContain('Withdraw nomination');
+          expect(dialog.find('input').exists()).toBe(false);
+          await dialog.get('button').trigger('click');
+          expect(dialog.element.open).toBe(false);
+        }
+      } finally {
+        panel.unmount();
+      }
+    },
+  );
+
   test('ranks entries with enough votes; a high-scoring provisional one waits below', async () => {
     const panel = await mountWith(
       board([
