@@ -76,29 +76,27 @@ describe('NominatePanel', () => {
     expect(panel.find('.just-nominated').exists()).toBe(true);
   });
 
-  test('offers rating immediately on the just nominated card', async () => {
+  test('shows loading state while waiting for entry to be ready, then enables rating', async () => {
+    const entry = {
+      id: 'freeform.inception',
+      item: {
+        source: 'freeform',
+        externalId: 'inception',
+        title: 'Inception',
+        subtitle: null,
+        imageUrl: null,
+      },
+      nominatedBy: 'ada',
+      isMine: true,
+      nominatedAt: '',
+    };
     stubApi({
-      'POST /api/lists/list-1/entries': () =>
-        Response.json(
-          {
-            id: 'freeform.inception',
-            item: {
-              source: 'freeform',
-              externalId: 'inception',
-              title: 'Inception',
-              subtitle: null,
-              imageUrl: null,
-            },
-            nominatedBy: 'ada',
-            isMine: true,
-            nominatedAt: '',
-          },
-          { status: 201 },
-        ),
+      'POST /api/lists/list-1/entries': () => Response.json(entry, { status: 201 }),
     });
+    const list = openTmdbList({ itemSource: { kind: 'freeform' } });
     const panel = mount(NominatePanel, {
       props: {
-        list: openTmdbList({ itemSource: { kind: 'freeform' } }),
+        list,
         scoreState: () => ({ value: null, saving: false, error: null }),
       },
     });
@@ -108,6 +106,18 @@ describe('NominatePanel', () => {
     await flushPromises();
 
     expect(panel.find('.just-nominated').exists()).toBe(true);
+    expect(panel.find('.just-nominated__loading').exists()).toBe(true);
+    expect(panel.find('.just-nominated__rating input[type=radio]').exists()).toBe(false);
+
+    // When the parent list reloads and includes the new entry
+    await panel.setProps({
+      list: {
+        ...list,
+        entries: [...list.entries, { ...entry, withdrawalToken: null }],
+      },
+    });
+
+    expect(panel.find('.just-nominated__loading').exists()).toBe(false);
     expect(panel.find('.just-nominated__rating').exists()).toBe(true);
     const radio = panel.get('.just-nominated__rating input[type=radio][value="8"]');
     await radio.setValue();

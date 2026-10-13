@@ -60,6 +60,10 @@ const selectedItem = ref<CatalogItemDto | null>(null);
 const reviewLoading = ref(false);
 const searched = ref(false);
 const searching = ref(false);
+const ratingReady = computed(() => {
+  if (justNominated.value === null) return false;
+  return props.list.entries.some((entry) => entry.id === justNominated.value?.id);
+});
 let debounce: ReturnType<typeof setTimeout> | undefined;
 let reviewRequest = 0;
 
@@ -197,7 +201,12 @@ const nominateSelected = async () => {
           v-if="list.viewer.canParticipate && scoreState !== undefined"
           class="just-nominated__rating"
         >
+          <div v-if="!ratingReady" class="just-nominated__loading" role="status">
+            <span class="just-nominated__spinner" aria-hidden="true"></span>
+            <span>Preparing rating…</span>
+          </div>
           <ScoreInput
+            v-else
             v-bind="scoreState(justNominated.id)"
             :scale="list.scale"
             :item-title="justNominated.item.title"
