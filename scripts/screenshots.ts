@@ -26,6 +26,7 @@ const me: MeDto = { id: '1', displayName: 'Ada', avatarUrl: '/favicon.svg', isAd
 const site: SiteDto = {
   community: { name: 'Board Game Night', iconUrl: null, inviteUrl: 'https://discord.gg/example' },
   offersMovieData: false,
+  offersTvData: false,
   demo: false,
   backups: true,
 };

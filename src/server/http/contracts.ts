@@ -42,10 +42,11 @@ export type LoginOutcomeCode =
 
 // ---- Catalog ----
 
-export type ItemSourceKind = 'tmdb-movie' | 'freeform' | 'preset';
+export type ItemSourceKind = 'tmdb-movie' | 'tvdb-series' | 'freeform' | 'preset';
 
 export type ItemSourceDto =
   | { readonly kind: 'tmdb-movie' }
+  | { readonly kind: 'tvdb-series' }
   | { readonly kind: 'freeform' }
   | { readonly kind: 'preset'; readonly presetId: string };
 
@@ -57,6 +58,7 @@ export interface CatalogItemDto {
   readonly imageUrl: string | null;
   readonly overview?: string;
   readonly director?: string;
+  readonly creator?: string;
   readonly cast?: readonly string[];
 }
 
@@ -249,6 +251,7 @@ export interface SiteDto {
   readonly community: CommunityDto | null;
   /** Whether movie lists (TMDB) are offered, for the attribution line. */
   readonly offersMovieData: boolean;
+  readonly offersTvData: boolean;
   /** Demo mode: pretend sign-in with sample data. Never true in production. */
   readonly demo: boolean;
   /** Whether backups are set up (`BACKUP_KEY`). */

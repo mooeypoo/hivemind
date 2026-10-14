@@ -21,6 +21,7 @@ import {
   SITE_ADMIN_ID,
   SITE_URL,
   startHarness,
+  testConfig,
   type Harness,
 } from '../testing/harness.ts';
 import { availableSources, importPreset } from './catalog.ts';
@@ -41,6 +42,7 @@ import {
 import { deleteMyData, exportMyData } from './me.ts';
 import { changeScore, getMyBallot, getPublicScores } from './voting.ts';
 import { getLeaderboard } from './ranking.ts';
+import { exportBackup, importBackup } from './backup.ts';
 
 type Endpoint = (request: Request, app: App) => Promise<Response>;
 
@@ -107,6 +109,118 @@ describe('GET /api/catalog/sources', () => {
 
   test('is for Admins only', async () => {
     expect((await call(availableSources, 'GET', '/api/catalog/sources', ada)).status).toBe(403);
+  });
+
+  test.each([
+    [null, null, ['freeform', 'preset']],
+    ['movie-token', null, ['tmdb-movie', 'freeform', 'preset']],
+    [null, 'tv-key', ['tvdb-series', 'freeform', 'preset']],
+    ['movie-token', 'tv-key', ['tmdb-movie', 'tvdb-series', 'freeform', 'preset']],
+  ] as const)(
+    'enables sources independently with TMDB=%s and TVDB=%s',
+    async (tmdbReadToken, tvdbReadToken, sources) => {
+      await h.close();
+      h = await startHarness({ ...testConfig, tmdbReadToken, tvdbReadToken });
+      admin = await signInAs(h, { id: SITE_ADMIN_ID });
+      expect(
+        (await call<SourcesDto>(availableSources, 'GET', '/api/catalog/sources', admin)).body
+          .sources,
+      ).toEqual(sources);
+      for (const kind of ['tmdb-movie', 'tvdb-series'] as const) {
+        if (sources.some((source) => source === kind)) continue;
+        const created = await call<ErrorDto>(createList, 'POST', '/api/lists', admin, {
+          title: 'Unavailable',
+          slug: 'unavailable',
+          itemSource: { kind },
+        });
+        expect(created.status).toBe(422);
+        expect(created.body.error.code).toBe('catalog.source-unavailable');
+      }
+    },
+  );
+});
+
+describe('a TVDB series list, end to end', () => {
+  test('creates, searches, nominates a fresh snapshot, and rates a show', async () => {
+    await h.close();
+    h = await startHarness(
+      { ...testConfig, tmdbReadToken: null, tvdbReadToken: 'tv-key' },
+      {
+        'api4.thetvdb.com': (url) => {
+          if (url.pathname === '/v4/login')
+            return Response.json({ status: 'success', data: { token: 'tv-access' } });
+          if (url.pathname === '/v4/search')
+            return Response.json({
+              status: 'success',
+              data: [
+                {
+                  tvdb_id: '123',
+                  type: 'series',
+                  name: 'A Show',
+                  year: '2020',
+                  thumbnail: 'https://artworks.thetvdb.com/banners/show.jpg',
+                },
+              ],
+            });
+          if (url.pathname === '/v4/series/123/extended')
+            return Response.json({
+              status: 'success',
+              data: {
+                id: 123,
+                name: 'A Show',
+                year: '2020',
+                image: 'https://artworks.thetvdb.com/banners/show.jpg',
+                overview: 'A series synopsis.',
+                characters: [
+                  { peopleType: 'Creator', personName: 'A Creator' },
+                  { peopleType: 'Actor', personName: 'An Actor' },
+                ],
+              },
+            });
+          return new Response(null, { status: 404 });
+        },
+      },
+    );
+    admin = await signInAs(h, { id: SITE_ADMIN_ID });
+    ada = await signInAs(h, { id: '900000000000000010', username: 'ada' });
+    const list = await openList({
+      title: 'Best TV Shows',
+      slug: 'best-tv',
+      itemSource: { kind: 'tvdb-series' },
+    });
+    const search = await call<SearchResultsDto>(
+      searchForList,
+      'GET',
+      `/api/lists/${list.id}/search?q=show`,
+      ada,
+    );
+    expect(search.status).toBe(200);
+    expect(search.body.items[0]?.source).toBe('tvdb-series');
+    const nominated = await call<EntryDto>(nominate, 'POST', `/api/lists/${list.id}/entries`, ada, {
+      externalId: '123',
+    });
+    expect(nominated.status).toBe(201);
+    expect(nominated.body).toMatchObject({
+      id: 'tvdb-series.123',
+      item: { overview: 'A series synopsis.', creator: 'A Creator', cast: ['An Actor'] },
+    });
+    const detail = await call<ListDetailDto>(getList, 'GET', `/api/lists/${list.id}`, ada);
+    expect(detail.body.entries[0]?.item).toEqual(nominated.body.item);
+    const rated = await call(changeScore, 'PUT', `/api/lists/${list.id}/ballot`, ada, {
+      entryId: nominated.body.id,
+      score: 8,
+    });
+    expect(rated.status).toBe(200);
+    const ballot = await call<BallotDto>(getMyBallot, 'GET', `/api/lists/${list.id}/ballot`, ada);
+    expect(ballot.body.scores[nominated.body.id]).toBe(8);
+    const file = await call<unknown>(exportBackup, 'GET', '/api/admin/backup?list=best-tv', admin);
+    expect(file.status).toBe(200);
+    expect((await call(importBackup, 'POST', '/api/admin/backup', admin, file.body)).status).toBe(
+      200,
+    );
+    const copy = await call<ListDetailDto>(getList, 'GET', '/api/lists/best-tv-2', admin);
+    expect(copy.body.visibility).toBe('hidden');
+    expect(copy.body.entries[0]?.item).toEqual(nominated.body.item);
   });
 });
 

@@ -14,6 +14,7 @@ export interface AppConfig {
   readonly sessionSecret: string;
   /** Null when no list uses the `tmdb-movie` source. */
   readonly tmdbReadToken: string | null;
+  readonly tvdbReadToken: string | null;
   /** How the site shows which Discord community it belongs to. Both optional. */
   readonly community: { readonly inviteCode: string | null; readonly name: string | null };
   /** `DEMO_MODE=true`. Demo mode also requires a non-production deploy; see composition. */
@@ -47,6 +48,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     .filter((id) => id !== '');
   const sessionSecret = required('SESSION_SECRET');
   const tmdbReadToken = env.TMDB_READ_TOKEN?.trim() ?? '';
+  const tvdbReadToken = env.TVDB_READ_TOKEN?.trim() ?? '';
   const inviteRaw = env.DISCORD_INVITE_CODE?.trim() ?? '';
   const inviteCode = inviteRaw === '' ? null : inviteCodeFrom(inviteRaw);
   const communityName = env.COMMUNITY_NAME?.trim() ?? '';
@@ -91,6 +93,7 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     admins: { roleId: adminRoleId === '' ? null : adminRoleId, memberIds: adminMemberIds },
     sessionSecret,
     tmdbReadToken: tmdbReadToken === '' ? null : tmdbReadToken,
+    tvdbReadToken: tvdbReadToken === '' ? null : tvdbReadToken,
     community: { inviteCode, name: communityName === '' ? null : communityName },
     demoRequested: env.DEMO_MODE?.trim().toLowerCase() === 'true',
     backupKey: backupKey === '' ? null : backupKey,

@@ -22,6 +22,31 @@ const entry: EntryDto = {
 };
 
 describe('EntryDetails', () => {
+  test('shows series synopsis, creator, and cast without labeling creators as directors', () => {
+    const item = {
+      source: 'tvdb-series',
+      externalId: '123',
+      title: 'A Show',
+      subtitle: null,
+      imageUrl: null,
+      overview: 'A series synopsis.',
+      creator: 'A Creator',
+      cast: ['An Actor'],
+    };
+    const dialog = mount(EntryDetails, {
+      props: {
+        entry: { ...entry, item },
+        scale: { min: 1, max: 10 },
+      },
+      attachTo: document.body,
+    });
+    expect(dialog.text()).toContain('A series synopsis.');
+    expect(dialog.text()).toContain('Created by');
+    expect(dialog.text()).toContain('A Creator');
+    expect(dialog.text()).toContain('An Actor');
+    expect(dialog.text()).not.toContain('Director');
+    dialog.unmount();
+  });
   test('shows movie overview, director, and leading cast', () => {
     const dialog = mount(EntryDetails, {
       props: { entry, scale: { min: 1, max: 10 } },

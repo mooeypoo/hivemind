@@ -50,5 +50,9 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
       <a href="https://www.themoviedb.org/api-terms-of-use" rel="noopener">its terms</a>. This
       product uses the TMDB API but is not endorsed or certified by TMDB.
     </p>
+    <p v-if="site.info?.offersTvData === true">
+      TV series data and artwork from <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>,
+      used under its API terms. Available credits vary by series.
+    </p>
   </article>
 </template>

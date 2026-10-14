@@ -32,6 +32,7 @@ describe('GET /api/site', () => {
       body: {
         community: { name: 'Test Community', iconUrl: null, inviteUrl: null },
         offersMovieData: true,
+        offersTvData: false,
         demo: false,
         backups: true,
       },
@@ -62,6 +63,14 @@ describe('GET /api/site', () => {
     h = await startHarness({ ...testConfig, tmdbReadToken: null });
     const result = await read<SiteDto>(await getSite(request('GET', '/api/site'), h.app));
     expect(result.body.offersMovieData).toBe(false);
+  });
+
+  test('reports TVDB independently without exposing credentials', async () => {
+    h = await startHarness({ ...testConfig, tmdbReadToken: null, tvdbReadToken: 'secret-tv-key' });
+    const result = await read<SiteDto>(await getSite(request('GET', '/api/site'), h.app));
+    expect(result.body.offersTvData).toBe(true);
+    expect(result.body.offersMovieData).toBe(false);
+    expect(JSON.stringify(result.body)).not.toContain('secret-tv-key');
   });
 });
 

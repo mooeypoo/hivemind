@@ -36,6 +36,29 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test('offers TVDB only when available and sends the selected series source', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': () =>
+        Response.json({ sources: ['tvdb-series', 'freeform', 'preset'] }),
+      'GET /api/roles': roles,
+      'POST /api/lists': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', itemSource: { kind: 'tvdb-series' } }), {
+          status: 201,
+        }),
+    });
+    const editor = await mountAt('/admin/lists/new');
+    expect(editor.find('input[value=tmdb-movie]').exists()).toBe(false);
+    expect(editor.text()).toContain('TV shows (TheTVDB)');
+    await editor.get('input[value=tvdb-series]').setValue(true);
+    await editor.get('#title').setValue('Best TV Shows');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      itemSource: { kind: 'tvdb-series' },
+    });
+    editor.unmount();
+  });
+
   test('offers the sources this site has', async () => {
     stubApi({ 'GET /api/catalog/sources': sources, 'GET /api/roles': roles });
     const editor = await mountAt('/admin/lists/new');
@@ -44,6 +67,7 @@ describe('ListEditor', () => {
       'freeform',
       'preset',
     ]);
+    expect(editor.find('input[value=tvdb-series]').exists()).toBe(false);
   });
 
   test('the address follows the title until you edit it', async () => {

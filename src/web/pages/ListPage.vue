@@ -18,6 +18,7 @@ import PublicScoreDisclosure from '../components/PublicScoreDisclosure.vue';
 import RateOneByOne from '../components/RateOneByOne.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import TmdbAttribution from '../components/TmdbAttribution.vue';
+import TvdbAttribution from '../components/TvdbAttribution.vue';
 import AppTabs from '../components/ui/AppTabs.vue';
 import type { Tab } from '../lib/tabs.ts';
 import RatingProgress from '../components/ui/RatingProgress.vue';
@@ -306,6 +307,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
     </section>
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />
+    <TvdbAttribution v-if="list.itemSource.kind === 'tvdb-series'" />
 
     <EntryDetails
       :entry="selected"

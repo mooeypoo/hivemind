@@ -20,7 +20,7 @@ Screenshots use sample data (`npm run screenshots` retakes them). The look is a 
 
 1. **Discord application.** Follow [docs/discord-setup.md](docs/discord-setup.md) to register the app, choose your `SITE_URL`, and collect your server and admin role IDs.
 2. **Netlify site.** Create a site from your fork. The build settings come from `netlify.toml`.
-3. **Environment.** In the Netlify site settings, set the variables listed in `.env.example`, including `SITE_URL`. If you later move to a custom domain, update `SITE_URL` and the Discord redirect URI together. The Environment section of [AGENTS.md](AGENTS.md) describes each one. You only need `TMDB_READ_TOKEN` if you want movie lists; [docs/tmdb-setup.md](docs/tmdb-setup.md) explains how to get one.
+3. **Environment.** In the Netlify site settings, set the variables listed in `.env.example`, including `SITE_URL`. If you later move to a custom domain, update `SITE_URL` and the Discord redirect URI together. The Environment section of [AGENTS.md](AGENTS.md) describes each one. Movie lists need `TMDB_READ_TOKEN` ([setup](docs/tmdb-setup.md)); TV show lists need `TVDB_READ_TOKEN` ([setup and licensing](docs/tvdb-setup.md)). Each source is offered only when its own credential is set.
 4. **Deploy.** Members of your Discord server can now sign in. Admins, meaning holders of the `ADMIN_ROLE_ID` role plus anyone listed in `ADMIN_MEMBER_IDS`, can create lists.
 
 ## Develop
@@ -67,3 +67,4 @@ With `DEMO_MODE=true` (set in `.env.example`), local dev and Netlify deploy prev
 - **Code.** Copyright © Moriel Schottlender ([moriel.tech](https://moriel.tech)). Licensed under the GNU General Public License, version 3 or (at your option) any later version; see [LICENSE](LICENSE). If you run a modified version for others, the GPL requires you to share your changes under the same license.
 - **Community content.** The lists, nominations, descriptions, imported CSVs and scores that a community creates belong to that community and its members. They are not part of this software and are not covered by its license.
 - **Movie data.** Titles, years and posters come from [TMDB](https://www.themoviedb.org/) and are used under [TMDB's terms of use](https://www.themoviedb.org/api-terms-of-use). This product uses the TMDB API but is not endorsed or certified by TMDB.
+- **TV series data.** Titles, years, artwork, synopses and available credits come from [TheTVDB](https://thetvdb.com/), under the deployment operator's API license, not the software's GPL license. Confirm access, attribution and retention rights before enabling it; see [docs/tvdb-setup.md](docs/tvdb-setup.md).

@@ -45,7 +45,13 @@ const chooseFile = async (page: Awaited<ReturnType<typeof mountPage>>, contents:
 };
 
 beforeEach(() => {
-  site.info = { community: null, offersMovieData: true, demo: false, backups: true };
+  site.info = {
+    community: null,
+    offersMovieData: true,
+    offersTvData: false,
+    demo: false,
+    backups: true,
+  };
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -53,7 +59,13 @@ afterEach(() => {
 
 describe('BackupsPage', () => {
   test('explains how to turn backups on when they are off', async () => {
-    site.info = { community: null, offersMovieData: true, demo: false, backups: false };
+    site.info = {
+      community: null,
+      offersMovieData: true,
+      offersTvData: false,
+      demo: false,
+      backups: false,
+    };
     const page = await mountPage();
     expect(page.text()).toContain('Backups aren’t set up on this site');
     expect(page.find('#backup-file').exists()).toBe(false);

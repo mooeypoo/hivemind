@@ -30,6 +30,10 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
         Movie data from <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a>, used under
         TMDB’s terms.
       </template>
+      <template v-if="site.info?.offersTvData === true">
+        TV series data from <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>, used under
+        its API terms.
+      </template>
     </p>
   </footer>
 </template>

@@ -48,14 +48,23 @@ const next = () => {
       <div class="one-by-one__body">
         <h3 class="one-by-one__title">{{ entry.item.title }}</h3>
         <p v-if="entry.item.subtitle !== null" class="meta">{{ entry.item.subtitle }}</p>
-        <div v-if="entry.item.source === 'tmdb-movie'" class="one-by-one__movie-details">
+        <div
+          v-if="entry.item.source === 'tmdb-movie' || entry.item.source === 'tvdb-series'"
+          class="one-by-one__movie-details"
+        >
           <p v-if="entry.item.overview != null" class="entry-details__overview">
             {{ entry.item.overview }}
           </p>
           <dl
-            v-if="entry.item.director != null || entry.item.cast != null"
+            v-if="
+              entry.item.director != null || entry.item.creator != null || entry.item.cast != null
+            "
             class="entry-details__credits"
           >
+            <div v-if="entry.item.creator != null">
+              <dt>Created by</dt>
+              <dd>{{ entry.item.creator }}</dd>
+            </div>
             <div v-if="entry.item.director != null">
               <dt>Director</dt>
               <dd>{{ entry.item.director }}</dd>
