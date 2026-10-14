@@ -11,6 +11,7 @@ export const getSite = async (_request: Request, app: App): Promise<Response> =>
   const body: SiteDto = {
     community: await app.identity.getCommunity(),
     offersMovieData: app.config.tmdbReadToken !== null,
+    offersTvData: app.config.tvdbReadToken !== null,
     demo: app.demo,
     backups: app.backupsEnabled,
   };

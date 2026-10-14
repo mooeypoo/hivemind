@@ -33,6 +33,45 @@ afterEach(() => {
 });
 
 describe('NominatePanel', () => {
+  test('reviews TV series details and creator credits before nominating', async () => {
+    const item = {
+      source: 'tvdb-series',
+      externalId: '123',
+      title: 'A Show',
+      subtitle: '2020',
+      imageUrl: null,
+      overview: 'A series synopsis.',
+      creator: 'A Creator',
+      cast: ['An Actor'],
+    };
+    const calls = stubApi({
+      'GET /api/lists/list-1/search': () => Response.json({ items: [item] }),
+      'GET /api/lists/list-1/item': () => Response.json(item),
+      'POST /api/lists/list-1/entries': () =>
+        Response.json(
+          { id: 'tvdb-series.123', item, nominatedBy: null, isMine: true, nominatedAt: '' },
+          { status: 201 },
+        ),
+    });
+    const panel = mount(NominatePanel, {
+      props: { list: openTmdbList({ itemSource: { kind: 'tvdb-series' } }) },
+    });
+    await panel.get('input[type=search]').setValue('show');
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    expect(panel.get('.result button').text()).toBe('Review');
+    await panel.get('.result button').trigger('click');
+    await flushPromises();
+    expect(calls).toHaveLength(2);
+    expect(panel.get('dialog').text()).toContain('Created by');
+    expect(panel.get('dialog').text()).toContain('A Creator');
+    expect(panel.get('dialog').text()).toContain('A series synopsis.');
+    await panel.get('dialog .button--primary').trigger('click');
+    await flushPromises();
+    expect(calls[2]).toMatchObject({ method: 'POST', body: { externalId: '123' } });
+    panel.unmount();
+  });
+
   test('searches, reviews a movie result, then nominates after confirmation', async () => {
     const calls = stubApi({
       'GET /api/lists/list-1/search': () => Response.json({ items: [bladeRunnerSearchResult] }),

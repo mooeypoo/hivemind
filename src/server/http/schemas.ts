@@ -16,6 +16,7 @@ const roleId = z
 
 const itemSource = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('tmdb-movie') }),
+  z.strictObject({ kind: z.literal('tvdb-series') }),
   z.strictObject({ kind: z.literal('freeform') }),
   z.strictObject({ kind: z.literal('preset'), presetId: z.string().min(1).max(64) }),
 ]);
@@ -136,6 +137,7 @@ const backupListPart = z.object({
           imageUrl: z.url().max(500).nullable(),
           overview: z.string().max(10_000).optional(),
           director: z.string().max(200).optional(),
+          creator: z.string().max(2000).optional(),
           cast: z.array(z.string().max(200)).max(2).optional(),
         }),
         nominatedBy: z

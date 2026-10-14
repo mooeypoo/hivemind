@@ -4,7 +4,11 @@
  */
 
 /** Image hosts adapters use. A new adapter that serves images adds its host here and in netlify.toml. */
-export const IMAGE_HOSTS = ['https://image.tmdb.org', 'https://cdn.discordapp.com'] as const;
+export const IMAGE_HOSTS = [
+  'https://image.tmdb.org',
+  'https://artworks.thetvdb.com',
+  'https://cdn.discordapp.com',
+] as const;
 
 export const REQUIRED_HEADERS: Readonly<Record<string, (value: string) => string | null>> = {
   'content-security-policy': (value) => checkCsp(value),

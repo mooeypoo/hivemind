@@ -14,6 +14,7 @@ describe('loadConfig', () => {
   test('accepts a complete environment; TMDB is optional', () => {
     const result = loadConfig(valid);
     expect(result.ok && result.value.tmdbReadToken).toBeNull();
+    expect(result.ok && result.value.tvdbReadToken).toBeNull();
     expect(result.ok && result.value.siteUrl).toBe('https://lists.example.org');
   });
 
@@ -31,6 +32,20 @@ describe('loadConfig', () => {
       ]);
     }
   });
+
+  test.each([
+    { tmdb: '', tvdb: '', expectedTmdb: null, expectedTvdb: null },
+    { tmdb: ' movie-token ', tvdb: '', expectedTmdb: 'movie-token', expectedTvdb: null },
+    { tmdb: '', tvdb: ' tv-key ', expectedTmdb: null, expectedTvdb: 'tv-key' },
+    { tmdb: 'movie-token', tvdb: 'tv-key', expectedTmdb: 'movie-token', expectedTvdb: 'tv-key' },
+  ])(
+    'enables media sources independently: $tmdb / $tvdb',
+    ({ tmdb, tvdb, expectedTmdb, expectedTvdb }) => {
+      const result = loadConfig({ ...valid, TMDB_READ_TOKEN: tmdb, TVDB_READ_TOKEN: tvdb });
+      expect(result.ok && result.value.tmdbReadToken).toBe(expectedTmdb);
+      expect(result.ok && result.value.tvdbReadToken).toBe(expectedTvdb);
+    },
+  );
 
   test.each([
     'https://lists.example.org/',

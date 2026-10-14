@@ -295,12 +295,16 @@ const nominateSelected = async () => {
               class="button"
               :disabled="busy"
               @click="
-                item.source === 'tmdb-movie'
+                item.source === 'tmdb-movie' || item.source === 'tvdb-series'
                   ? review(item)
                   : nominate({ externalId: item.externalId })
               "
             >
-              {{ item.source === 'tmdb-movie' ? 'Review' : 'Nominate' }}
+              {{
+                item.source === 'tmdb-movie' || item.source === 'tvdb-series'
+                  ? 'Review'
+                  : 'Nominate'
+              }}
             </button>
           </li>
         </ul>
@@ -323,7 +327,7 @@ const nominateSelected = async () => {
           size="large"
         />
         <div class="nomination-review__info">
-          <p v-if="reviewLoading" class="meta" role="status">Loading full movie details…</p>
+          <p v-if="reviewLoading" class="meta" role="status">Loading full details…</p>
           <MovieMetadata :item="selectedItem" />
         </div>
       </div>

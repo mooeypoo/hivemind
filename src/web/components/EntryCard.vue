@@ -38,12 +38,24 @@ const emit = defineEmits<{ open: [] }>();
           <span class="entry__info-icon" aria-hidden="true">i</span>
         </button>
       </h3>
-      <p v-if="entry.item.subtitle !== null || entry.item.director != null" class="entry__subtitle">
+      <p
+        v-if="
+          entry.item.subtitle !== null || entry.item.director != null || entry.item.creator != null
+        "
+        class="entry__subtitle"
+      >
         <span v-if="entry.item.subtitle !== null">{{ entry.item.subtitle }}</span>
-        <span v-if="entry.item.subtitle !== null && entry.item.director != null" aria-hidden="true">
+        <span
+          v-if="
+            entry.item.subtitle !== null &&
+            (entry.item.director != null || entry.item.creator != null)
+          "
+          aria-hidden="true"
+        >
           ·
         </span>
-        <span v-if="entry.item.director != null">Directed by {{ entry.item.director }}</span>
+        <span v-if="entry.item.creator != null">Created by {{ entry.item.creator }}</span>
+        <span v-else-if="entry.item.director != null">Directed by {{ entry.item.director }}</span>
       </p>
       <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
       <p v-else-if="entry.nominatedBy !== null" class="entry__meta">

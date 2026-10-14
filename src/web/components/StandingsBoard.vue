@@ -160,17 +160,23 @@ const voters = (row: StandingRow) =>
               {{ row.item.title }}
             </button>
             <span
-              v-if="row.item.subtitle !== null || row.item.director != null"
+              v-if="
+                row.item.subtitle !== null || row.item.director != null || row.item.creator != null
+              "
               class="ranking__metadata meta"
             >
               <span v-if="row.item.subtitle !== null">{{ row.item.subtitle }}</span>
               <span
-                v-if="row.item.subtitle !== null && row.item.director != null"
+                v-if="
+                  row.item.subtitle !== null &&
+                  (row.item.director != null || row.item.creator != null)
+                "
                 aria-hidden="true"
               >
                 ·
               </span>
-              <span v-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+              <span v-if="row.item.creator != null">Created by {{ row.item.creator }}</span>
+              <span v-else-if="row.item.director != null">Directed by {{ row.item.director }}</span>
             </span>
             <span v-if="row.nominatedBy !== null" class="standing__nominator">
               Nominated by {{ row.nominatedBy }}
@@ -247,17 +253,27 @@ const voters = (row: StandingRow) =>
                 {{ row.item.title }}
               </button>
               <span
-                v-if="row.item.subtitle !== null || row.item.director != null"
+                v-if="
+                  row.item.subtitle !== null ||
+                  row.item.director != null ||
+                  row.item.creator != null
+                "
                 class="ranking__metadata meta"
               >
                 <span v-if="row.item.subtitle !== null">{{ row.item.subtitle }}</span>
                 <span
-                  v-if="row.item.subtitle !== null && row.item.director != null"
+                  v-if="
+                    row.item.subtitle !== null &&
+                    (row.item.director != null || row.item.creator != null)
+                  "
                   aria-hidden="true"
                 >
                   ·
                 </span>
-                <span v-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+                <span v-if="row.item.creator != null">Created by {{ row.item.creator }}</span>
+                <span v-else-if="row.item.director != null"
+                  >Directed by {{ row.item.director }}</span
+                >
               </span>
               <span class="visually-hidden">, </span>
               <span class="tag">{{ needsText(row) }}</span>
@@ -319,17 +335,27 @@ const voters = (row: StandingRow) =>
                 {{ row.item.title }}
               </button>
               <span
-                v-if="row.item.subtitle !== null || row.item.director != null"
+                v-if="
+                  row.item.subtitle !== null ||
+                  row.item.director != null ||
+                  row.item.creator != null
+                "
                 class="ranking__metadata meta"
               >
                 <span v-if="row.item.subtitle !== null">{{ row.item.subtitle }}</span>
                 <span
-                  v-if="row.item.subtitle !== null && row.item.director != null"
+                  v-if="
+                    row.item.subtitle !== null &&
+                    (row.item.director != null || row.item.creator != null)
+                  "
                   aria-hidden="true"
                 >
                   ·
                 </span>
-                <span v-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+                <span v-if="row.item.creator != null">Created by {{ row.item.creator }}</span>
+                <span v-else-if="row.item.director != null"
+                  >Directed by {{ row.item.director }}</span
+                >
               </span>
               <span v-if="row.nominatedBy !== null" class="standing__nominator">
                 Nominated by {{ row.nominatedBy }}

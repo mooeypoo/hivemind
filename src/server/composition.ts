@@ -48,6 +48,7 @@ export const createApp = (
     ids,
     fetch,
     tmdbReadToken: config.tmdbReadToken,
+    tvdbReadToken: config.tvdbReadToken,
   });
 
   const lists = createListsModule({ store: platform.store('lists'), clock, ids, catalog });

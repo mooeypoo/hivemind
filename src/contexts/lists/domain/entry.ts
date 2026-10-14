@@ -12,6 +12,7 @@ export interface ItemSnapshot {
   readonly imageUrl: string | null;
   readonly overview?: string;
   readonly director?: string;
+  readonly creator?: string;
   readonly cast?: readonly string[];
 }
 

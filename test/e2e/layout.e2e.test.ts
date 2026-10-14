@@ -77,6 +77,47 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`TV series review, rating and results at ${String(width)} px fit on screen`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin, { tvSeries: true });
+        await page.goto('/lists/films');
+        await expect(page.getByText('TV series data and artwork from')).toBeVisible();
+        await page.getByRole('button', { name: 'Rate one by one' }).click();
+        const stage = page.getByRole('dialog', { name: 'Rate one by one' });
+        await expect(stage.getByText('Created by')).toBeVisible();
+        await expect(stage.getByText(/A series synopsis/)).toBeVisible();
+        const image = stage.locator('img');
+        await expect(image).toBeVisible();
+        expect(
+          await image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+        ).toBeGreaterThan(0);
+        await expectNoSidewaysScroll(page);
+        await stage.getByRole('button', { name: 'Stop' }).click();
+        await page.getByRole('tab', { name: 'Nominate' }).click();
+        await page.getByRole('searchbox', { name: 'Search' }).fill('series');
+        await page.getByRole('button', { name: 'Review', exact: true }).click();
+        const review = page.getByRole('dialog', {
+          name: 'A Television Series With A Very Long Title',
+        });
+        await expect(review.getByText('Created by')).toBeVisible();
+        await expect(
+          review.getByText('An Actor With A Long Name, Another Actor With A Long Name'),
+        ).toBeVisible();
+        if (width < 640) {
+          const posterBox = await review.locator('img').boundingBox();
+          const infoBox = await review.locator('.nomination-review__info').boundingBox();
+          expect(infoBox?.width).toBeGreaterThan(width * 0.7);
+          expect(infoBox?.y).toBeGreaterThanOrEqual((posterBox?.y ?? 0) + (posterBox?.height ?? 0));
+        }
+        await expectNoSidewaysScroll(page);
+        await review.getByRole('button', { name: 'Cancel', exact: true }).click();
+        await page.goto('/lists/films/results');
+        await expect(page.getByText('TV series data and artwork from')).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
       test(`compact movie standings at ${String(width)} px fit and open details`, async ({
         page,
       }) => {

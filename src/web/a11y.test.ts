@@ -32,6 +32,7 @@ const siteInfo: SiteDto = {
     inviteUrl: 'https://discord.gg/x',
   },
   offersMovieData: true,
+  offersTvData: true,
   demo: false,
   backups: true,
 };
@@ -49,6 +50,7 @@ const renderAt = async (
   demo = false,
   publicScores = false,
   unlimitedCap = false,
+  tvSeries = false,
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -62,6 +64,26 @@ const renderAt = async (
     'GET /api/lists/best-sci-fi': () =>
       Response.json(
         list({
+          ...(tvSeries
+            ? {
+                itemSource: { kind: 'tvdb-series' as const },
+                entries: [
+                  {
+                    ...entry('a', 'A TV Show'),
+                    item: {
+                      source: 'tvdb-series',
+                      externalId: '123',
+                      title: 'A TV Show',
+                      subtitle: '2020',
+                      imageUrl: null,
+                      overview: 'A series synopsis.',
+                      creator: 'A Creator',
+                      cast: ['An Actor'],
+                    },
+                  },
+                ],
+              }
+            : {}),
           scoreVisibility: publicScores ? 'public' : 'private',
           maxNominationsPerMember: unlimitedCap ? null : 3,
         }),
@@ -104,7 +126,7 @@ const renderAt = async (
     'GET /api/lists/closed/leaderboard': () =>
       Response.json({ hidden: true, revealsAt: '2026-01-10T00:00:00.000Z' }),
     'GET /api/catalog/sources': () =>
-      Response.json({ sources: ['tmdb-movie', 'freeform', 'preset'] }),
+      Response.json({ sources: ['tmdb-movie', 'tvdb-series', 'freeform', 'preset'] }),
     'GET /api/roles': () =>
       Response.json({
         labels: [{ roleId: '900000000000000077', name: 'Film Club' }],
@@ -130,6 +152,16 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test.each(['/lists/best-sci-fi', '/lists/best-sci-fi/results'])(
+    'TV series state at %s is accessible',
+    async (path) => {
+      const wrapper = await renderAt(path, true, false, false, false, true);
+      expect(wrapper.text()).toContain('TheTVDB');
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
+
   test.each([
     ['the welcome page, signed out', '/', false],
     ['a sign-in failure message', '/?login=identity.not-a-member', false],
@@ -156,36 +188,39 @@ describe('every page passes automated accessibility checks', () => {
     wrapper.unmount();
   });
 
-  test('the movie nomination review dialog is accessible', async () => {
-    const wrapper = await renderAt('/lists/best-sci-fi', true);
-    stubApi({
-      'GET /api/lists/list-1/search': () =>
-        Response.json({
-          items: [
-            {
-              source: 'tmdb-movie',
-              externalId: '78',
-              title: 'Blade Runner',
-              subtitle: '1982',
-              imageUrl: null,
-              overview: 'A blade runner must pursue replicants.',
-            },
-          ],
-        }),
-    });
-    vi.useFakeTimers();
+  test.each(['tmdb-movie', 'tvdb-series'])(
+    'the %s nomination review dialog is accessible',
+    async (source) => {
+      const wrapper = await renderAt('/lists/best-sci-fi', true);
+      stubApi({
+        'GET /api/lists/list-1/search': () =>
+          Response.json({
+            items: [
+              {
+                source,
+                externalId: '78',
+                title: 'Blade Runner',
+                subtitle: '1982',
+                imageUrl: null,
+                overview: 'A blade runner must pursue replicants.',
+              },
+            ],
+          }),
+      });
+      vi.useFakeTimers();
 
-    await wrapper.get('#list-tab-nominate').trigger('click');
-    await wrapper.get('input[type=search]').setValue('blade');
-    vi.advanceTimersByTime(300);
-    await flushPromises();
-    await wrapper.get('.result button').trigger('click');
-    await flushPromises();
-    vi.useRealTimers();
-    await expectAccessible(document.body);
+      await wrapper.get('#list-tab-nominate').trigger('click');
+      await wrapper.get('input[type=search]').setValue('blade');
+      vi.advanceTimersByTime(300);
+      await flushPromises();
+      await wrapper.get('.result button').trigger('click');
+      await flushPromises();
+      vi.useRealTimers();
+      await expectAccessible(document.body);
 
-    wrapper.unmount();
-  });
+      wrapper.unmount();
+    },
+  );
 });
 
 describe('demo mode', () => {
@@ -414,7 +449,13 @@ describe('site-wide content', () => {
 
   test('without movie lists, the footer does not mention TMDB', async () => {
     const wrapper = await renderAt('/privacy', false);
-    site.info = { community: null, offersMovieData: false, demo: false, backups: false };
+    site.info = {
+      community: null,
+      offersMovieData: false,
+      offersTvData: false,
+      demo: false,
+      backups: false,
+    };
     await flushPromises();
     expect(document.querySelector('footer')?.textContent).not.toContain('TMDB');
     expect(document.querySelector('footer')?.textContent).toContain(

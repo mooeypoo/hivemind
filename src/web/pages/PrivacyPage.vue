@@ -40,6 +40,11 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         months after a list is archived, they are removed: the entry keeps its scores and place,
         labelled “details removed”.
       </li>
+      <li v-if="site.info?.offersTvData !== false">
+        <strong>Details of nominated TV shows</strong> (title, year, poster address, synopsis,
+        creators and two cast members where available) from TheTVDB. These describe the shows, not
+        you, and are kept with the list, including after it is archived.
+      </li>
     </ul>
 
     <h2>What we never store</h2>
@@ -95,6 +100,11 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       </li>
       <li>No third-party cookies.</li>
     </ul>
+    <p v-if="site.info?.offersTvData !== false">
+      TV show searches and selected show IDs are sent to TheTVDB by our server, without your Discord
+      identity or scores. Posters load from TheTVDB's artwork service, which receives your IP
+      address when your browser requests an image.
+    </p>
 
     <h2 id="download">Download my data</h2>
     <p>
@@ -134,6 +144,11 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         used under
         <a href="https://www.themoviedb.org/api-terms-of-use" rel="noopener">TMDB’s terms</a>. This
         product uses the TMDB API but is not endorsed or certified by TMDB.
+      </li>
+      <li v-if="site.info?.offersTvData !== false">
+        TV series data and artwork come from
+        <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>
+        and are used under its API terms, separately from the software's license.
       </li>
     </ul>
 

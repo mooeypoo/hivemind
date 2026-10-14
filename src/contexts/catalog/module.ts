@@ -13,6 +13,7 @@ import { createBlobsPresetRepository } from './infrastructure/blobs-preset-repos
 import { createFreeformSource } from './infrastructure/freeform-source.ts';
 import { createPresetSource } from './infrastructure/preset-source.ts';
 import { createTmdbMovieSource } from './infrastructure/tmdb-movie-source.ts';
+import { createTvdbSeriesSource } from './infrastructure/tvdb-series-source.ts';
 
 export interface CatalogModuleDeps {
   /** The `catalog` Blobs store. */
@@ -20,6 +21,7 @@ export interface CatalogModuleDeps {
   readonly ids: IdGenerator;
   /** Without a token, the `tmdb-movie` source is not offered. */
   readonly tmdbReadToken: string | null;
+  readonly tvdbReadToken: string | null;
   readonly fetch?: typeof fetch;
 }
 
@@ -29,6 +31,9 @@ export const createCatalogModule = (deps: CatalogModuleDeps) => {
     ...(deps.tmdbReadToken === null
       ? {}
       : { 'tmdb-movie': createTmdbMovieSource(deps.tmdbReadToken, deps.fetch) }),
+    ...(deps.tvdbReadToken === null
+      ? {}
+      : { 'tvdb-series': createTvdbSeriesSource(deps.tvdbReadToken, deps.fetch) }),
     freeform: createFreeformSource(),
     preset: createPresetSource(presets),
   };

@@ -22,6 +22,7 @@ export const admin: MeDto = {
 const site: SiteDto = {
   community: { name: 'The Midnight Screening Society', iconUrl: null, inviteUrl: 'https://x.y' },
   offersMovieData: true,
+  offersTvData: true,
   demo: true,
   backups: true,
 };
@@ -98,7 +99,7 @@ const responses = (me: MeDto | null): Record<string, unknown> => ({
     labels: [{ roleId: '123456789012345678', name: 'Film Club' }],
     version: 'v1',
   },
-  'GET /api/catalog/sources': { sources: ['tmdb-movie', 'freeform', 'preset'] },
+  'GET /api/catalog/sources': { sources: ['tmdb-movie', 'tvdb-series', 'freeform', 'preset'] },
 });
 
 /** Serves every `/api/` request from the fake API; `me: null` is a signed-out visitor. */
@@ -109,9 +110,36 @@ export const fakeApi = async (
     readonly movieSearch?: boolean;
     readonly movieDetails?: boolean;
     readonly movieStandings?: boolean;
+    readonly tvSeries?: boolean;
   } = {},
 ) => {
   const routes = responses(me);
+  if (options.tvSeries === true) {
+    const item = {
+      source: 'tvdb-series',
+      externalId: '123',
+      title: 'A Television Series With A Very Long Title',
+      subtitle: '2020',
+      imageUrl: '/favicon.svg',
+      overview:
+        'A series synopsis with enough detail to check wrapping in the review and rating dialogs.',
+      creator: 'A Creator With A Long Name, Another Creator With A Long Name',
+      cast: ['An Actor With A Long Name', 'Another Actor With A Long Name'],
+    };
+    const show = { ...entry('a', item.title, item.subtitle), item };
+    routes['GET /api/lists/films'] = {
+      ...list,
+      itemSource: { kind: 'tvdb-series' },
+      entries: [show],
+    };
+    routes['GET /api/lists/films/ballot'] = { listId: list.id, scores: {} };
+    routes['GET /api/lists/films/leaderboard'] = {
+      ...leaderboard,
+      rows: leaderboard.rows.slice(0, 1).map((row) => ({ ...row, item })),
+    };
+    routes['GET /api/lists/list-1/search'] = { items: [{ ...item, externalId: '456' }] };
+    routes['GET /api/lists/list-1/item'] = { ...item, externalId: '456' };
+  }
   if (options.movieDetails === true || options.movieStandings === true) {
     const movie: EntryDto = {
       ...entry(options.movieStandings === true ? 'd' : 'a', 'Blade Runner', '1982'),
