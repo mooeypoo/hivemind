@@ -1,4 +1,7 @@
-import { startLocalBlobs } from '../../../shared/infrastructure/testing/local-blobs.ts';
+import {
+  startLocalBlobs,
+  type LocalBlobs,
+} from '../../../shared/infrastructure/testing/local-blobs.ts';
 import { FixedClock, SequentialIds } from '../../../shared/kernel/testing/index.ts';
 import { createApp, type App } from '../../composition.ts';
 import { LOGIN_STATE_COOKIE, SESSION_COOKIE } from '../cookies.ts';
@@ -53,6 +56,7 @@ const fakeDiscordFetch =
   };
 
 export interface Harness {
+  readonly store: LocalBlobs['store'];
   readonly app: App;
   readonly discord: FakeDiscordState;
   readonly clock: FixedClock;
@@ -85,7 +89,7 @@ export const startHarness = async (
     deployContext,
   );
 
-  return { app, discord, clock, close: () => blobs.close() };
+  return { app, discord, clock, store: (name) => blobs.store(name), close: () => blobs.close() };
 };
 
 export const request = (

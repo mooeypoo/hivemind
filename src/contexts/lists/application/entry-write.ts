@@ -25,6 +25,7 @@ export const withEntryWrite = async <T>(
     const admitted = await withConflictRetry(async () => {
       const current = await lists.get(expected.id);
       if (current === null) return err(listsErrors.notFound);
+      if (current.value.deletionRequested === true) return err(listsErrors.deleting);
       if (
         JSON.stringify(current.value.config.itemSource) !==
           JSON.stringify(expected.config.itemSource) ||
@@ -36,7 +37,8 @@ export const withEntryWrite = async <T>(
         return err(listsErrors.conflict);
       }
       const saved = await lists.get(expected.id);
-      return saved === null ? err(listsErrors.notFound) : ok(saved);
+      if (saved === null) return err(listsErrors.notFound);
+      return saved.value.deletionRequested === true ? err(listsErrors.deleting) : ok(saved);
     });
     const result = admitted.ok ? await work(admitted.value) : admitted;
     completed = true;

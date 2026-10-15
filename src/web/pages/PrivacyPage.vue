@@ -53,10 +53,10 @@ const siteName = import.meta.env.VITE_SITE_NAME;
     </ul>
 
     <p>
-      The site also keeps random operation tokens to prevent item-source changes from racing with
-      entries being added or restored. They contain no member identity or scores. Active write
-      markers are normally removed after completion; an interrupted write may leave its marker for
-      an operator to check.
+      The site also keeps random operation tokens to prevent item-source changes and permanent list
+      deletion from racing with entry, ballot and leaderboard writes. They contain no member
+      identity or scores. Active write markers are normally removed after completion; an interrupted
+      write may leave its marker for an operator to check.
     </p>
 
     <h2>What we never store</h2>
@@ -80,6 +80,20 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       scores while the item is withdrawn. If you or another member nominates the same item in the
       same list, its earlier scores return. Download my data includes your retained scores, and
       Delete my data removes them.
+    </p>
+
+    <h2>When an Admin deletes a list</h2>
+    <p>
+      Admins can permanently delete a list, including an archived one. This removes its entries,
+      withdrawn nominations, nomination records, all members' scores for that list and its cached
+      ranking. It does not delete member accounts or shared imported presets. Once deletion starts,
+      the list is unavailable to members; interrupted cleanup can be retried by an Admin.
+    </p>
+    <p>
+      After cleanup, only a non-personal marker at the old list ID and an empty address reservation
+      remain to prevent stale requests from restoring data or affecting a replacement list. No
+      title, entry, nominator identity or score is retained in these markers. Previously downloaded
+      backups are not erased and can restore a separate copy.
     </p>
 
     <h2>Shared links</h2>

@@ -1,4 +1,11 @@
-import { err, ok, domainError, type MemberId } from '../../../../shared/kernel/index.ts';
+import {
+  err,
+  ok,
+  domainError,
+  type MemberId,
+  type DomainError,
+  type Result,
+} from '../../../../shared/kernel/index.ts';
 import type {
   BallotRepository,
   ListReader,
@@ -44,6 +51,9 @@ export class InMemoryBallotRepository implements BallotRepository {
 
 /** Lists as voting sees them: set the rules and entries per list directly. */
 export class FakeListReader implements ListReader {
+  withWrite<T>(_listId: string, work: () => Promise<Result<T, DomainError>>) {
+    return work();
+  }
   readonly lists = new Map<string, ListVotingRules & { entries: Set<string> }>();
 
   add(

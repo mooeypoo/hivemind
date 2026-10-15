@@ -43,6 +43,7 @@ export const makeRankingContext =
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
     if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
+    if (list.deletionRequested === true) return err(listsErrors.deleting);
     return ok({
       listId: list.id,
       resultsVisibility: list.config.resultsVisibility,

@@ -1,12 +1,13 @@
 import type { Store } from '@netlify/blobs';
 import { makeChangeScore } from './application/change-score.ts';
+import { makeDeleteListData } from './application/delete-list-data.ts';
 import { makeGetMyBallot } from './application/get-my-ballot.ts';
 import { makeGetPublicScores } from './application/get-public-scores.ts';
 import { makeVotingPersonalData } from './application/personal-data.ts';
 import { makeScoresForList } from './application/scores-for-list.ts';
 import {
   makeExportBallots,
-  makeRestoreBallots,
+  makeGuardedRestoreBallots,
   type BallotSealer,
 } from './application/ballot-backup.ts';
 import { createBlobsBallotRepository } from './infrastructure/blobs-ballot-repository.ts';
@@ -27,6 +28,7 @@ export const createVotingModule = (deps: VotingModuleDeps) => {
 
   return {
     changeScore: makeChangeScore({ lists, ballots }),
+    deleteListData: makeDeleteListData({ ballots }),
     getMyBallot: makeGetMyBallot({ lists, ballots }),
     getPublicScores: makeGetPublicScores({ lists, ballots }),
     personalData: makeVotingPersonalData({ ballots }),
@@ -34,7 +36,7 @@ export const createVotingModule = (deps: VotingModuleDeps) => {
     scoresForList: makeScoresForList({ ballots }),
     /** Backup services: ballots only ever leave voting sealed. */
     exportBallots: makeExportBallots({ ballots, sealer: deps.sealer }),
-    restoreBallots: makeRestoreBallots({ ballots, sealer: deps.sealer }),
+    restoreBallots: makeGuardedRestoreBallots({ lists, ballots, sealer: deps.sealer }),
   };
 };
 

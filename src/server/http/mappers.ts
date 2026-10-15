@@ -11,6 +11,7 @@ const scheduleDto = (schedule: Schedule | null): ScheduleDto | null =>
       };
 
 export const listDto = (view: ListView): ListDto => ({
+  deleting: view.deleting,
   id: view.id,
   title: view.title,
   slug: view.slug,

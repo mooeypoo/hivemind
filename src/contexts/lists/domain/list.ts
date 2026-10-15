@@ -83,6 +83,7 @@ export interface List {
   readonly visibility: Visibility;
   /** Changes on entry-write admission, fencing source edits against in-flight nominations. */
   readonly entryWriteToken?: string;
+  readonly deletionRequested?: boolean;
 }
 
 export const DEFAULT_SCALE: Scale = { min: 1, max: 10 };
@@ -290,7 +291,8 @@ export const setVisibility = (list: List, visibility: Visibility): List => ({
 
 /** Whether this member may see the list at all: drafts and hidden lists are Admin-only. */
 export const visibleTo = (list: List, isAdmin: boolean): boolean =>
-  isAdmin || (list.phase !== 'draft' && list.visibility === 'public');
+  isAdmin ||
+  (list.deletionRequested !== true && list.phase !== 'draft' && list.visibility === 'public');
 
 /** When retention starts for an archived list. Lists archived before `archivedAt` existed use their close. */
 export const archivedSince = (list: List): Date | null =>

@@ -12,9 +12,10 @@ import type {
 } from '../contracts.ts';
 import { entryDto, listDetailDto, listDto } from '../mappers.ts';
 import { rejectForeignOrigin } from '../origin.ts';
-import { domainErrorResponse, json } from '../respond.ts';
+import { domainErrorResponse, json, noContent } from '../respond.ts';
 import {
   createListBody,
+  deleteListBody,
   editListBody,
   nominateBody,
   refreshDetailsQuery,
@@ -28,6 +29,19 @@ import {
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
   result.ok ? json(map(result.value), status) : domainErrorResponse(result.error);
+
+/** `DELETE /api/lists/:list` — immutable list ID only, never a reusable slug. */
+export const deleteList = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, deleteListBody);
+  if (!body.ok) return body.response;
+  const result = await app.deleteList(await actorOf(request, app), {
+    listId: listParam(request),
+    confirmation: body.data.confirmation,
+  });
+  return result.ok ? noContent() : domainErrorResponse(result.error);
+};
 
 /** `GET /api/lists` */
 export const listLists = async (request: Request, app: App): Promise<Response> =>

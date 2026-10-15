@@ -46,7 +46,9 @@ export const makeGetList =
   ): Promise<Result<ListDetail, DomainError>> => {
     const member = requireMember(actor);
     if (!member.ok) return member;
-    const found = await findList(deps, member.value, input.list);
+    const found = await findList(deps, member.value, input.list, {
+      allowDeleting: member.value.isAdmin,
+    });
     if (!found.ok) return found;
     const list = found.value.value;
     const writingEntries = member.value.isAdmin && (await deps.lists.hasEntryWrites(list.id));
@@ -63,6 +65,7 @@ export const makeGetList =
       ),
       itemSourceEditable:
         member.value.isAdmin &&
+        list.deletionRequested !== true &&
         !writingEntries &&
         entries.length === 0 &&
         (list.phase === 'draft' ||

@@ -1,6 +1,26 @@
 import { domainError, type DomainError } from '../../../shared/kernel/index.ts';
 
 export const listsErrors = {
+  immutableIdRequired: domainError(
+    'invalid',
+    'lists.immutable-id-required',
+    'Permanent deletion requires the original list ID, not its reusable address.',
+  ),
+  deleting: domainError(
+    'conflict',
+    'lists.deleting',
+    'This list is being permanently deleted. Only retrying deletion is allowed.',
+  ),
+  deletionBusy: domainError(
+    'conflict',
+    'lists.deletion-busy',
+    'Deletion has started, but earlier writes must finish before cleanup. Retry deletion shortly. If this persists, an operator must check unfinished writes.',
+  ),
+  confirmationMismatch: domainError(
+    'invalid',
+    'lists.confirmation-mismatch',
+    'Type the current list address exactly to confirm permanent deletion.',
+  ),
   notFound: domainError('not-found', 'lists.not-found', 'That list does not exist.'),
   slugTaken: domainError('conflict', 'lists.slug-taken', 'Another list already uses that slug.'),
   notADraft: domainError('invalid', 'lists.not-a-draft', 'Only a draft list can be scheduled.'),

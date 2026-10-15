@@ -67,6 +67,7 @@ export const scheduleBody = z.strictObject({
 });
 
 export const visibilityBody = z.strictObject({ visibility: z.enum(['public', 'hidden']) });
+export const deleteListBody = z.strictObject({ confirmation: z.string().min(1).max(60) });
 
 export const scoreVisibilityBody = z.strictObject({
   scoreVisibility: z.enum(['private', 'public']),

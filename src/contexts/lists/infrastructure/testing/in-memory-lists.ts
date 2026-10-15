@@ -41,9 +41,16 @@ class Table<T> {
 export class InMemoryListRepository implements ListRepository {
   private readonly table = new Table<List>();
   private readonly entryWrites = new Map<ListId, Set<string>>();
+  private readonly deleted = new Set<ListId>();
   get = (id: ListId) => this.table.get(id);
   save = (list: List, expectedVersion: string | null) =>
-    this.table.save(list.id, list, expectedVersion);
+    this.deleted.has(list.id)
+      ? Promise.resolve(false)
+      : this.table.save(list.id, list, expectedVersion);
+  delete = (id: ListId) => {
+    this.deleted.add(id);
+    return this.table.delete(id);
+  };
   all = () => Promise.resolve(this.table.values());
   beginEntryWrite = (id: ListId, token: string) => {
     const writes = this.entryWrites.get(id) ?? new Set<string>();
@@ -62,12 +69,15 @@ export class InMemorySlugIndex implements SlugIndex {
   private readonly table = new Table<ListId>();
   lookup = async (slug: string) => (await this.table.get(slug))?.value ?? null;
   claim = (slug: string, id: ListId) => this.table.save(slug, id, null);
-  release = (slug: string) => this.table.delete(slug);
+  release = async (slug: string, owner: ListId) => {
+    if ((await this.table.get(slug))?.value === owner) await this.table.delete(slug);
+  };
 }
 
 export class InMemoryEntryRepository implements EntryRepository {
   private readonly table = new Table<Entry>();
   private key = (listId: ListId, entryId: EntryId) => `${listId}/${entryId}`;
+  delete = (listId: ListId, entryId: EntryId) => this.table.delete(this.key(listId, entryId));
   create = (entry: Entry) => this.table.save(this.key(entry.listId, entry.id), entry, null);
   get = (listId: ListId, entryId: EntryId) => this.table.get(this.key(listId, entryId));
   save = (entry: Entry, expectedVersion: string) =>

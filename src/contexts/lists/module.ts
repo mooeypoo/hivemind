@@ -5,6 +5,8 @@ import { makeCloseVoting, makeSetVisibility } from './application/close-voting.t
 import { makeSetScoreVisibility } from './application/score-visibility.ts';
 import { makeCreateList } from './application/create-list.ts';
 import { makeEditList } from './application/edit-list.ts';
+import { makePrepareListDeletion, makeFinishListDeletion } from './application/delete-list.ts';
+import { makeWithListWrite } from './application/list-write.ts';
 import { makeGetList, makeGetSharePreview } from './application/get-list.ts';
 import { makeListLists } from './application/list-lists.ts';
 import { makeNominate } from './application/nominate.ts';
@@ -50,6 +52,9 @@ export const createListsModule = (deps: ListsModuleDeps) => {
   return {
     createList: makeCreateList({ ...shared, ids: deps.ids }),
     editList: makeEditList(shared),
+    prepareListDeletion: makePrepareListDeletion(repositories),
+    finishListDeletion: makeFinishListDeletion(repositories),
+    withListWrite: makeWithListWrite({ ...repositories, ids: deps.ids }),
     scheduleList: makeScheduleList({ ...shared, ids: deps.ids }),
     archiveList: makeArchiveList(shared),
     closeVoting: makeCloseVoting(shared),

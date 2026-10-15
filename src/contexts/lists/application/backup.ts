@@ -26,6 +26,7 @@ import {
   type Visibility,
 } from '../domain/list.ts';
 import type { EntryRepository, LedgerRepository, ListRepository, SlugIndex } from './ports.ts';
+import { listsErrors } from '../domain/errors.ts';
 
 /** A list as stored in a backup file: plain JSON, dates as ISO strings. */
 export interface ListBackup {
@@ -136,12 +137,13 @@ export const makeExportForBackup =
   > => {
     let lists: List[];
     if (ref === null) {
-      lists = await deps.lists.all();
+      lists = (await deps.lists.all()).filter((list) => list.deletionRequested !== true);
     } else {
       const byId = await deps.lists.get(ref as ListId);
       const id = byId === null ? await deps.slugs.lookup(ref) : null;
       const found = byId ?? (id === null ? null : await deps.lists.get(id));
       if (found === null) return err(notFound);
+      if (found.value.deletionRequested === true) return err(listsErrors.deleting);
       lists = [found.value];
     }
     lists.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -220,7 +222,7 @@ export const makeRestoreFromBackup =
     try {
       await deps.lists.beginEntryWrite(id, writeToken);
       if (!(await deps.lists.save(list, null))) {
-        await deps.slugs.release(slug);
+        await deps.slugs.release(slug, id);
         completed = true;
         return err(invalidBackup(['the list could not be saved']));
       }

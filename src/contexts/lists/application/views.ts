@@ -14,6 +14,7 @@ import {
 } from '../domain/list.ts';
 
 export interface ListView extends ListConfig {
+  readonly deleting: boolean;
   readonly id: ListId;
   readonly lifecycle: Lifecycle;
   readonly schedule: Schedule | null;
@@ -49,9 +50,10 @@ export const toListView = (
   now: Date,
   nominationsUsed: number,
 ): ListView => {
-  const canParticipate = mayParticipate(list, actor.roleIds);
+  const canParticipate = list.deletionRequested !== true && mayParticipate(list, actor.roleIds);
   return {
     ...list.config,
+    deleting: list.deletionRequested === true,
     id: list.id,
     lifecycle: lifecycleOf(list, now),
     schedule: list.schedule,

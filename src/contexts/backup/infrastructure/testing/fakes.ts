@@ -88,14 +88,14 @@ export class FakeUpstream implements ListsBackup, PresetsBackup, BallotsBackup, 
   ) {
     const [key, json] = sealed.split('|');
     if (key !== this.openKey || json === undefined)
-      return { restored: 0, membersLeftOut: [], unreadable: true };
+      return ok({ restored: 0, membersLeftOut: [], unreadable: true });
     const kept: string[] = [];
     const left: string[] = [];
     for (const { memberId } of JSON.parse(json) as { memberId: string }[]) {
       ((await keepMember(memberId)) ? kept : left).push(memberId);
     }
     this.restoredBallots.push({ listId, memberIds: kept });
-    return { restored: kept.length, membersLeftOut: left, unreadable: false };
+    return ok({ restored: kept.length, membersLeftOut: left, unreadable: false });
   }
 
   wasErased(memberId: string) {

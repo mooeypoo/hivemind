@@ -56,8 +56,10 @@ export const makeGetLeaderboard =
     }
     const built = await build(deps, context.value, now);
     if (!built.ok) return built;
-    await deps.cache.put(built.value);
-    return ok({ hidden: false, minVotes, board: built.value });
+    return deps.lists.withWrite(context.value.listId, async () => {
+      await deps.cache.put(built.value);
+      return ok({ hidden: false as const, minVotes, board: built.value });
+    });
   };
 
 const build = async (

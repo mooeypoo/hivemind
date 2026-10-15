@@ -24,6 +24,34 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test.use({ colorScheme });
 
     for (const width of widths) {
+      test(`permanent deletion confirmation at ${String(width)} px fits and requires the slug`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.route('**/api/lists/list-1', async (route) => {
+          expect(route.request().method()).toBe('DELETE');
+          expect(route.request().postDataJSON()).toEqual({ confirmation: 'films' });
+          await route.fulfill({ status: 204 });
+        });
+        await page.goto('/admin/lists/films');
+        await page.getByRole('button', { name: 'Delete list…', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: /^Permanently delete/ });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+        const confirm = dialog.getByRole('button', { name: 'Delete permanently', exact: true });
+        await expect(confirm).toBeDisabled();
+        await expect(dialog.getByText(/including withdrawn/)).toBeVisible();
+        await dialog.getByRole('textbox').fill('wrong');
+        await expect(confirm).toBeDisabled();
+        await dialog.getByRole('textbox').fill('films');
+        await expect(confirm).toBeEnabled();
+        await expectNoSidewaysScroll(page);
+        await confirm.click();
+        await expect(page).toHaveURL('/?deleted=1');
+        await expect(page.getByRole('status').filter({ hasText: 'List deleted' })).toBeVisible();
+      });
+
       test(`unused list source controls at ${String(width)} px fit on screen`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await fakeApi(page, admin);

@@ -12,6 +12,7 @@ const mountAt = async (path: string) => {
     history: createMemoryHistory(),
     routes: [
       { path: '/admin/lists/new', name: 'new-list', component: ListEditor },
+      { path: '/', name: 'lists', component: Blank },
       { path: '/admin/lists/:slug', name: 'edit-list', component: ListEditor },
       { path: '/lists/:slug', name: 'list', component: Blank },
       { path: '/admin/roles', name: 'roles', component: Blank },
@@ -36,6 +37,83 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test.each(['draft', 'open', 'archived'] as const)(
+    'a %s list requires a typed slug before permanent deletion',
+    async (lifecycle) => {
+      const list = openTmdbList({ lifecycle });
+      const calls = stubApi({
+        'GET /api/catalog/sources': sources,
+        'GET /api/roles': roles,
+        'GET /api/lists/best-sci-fi': () => Response.json(list),
+        [`DELETE /api/lists/${list.id}`]: () => new Response(null, { status: 204 }),
+      });
+      const editor = await mountAt('/admin/lists/best-sci-fi');
+      await editor
+        .findAll('button')
+        .find((button) => button.text() === 'Delete list…')
+        ?.trigger('click');
+      await flushPromises();
+      const dialog = editor.get('dialog[open]');
+      const confirm = dialog
+        .findAll('button')
+        .find((button) => button.text() === 'Delete permanently');
+      expect(confirm?.attributes('disabled')).toBeDefined();
+      expect(dialog.text()).toContain('withdrawn');
+      expect(dialog.text()).toContain('scores');
+      await dialog.get('input').setValue('wrong');
+      expect(confirm?.attributes('disabled')).toBeDefined();
+      await dialog.get('input').setValue(list.slug);
+      await confirm?.trigger('click');
+      await flushPromises();
+      expect(calls.find((call) => call.method === 'DELETE')).toMatchObject({
+        url: `/api/lists/${list.id}`,
+        body: { confirmation: list.slug },
+      });
+      expect(editor.vm.$route.fullPath).toBe('/?deleted=1');
+      editor.unmount();
+    },
+  );
+
+  test('a failed deletion stays in the dialog with an explicit retry and survives reload', async () => {
+    let attempt = 0;
+    const list = openTmdbList({ deleting: true });
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(list),
+      [`DELETE /api/lists/${list.id}`]: () => {
+        attempt += 1;
+        return attempt === 1
+          ? Response.json(
+              { error: { code: 'lists.deletion-busy', message: 'Earlier writes must finish.' } },
+              { status: 409 },
+            )
+          : new Response(null, { status: 204 });
+      },
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.find('form').exists()).toBe(false);
+    expect(editor.text()).toContain('Deletion in progress');
+    await editor
+      .findAll('button')
+      .find((button) => button.text() === 'Retry deletion…')
+      ?.trigger('click');
+    await flushPromises();
+    const dialog = editor.get('dialog[open]');
+    await dialog.get('input').setValue(list.slug);
+    const confirm = dialog
+      .findAll('button')
+      .find((button) => button.text() === 'Delete permanently');
+    await confirm?.trigger('click');
+    await flushPromises();
+    expect(dialog.get('[role=alert]').text()).toContain('Earlier writes must finish.');
+    expect(editor.vm.$route.name).toBe('edit-list');
+    await confirm?.trigger('click');
+    await flushPromises();
+    expect(editor.vm.$route.name).toBe('lists');
+    editor.unmount();
+  });
+
   test('an eligible published list can change only its item source', async () => {
     const list = openTmdbList({ entries: [], itemSourceEditable: true });
     const calls = stubApi({

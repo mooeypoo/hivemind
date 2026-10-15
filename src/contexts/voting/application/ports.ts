@@ -14,6 +14,10 @@ export interface ListVotingRules {
 
 /** What voting asks lists (upstream). Implemented over the lists module in infrastructure. */
 export interface ListReader {
+  withWrite<T>(
+    listId: string,
+    work: () => Promise<Result<T, DomainError>>,
+  ): Promise<Result<T, DomainError>>;
   /** By list id or slug. Not found for drafts and hidden lists, unless the viewer is an Admin. */
   rulesFor(
     list: string,

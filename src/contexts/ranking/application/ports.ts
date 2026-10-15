@@ -16,6 +16,10 @@ export interface RankingContext {
 
 /** What ranking reads from lists (upstream). */
 export interface ListSource {
+  withWrite<T>(
+    listId: string,
+    work: () => Promise<Result<T, DomainError>>,
+  ): Promise<Result<T, DomainError>>;
   /** By id or slug. Not found for drafts. */
   /** Not found for drafts and hidden lists, unless the viewer is an Admin. */
   context(

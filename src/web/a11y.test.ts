@@ -53,6 +53,7 @@ const renderAt = async (
   unlimitedCap = false,
   mediaSource: 'tvdb-series' | 'igdb-game' | null = null,
   unusedList = false,
+  deletingList = false,
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -92,6 +93,7 @@ const renderAt = async (
           scoreVisibility: publicScores ? 'public' : 'private',
           maxNominationsPerMember: unlimitedCap ? null : 3,
           ...(unusedList ? { entries: [], itemSourceEditable: true } : {}),
+          ...(deletingList ? { deleting: true, itemSourceEditable: false } : {}),
         }),
       ),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
@@ -158,6 +160,30 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test.each([false, true])(
+    'the permanent deletion dialog is accessible (pending: %s)',
+    async (pending) => {
+      const wrapper = await renderAt(
+        '/admin/lists/best-sci-fi',
+        true,
+        false,
+        false,
+        false,
+        null,
+        false,
+        pending,
+      );
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === (pending ? 'Retry deletion…' : 'Delete list…'))
+        ?.trigger('click');
+      await flushPromises();
+      expect(document.querySelector('dialog[open]')).not.toBeNull();
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
+
   test('an unused published list with editable source and preset controls is accessible', async () => {
     const wrapper = await renderAt(
       '/admin/lists/best-sci-fi',
@@ -396,7 +422,7 @@ describe('archiving', () => {
   test('explains plainly that it is permanent, and asks for the address to be typed', async () => {
     const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
     const dialogs = [...document.querySelectorAll('dialog')].map((d) => d.textContent);
-    const archive = dialogs.find((text) => text.includes('permanently'));
+    const archive = dialogs.find((text) => text.includes('un-archived'));
     expect(archive).toContain('This can’t be undone.');
     expect(archive).toContain('can never be edited, reopened or un-archived');
     expect(archive).toContain('Type best-sci-fi to confirm');
@@ -532,6 +558,7 @@ describe('site-wide content', () => {
       'What we store about you',
       'What we never store',
       'Withdrawing a nomination',
+      'When an Admin deletes a list',
       'Shared links',
       'Cookies and browser storage',
       'Download my data',

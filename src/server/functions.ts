@@ -22,6 +22,7 @@ export {
   archiveList,
   closeVoting,
   createList,
+  deleteList,
   editList,
   getList,
   listLists,

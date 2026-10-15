@@ -14,6 +14,8 @@ export interface ListRepository {
   /** Creates when `expectedVersion` is null; otherwise updates only if unchanged. False on a lost race. */
   save(list: List, expectedVersion: string | null): Promise<boolean>;
   all(): Promise<List[]>;
+  /** Leaves a non-personal fence so stale writers cannot recreate the aggregate. */
+  delete(id: ListId): Promise<void>;
   beginEntryWrite(id: ListId, token: string): Promise<void>;
   endEntryWrite(id: ListId, token: string): Promise<void>;
   hasEntryWrites(id: ListId): Promise<boolean>;
@@ -24,7 +26,8 @@ export interface SlugIndex {
   lookup(slug: string): Promise<ListId | null>;
   /** False when another list holds the slug. */
   claim(slug: string, id: ListId): Promise<boolean>;
-  release(slug: string): Promise<void>;
+  /** A delayed retry must never release another list's replacement claim. */
+  release(slug: string, owner: ListId): Promise<void>;
 }
 
 export interface EntryRepository {
@@ -35,6 +38,7 @@ export interface EntryRepository {
   forList(listId: ListId): Promise<Entry[]>;
   /** Active entry ids; withdrawn entries are excluded. */
   idsForList(listId: ListId): Promise<EntryId[]>;
+  delete(listId: ListId, entryId: EntryId): Promise<void>;
 }
 
 export interface LedgerRepository {

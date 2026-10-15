@@ -38,6 +38,7 @@ export const makeRulesForVoting =
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
     if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
+    if (list.deletionRequested === true) return err(listsErrors.deleting);
     const lifecycle = lifecycleOf(list, deps.clock.now());
     const publicScores = list.config.scoreVisibility === 'public';
     const resultsVisible =

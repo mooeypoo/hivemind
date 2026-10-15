@@ -121,6 +121,8 @@ export interface ScheduleDto {
 export type Visibility = 'public' | 'hidden';
 
 export interface ListDto extends ListConfigDto {
+  /** Pending permanent deletion: Admins may resume it, members cannot access it. */
+  readonly deleting?: boolean;
   readonly id: string;
   readonly lifecycle: Lifecycle;
   readonly schedule: ScheduleDto | null;
@@ -130,6 +132,10 @@ export interface ListDto extends ListConfigDto {
     readonly canNominate: boolean;
     readonly nominationsUsed: number;
   };
+}
+
+export interface DeleteListRequest {
+  readonly confirmation: string;
 }
 
 export interface EntryDto {

@@ -3,10 +3,11 @@ import type { VotingModule } from '../../voting/index.ts';
 import type { ListSource, ScoreSource } from '../application/ports.ts';
 
 /** What ranking needs from the lists and voting modules' public interfaces. */
-export type ListsApi = Pick<ListsModule, 'rankingContext' | 'entriesForRanking'>;
+export type ListsApi = Pick<ListsModule, 'rankingContext' | 'entriesForRanking' | 'withListWrite'>;
 export type VotingApi = Pick<VotingModule, 'scoresForList'>;
 
 export const createListSource = (lists: ListsApi): ListSource => ({
+  withWrite: (listId, work) => lists.withListWrite(listId, work),
   context: (list, viewer) => lists.rankingContext(list, viewer),
   entries: (listId) => lists.entriesForRanking(listId as ListId),
 });

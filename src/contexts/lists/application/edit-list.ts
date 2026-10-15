@@ -65,9 +65,9 @@ export const makeEditList =
         return err(listsErrors.slugTaken);
       }
       if (!(await deps.lists.save(after, found.value.version))) {
-        if (slugChanged) await deps.slugs.release(after.config.slug);
+        if (slugChanged) await deps.slugs.release(after.config.slug, after.id);
         return err(listsErrors.conflict);
       }
-      if (slugChanged) await deps.slugs.release(before.config.slug);
+      if (slugChanged) await deps.slugs.release(before.config.slug, before.id);
       return ok(toListView(after, admin.value, now, 0));
     });
