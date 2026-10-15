@@ -28,12 +28,12 @@ export const listsErrors = {
   notMovieList: domainError(
     'invalid',
     'lists.not-movie-list',
-    'Only lists using TMDB movies can refresh movie details.',
+    'Only lists using TMDB movies or TVDB shows can refresh item details.',
   ),
   movieDetailsNotPublished: domainError(
     'invalid',
     'lists.movie-details-not-published',
-    'Movie details can only be refreshed on a published, unarchived list.',
+    'Item details can only be refreshed on a published, unarchived list.',
   ),
   notOpen: domainError(
     'invalid',

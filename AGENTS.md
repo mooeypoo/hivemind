@@ -201,7 +201,7 @@ Each route is one file in `netlify/functions` (`export default handle(endpoint)`
 
 The member-only `GET /api/lists/:list/item?externalId=...` returns full details for one selected item while nominations are open. It uses the search rate limit.
 
-The Admin-only `POST /api/lists/:list/refresh-movie-details` fills missing TMDB synopses and available credits on active, unpurged entries, with at most 20 lookups per request.
+The Admin-only `POST /api/lists/:list/refresh-movie-details` fills missing TMDB synopses and available credits on active, unpurged entries, with at most 20 lookups per request. On a TVDB list it instead checks every active, unpurged entry, in entry-id order, 20 per request. It replaces each poster with the one TVDB search shows and fills missing details. Pass the returned `next` as `?after=` to continue.
 
 Request bodies are JSON, at most 256 KB, validated by zod with unknown keys rejected. Shape errors return 422 `http.invalid-input` with one detail per problem; domain rule errors also carry `details` where there is more than one.
 

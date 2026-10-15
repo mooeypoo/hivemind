@@ -78,6 +78,7 @@ describe('POST /api/lists/:list/refresh-movie-details', () => {
       skipped: 1,
       failed: 0,
       remaining: 0,
+      next: null,
     });
 
     const forbidden = await call(

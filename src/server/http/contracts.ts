@@ -175,13 +175,17 @@ export interface SearchResultsDto {
   readonly items: readonly CatalogItemDto[];
 }
 
-/** `POST /api/lists/:list/refresh-movie-details` */
+/**
+ * `POST /api/lists/:list/refresh-movie-details?after=`: fills missing TMDB details, or, on a
+ * TVDB list, updates posters and missing details. TVDB runs in batches: pass `next` as `after`.
+ */
 export interface RefreshMovieDetailsDto {
   readonly eligible: number;
   readonly updated: number;
   readonly skipped: number;
   readonly failed: number;
   readonly remaining: number;
+  readonly next: string | null;
 }
 
 /** `POST /api/lists/:list/entries` body: an item from search, or a title for a free-text list. */

@@ -130,7 +130,7 @@ describe('refresh missing TMDB movie details', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { eligible: 2, updated: 1, skipped: 1, failed: 0, remaining: 0 },
+      value: { eligible: 2, updated: 1, skipped: 1, failed: 0, remaining: 0, next: null },
     });
     expect(resolve).toHaveBeenCalledTimes(1);
     expect(resolve).toHaveBeenCalledWith(config.itemSource, '78');
@@ -189,7 +189,7 @@ describe('refresh missing TMDB movie details', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { eligible: 1, updated: 0, skipped: 0, failed: 1, remaining: 1 },
+      value: { eligible: 1, updated: 0, skipped: 0, failed: 1, remaining: 1, next: null },
     });
     expect((await entries.get('list-1' as ListId, missing.id))?.value.item).toEqual(missing.item);
   });
@@ -203,8 +203,144 @@ describe('refresh missing TMDB movie details', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { eligible: 21, updated: 20, skipped: 0, failed: 0, remaining: 1 },
+      value: { eligible: 21, updated: 20, skipped: 0, failed: 0, remaining: 1, next: null },
     });
     expect(resolve).toHaveBeenCalledTimes(20);
+  });
+});
+
+describe('refresh TVDB show posters and details', () => {
+  const tvdbConfig: ListConfig = {
+    ...config,
+    slug: 'best-shows',
+    itemSource: { kind: 'tvdb-series' },
+  };
+  const oldPoster = 'https://artworks.thetvdb.com/banners/posters/1-4.jpg';
+  const topPoster = 'https://artworks.thetvdb.com/banners/v4/series/1/posters/top.jpg';
+  const tvdbEntry = (
+    externalId: string,
+    patch: Partial<Entry> = {},
+    itemPatch: Partial<ItemSnapshot> = {},
+  ): Entry => ({
+    id: `tvdb-series.${externalId}` as EntryId,
+    listId: 'list-1' as ListId,
+    item: {
+      source: 'tvdb-series',
+      externalId,
+      title: `Show ${externalId}`,
+      subtitle: '2011',
+      imageUrl: oldPoster,
+      overview: 'Kept as it is.',
+      ...itemPatch,
+    },
+    nominatedBy: null,
+    nominatedAt: now,
+    snapshotPurgedAt: null,
+    ...patch,
+  });
+  const run = (after?: string) =>
+    makeRefreshMovieDetails({ lists, slugs, entries, catalog })(admin, {
+      list: tvdbConfig.slug,
+      ...(after === undefined ? {} : { after }),
+    });
+
+  beforeEach(async () => {
+    await setUp();
+    const stored = await lists.get('list-1' as ListId);
+    if (stored === null) throw new Error('missing list');
+    await lists.save({ ...stored.value, config: tvdbConfig }, stored.version);
+    await slugs.claim(tvdbConfig.slug, 'list-1' as ListId);
+    resolve = vi.fn<Catalog['resolve']>((_ref, externalId) =>
+      Promise.resolve(
+        ok<ItemSnapshot>({
+          source: 'tvdb-series',
+          externalId,
+          title: `Fresh ${externalId}`,
+          subtitle: '2099',
+          imageUrl: topPoster,
+          overview: 'A fresh synopsis.',
+          creator: 'A Creator',
+          cast: ['Actor One', 'Actor Two'],
+        }),
+      ),
+    );
+    catalog.resolve = resolve;
+  });
+
+  test('replaces the poster and fills missing details, keeping existing text', async () => {
+    const stale = tvdbEntry('1');
+    const current = tvdbEntry(
+      '2',
+      {},
+      { imageUrl: topPoster, creator: 'A Creator', cast: ['Actor One', 'Actor Two'] },
+    );
+    const withdrawn = tvdbEntry('3', { withdrawnAt: now });
+    const purged = tvdbEntry('4', { snapshotPurgedAt: now });
+    for (const entry of [stale, current, withdrawn, purged]) await entries.create(entry);
+
+    expect(await run()).toEqual({
+      ok: true,
+      value: { eligible: 2, updated: 1, skipped: 1, failed: 0, remaining: 0, next: null },
+    });
+    expect(resolve).toHaveBeenCalledTimes(2);
+    expect((await entries.get('list-1' as ListId, stale.id))?.value.item).toEqual({
+      ...stale.item,
+      imageUrl: topPoster,
+      creator: 'A Creator',
+      cast: ['Actor One', 'Actor Two'],
+    });
+    expect((await entries.get('list-1' as ListId, withdrawn.id))?.value.item).toEqual(
+      withdrawn.item,
+    );
+  });
+
+  test('keeps the current poster when TVDB has none, and reports failures', async () => {
+    await entries.create(tvdbEntry('1'));
+    await entries.create(tvdbEntry('2'));
+    resolve.mockImplementation((_ref, externalId) =>
+      Promise.resolve(
+        externalId === '1'
+          ? ok<ItemSnapshot>({
+              source: 'tvdb-series',
+              externalId,
+              title: 'Show 1',
+              subtitle: '2011',
+              imageUrl: null,
+            })
+          : err(domainError('unavailable', 'catalog.upstream-unavailable', 'Unavailable')),
+      ),
+    );
+
+    expect(await run()).toEqual({
+      ok: true,
+      value: { eligible: 2, updated: 0, skipped: 1, failed: 1, remaining: 0, next: null },
+    });
+    expect((await entries.get('list-1' as ListId, tvdbEntry('1').id))?.value.item.imageUrl).toBe(
+      oldPoster,
+    );
+  });
+
+  test('checks 20 entries per run and continues after the cursor', async () => {
+    const ids = Array.from({ length: 23 }, (_, index) => String(100 + index));
+    for (const id of ids) await entries.create(tvdbEntry(id));
+
+    const first = await run();
+    expect(first).toEqual({
+      ok: true,
+      value: {
+        eligible: 23,
+        updated: 20,
+        skipped: 0,
+        failed: 0,
+        remaining: 3,
+        next: 'tvdb-series.119',
+      },
+    });
+    const second = await run('tvdb-series.119');
+    expect(second).toEqual({
+      ok: true,
+      value: { eligible: 23, updated: 3, skipped: 0, failed: 0, remaining: 0, next: null },
+    });
+    expect(resolve.mock.calls.map(([, id]) => id)).toEqual(ids);
   });
 });

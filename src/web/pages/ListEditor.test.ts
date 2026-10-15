@@ -246,7 +246,7 @@ describe('ListEditor', () => {
       'GET /api/roles': roles,
       'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList()),
       'POST /api/lists/list-1/refresh-movie-details': () =>
-        Response.json({ eligible: 4, updated: 2, skipped: 1, failed: 1, remaining: 1 }),
+        Response.json({ eligible: 4, updated: 2, skipped: 1, failed: 1, remaining: 1, next: null }),
     });
     const editor = await mountAt('/admin/lists/best-sci-fi');
 
@@ -261,5 +261,52 @@ describe('ListEditor', () => {
       '2 updated, 1 already had a synopsis, 1 could not be refreshed.',
     );
     expect(editor.text()).toContain('1 still need attention; run refresh again to continue.');
+  });
+
+  test('refreshes TVDB show posters in batches, continuing where the last run stopped', async () => {
+    let run = 0;
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ itemSource: { kind: 'tvdb-series' } })),
+      'POST /api/lists/list-1/refresh-movie-details': () =>
+        Response.json(
+          ++run === 1
+            ? {
+                eligible: 25,
+                updated: 18,
+                skipped: 2,
+                failed: 0,
+                remaining: 5,
+                next: 'tvdb-series.9',
+              }
+            : { eligible: 25, updated: 5, skipped: 0, failed: 0, remaining: 0, next: null },
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.text()).not.toContain('Refresh missing movie details');
+
+    const button = () =>
+      editor
+        .findAll('button')
+        .find((b) =>
+          /^(Refresh show posters and details|Continue refreshing shows)$/.test(b.text().trim()),
+        );
+    expect(button()?.text().trim()).toBe('Refresh show posters and details');
+    await button()?.trigger('click');
+    await flushPromises();
+    expect(editor.text()).toContain('18 updated, 2 already up to date, 0 could not be refreshed.');
+    expect(editor.text()).toContain('5 still to check; run refresh again to continue.');
+    expect(button()?.text().trim()).toBe('Continue refreshing shows');
+
+    await button()?.trigger('click');
+    await flushPromises();
+    const urls = calls.filter((c) => c.url.includes('/refresh-movie-details')).map((c) => c.url);
+    expect(urls).toEqual([
+      '/api/lists/list-1/refresh-movie-details',
+      '/api/lists/list-1/refresh-movie-details?after=tvdb-series.9',
+    ]);
+    expect(button()?.text().trim()).toBe('Refresh show posters and details');
   });
 });

@@ -103,6 +103,8 @@ export const searchQuery = z.object({ q: z.string().max(200).default('') });
 
 export const resolveItemQuery = z.strictObject({ externalId: z.string().min(1).max(300) });
 
+export const refreshDetailsQuery = z.strictObject({ after: z.string().min(1).max(700).optional() });
+
 // ---- Backups ----
 
 const isoString = z.iso.datetime({ offset: true });

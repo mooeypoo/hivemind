@@ -346,25 +346,39 @@ const makeScoresPrivate = async () => {
   }
 };
 
+// TVDB refreshes run in batches; this is where the next click continues.
+const refreshAfter = ref<string | null>(null);
+
 const refreshMovieDetails = async () => {
   const list = existing.value;
   if (list === null) return;
+  const isTvdb = list.itemSource.kind === 'tvdb-series';
   busy.value = true;
   error.value = null;
   status.value = '';
+  const after =
+    isTvdb && refreshAfter.value !== null ? `?after=${encodeURIComponent(refreshAfter.value)}` : '';
   const result = await api.post<RefreshMovieDetailsDto>(
-    `/api/lists/${encodeURIComponent(list.id)}/refresh-movie-details`,
+    `/api/lists/${encodeURIComponent(list.id)}/refresh-movie-details${after}`,
   );
   busy.value = false;
   if (!result.ok) {
     error.value = result.error;
     return;
   }
-  const { eligible, updated, skipped, failed } = result.data;
+  const { eligible, updated, skipped, failed, remaining, next } = result.data;
+  if (isTvdb) {
+    refreshAfter.value = next;
+    status.value =
+      eligible === 0
+        ? 'No active, unpurged show entries were found.'
+        : `Show posters and details checked: ${String(updated)} updated, ${String(skipped)} already up to date, ${String(failed)} could not be refreshed.${remaining > 0 ? ` ${String(remaining)} still to check; run refresh again to continue.` : ''}`;
+    return;
+  }
   status.value =
     eligible === 0
       ? 'No active, unpurged movie entries were found.'
-      : `Movie details refreshed: ${String(updated)} updated, ${String(skipped)} already had a synopsis, ${String(failed)} could not be refreshed.${result.data.remaining > 0 ? ` ${String(result.data.remaining)} still need attention; run refresh again to continue.` : ''}`;
+      : `Movie details refreshed: ${String(updated)} updated, ${String(skipped)} already had a synopsis, ${String(failed)} could not be refreshed.${remaining > 0 ? ` ${String(remaining)} still need attention; run refresh again to continue.` : ''}`;
 };
 
 const readCsvFile = async (event: Event) => {
@@ -807,6 +821,24 @@ const importCsv = async () => {
           @click="refreshMovieDetails"
         >
           Refresh missing movie details
+        </button>
+      </div>
+      <div v-if="existing.itemSource.kind === 'tvdb-series'" class="stack">
+        <p class="meta">
+          Update show posters to the ones TheTVDB currently shows in search, and fill any missing
+          synopses and credits. Checks up to 20 active entries per run; withdrawn entries are
+          skipped.
+        </p>
+        <button
+          v-if="existing.lifecycle !== 'archived'"
+          type="button"
+          class="button"
+          :disabled="busy"
+          @click="refreshMovieDetails"
+        >
+          {{
+            refreshAfter === null ? 'Refresh show posters and details' : 'Continue refreshing shows'
+          }}
         </button>
       </div>
       <fieldset class="stack">

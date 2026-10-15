@@ -17,6 +17,7 @@ import {
   createListBody,
   editListBody,
   nominateBody,
+  refreshDetailsQuery,
   resolveItemQuery,
   scheduleBody,
   searchQuery,
@@ -150,13 +151,16 @@ export const withdrawNomination = async (request: Request, app: App): Promise<Re
     : domainErrorResponse(result.error);
 };
 
-/** `POST /api/lists/:list/refresh-movie-details` */
+/** `POST /api/lists/:list/refresh-movie-details?after=` */
 export const refreshMovieDetails = async (request: Request, app: App): Promise<Response> => {
   const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
+  const query = parseWith(refreshDetailsQuery, queryOf(request));
+  if (!query.ok) return query.response;
   return respond(
     await app.lists.refreshMovieDetails(await actorOf(request, app), {
       list: listParam(request),
+      ...(query.data.after === undefined ? {} : { after: query.data.after }),
     }),
     (result): RefreshMovieDetailsDto => result,
   );
