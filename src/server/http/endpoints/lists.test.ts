@@ -101,6 +101,54 @@ const openList = async (body: Record<string, unknown>): Promise<ListDto> => {
   return scheduled.body;
 };
 
+describe('correcting an unused published list source', () => {
+  test('the Admin can correct the source, but a nomination including a withdrawn one locks it', async () => {
+    const list = await openList({
+      title: 'Picks',
+      slug: 'picks',
+      itemSource: { kind: 'tmdb-movie' },
+    });
+    const path = `/api/lists/${list.id}`;
+    expect((await call<ListDetailDto>(getList, 'GET', path, admin)).body.itemSourceEditable).toBe(
+      true,
+    );
+    expect((await call<ListDetailDto>(getList, 'GET', path, ada)).body.itemSourceEditable).toBe(
+      false,
+    );
+    expect(
+      (await call(editList, 'PUT', path, ada, { itemSource: { kind: 'freeform' } })).status,
+    ).toBe(403);
+    const edited = await call<ListDto>(editList, 'PUT', path, admin, {
+      itemSource: { kind: 'freeform' },
+    });
+    expect(edited.status).toBe(200);
+    expect(edited.body.itemSource).toEqual({ kind: 'freeform' });
+    const entry = await call<EntryDto>(nominate, 'POST', `${path}/entries`, ada, {
+      title: 'A pick',
+    });
+    expect(entry.status).toBe(201);
+    const locked = await call<ErrorDto>(editList, 'PUT', path, admin, {
+      itemSource: { kind: 'tmdb-movie' },
+    });
+    expect(locked.status).toBe(422);
+    expect(locked.body.error.code).toBe('lists.source-has-entries');
+    expect(
+      (
+        await call(withdrawNomination, 'POST', `${path}/entries/withdraw`, ada, {
+          entryId: entry.body.id,
+          token: entry.body.withdrawalToken,
+        })
+      ).status,
+    ).toBe(204);
+    expect((await call<ListDetailDto>(getList, 'GET', path, admin)).body.itemSourceEditable).toBe(
+      false,
+    );
+    expect(
+      (await call(editList, 'PUT', path, admin, { itemSource: { kind: 'tmdb-movie' } })).status,
+    ).toBe(422);
+  });
+});
+
 describe('GET /api/catalog/sources', () => {
   test('tells Admins which item sources this site offers', async () => {
     const result = await call<SourcesDto>(availableSources, 'GET', '/api/catalog/sources', admin);

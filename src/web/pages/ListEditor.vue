@@ -88,6 +88,14 @@ const form = reactive<Form>({
 });
 
 const existing = ref<ListDto | null>(null);
+const sourcePermission = ref(false);
+const itemSourceEditable = computed(
+  () =>
+    sourcePermission.value &&
+    (existing.value?.lifecycle === 'draft' ||
+      (existing.value?.entryMode === 'nominations' &&
+        (existing.value.lifecycle === 'scheduled' || existing.value.lifecycle === 'open'))),
+);
 /** Archived movie lists: when TMDB details will be removed. */
 const snapshotsExpireAt = ref<string | null>(null);
 
@@ -108,8 +116,9 @@ const csv = ref('');
 const csvError = ref<ApiError | null>(null);
 usePageTitle(() => (existing.value === null ? 'New list' : `Edit ${existing.value.title}`));
 
-/** Once published, only description, a later close, and removal of a finite cap may change. */
+/** Publishing locks settings except for the server-authorized source exception below. */
 const locked = computed(() => existing.value !== null && existing.value.lifecycle !== 'draft');
+const sourceLocked = computed(() => existing.value !== null && !itemSourceEditable.value);
 const finished = computed(
   () => existing.value?.lifecycle === 'closed' || existing.value?.lifecycle === 'archived',
 );
@@ -163,14 +172,29 @@ const load = async () => {
       return;
     }
     existing.value = result.data;
+    sourcePermission.value = result.data.itemSourceEditable;
     snapshotsExpireAt.value = result.data.snapshotsExpireAt;
     fillFrom(result.data);
   } else {
     existing.value = null;
+    sourcePermission.value = false;
   }
 
   const draft = loadDraft(draftKey.value);
   if (draft !== null && typeof draft === 'object' && !locked.value) Object.assign(form, draft);
+  if (
+    draft !== null &&
+    typeof draft === 'object' &&
+    locked.value &&
+    itemSourceEditable.value &&
+    'sourceKind' in draft
+  ) {
+    const savedKind = sources.value.find((kind) => kind === draft.sourceKind);
+    if (savedKind !== undefined) form.sourceKind = savedKind;
+    if ('presetId' in draft && (draft.presetId === null || typeof draft.presetId === 'string')) {
+      form.presetId = draft.presetId;
+    }
+  }
 };
 onMounted(load);
 watch(routeSlug, load);
@@ -271,7 +295,12 @@ const save = async () => {
       ? { maxNominationsPerMember: null }
       : {};
   const body = locked.value
-    ? { description: form.description, ...endChange(), ...removeNominationCap }
+    ? {
+        description: form.description,
+        ...endChange(),
+        ...removeNominationCap,
+        ...(itemSourceEditable.value ? { itemSource: config().itemSource } : {}),
+      }
     : config();
   const list = await run(
     () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
@@ -420,6 +449,9 @@ const importCsv = async () => {
       >
         You can also remove its nomination cap, but you can’t add one back.</template
       >
+      <template v-if="itemSourceEditable">
+        You can also change the item source until the first entry is added.
+      </template>
     </p>
     <p v-if="existing?.lifecycle === 'closed'" class="notice">
       Voting has closed, so the list can’t be edited. You can still hide it or archive it below.
@@ -480,9 +512,18 @@ const importCsv = async () => {
         <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
       </fieldset>
 
-      <fieldset id="editor-items" class="card stack" :disabled="locked">
+      <fieldset id="editor-items" class="card stack" :disabled="sourceLocked">
         <legend>Items</legend>
         <p class="meta">Where do the things in this list come from?</p>
+        <p v-if="locked && itemSourceEditable" class="meta">
+          This list is unused. You can change its item source until the first entry is added.
+          Published lists keep their nomination mode.
+        </p>
+        <p v-else-if="sourceLocked && !finished" class="meta">
+          The source is locked once entries have been added, including withdrawn entries. Published
+          seeded lists also keep their source. An unfinished entry write temporarily locks the
+          source.
+        </p>
         <div class="choices" role="radiogroup" aria-label="Item source">
           <label v-for="kind in sources" :key="kind" class="choice">
             <input v-model="form.sourceKind" type="radio" name="source" :value="kind" />
@@ -519,11 +560,23 @@ const importCsv = async () => {
           <p class="meta">How should members use these items?</p>
           <div class="choices" role="radiogroup" aria-label="Entry mode">
             <label class="choice">
-              <input v-model="form.entryMode" type="radio" name="mode" value="seeded" />
+              <input
+                v-model="form.entryMode"
+                type="radio"
+                name="mode"
+                value="seeded"
+                :disabled="locked"
+              />
               Rate them all: every item is in the list from the start
             </label>
             <label class="choice">
-              <input v-model="form.entryMode" type="radio" name="mode" value="nominations" />
+              <input
+                v-model="form.entryMode"
+                type="radio"
+                name="mode"
+                value="nominations"
+                :disabled="locked"
+              />
               Nominate from them: members pick which items go in
             </label>
           </div>

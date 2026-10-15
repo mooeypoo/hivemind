@@ -5,6 +5,16 @@ export const listsErrors = {
   slugTaken: domainError('conflict', 'lists.slug-taken', 'Another list already uses that slug.'),
   notADraft: domainError('invalid', 'lists.not-a-draft', 'Only a draft list can be scheduled.'),
   locked: domainError('invalid', 'lists.locked', 'This list can no longer be edited.'),
+  sourceHasEntries: domainError(
+    'invalid',
+    'lists.source-has-entries',
+    'The item source cannot change because this list has entries, including withdrawn entries.',
+  ),
+  sourceWriteInProgress: domainError(
+    'conflict',
+    'lists.source-write-in-progress',
+    "An unfinished entry write is protecting this list's item source. Try again after it finishes. If this persists, an operator must check the unfinished write.",
+  ),
   notScheduled: domainError(
     'invalid',
     'lists.not-scheduled',
@@ -77,6 +87,6 @@ export const lockedFields = (fields: readonly string[]): DomainError =>
   domainError(
     'invalid',
     'lists.locked-fields',
-    'Once a list is published, only its description, a later closing time, and removing its nomination cap can change.',
+    'Once a list is published, only its description, a later closing time, removing its nomination cap, and the item source of an unused nomination list can change.',
     fields,
   );

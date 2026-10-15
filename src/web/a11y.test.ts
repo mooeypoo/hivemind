@@ -52,6 +52,7 @@ const renderAt = async (
   publicScores = false,
   unlimitedCap = false,
   mediaSource: 'tvdb-series' | 'igdb-game' | null = null,
+  unusedList = false,
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -90,6 +91,7 @@ const renderAt = async (
             : {}),
           scoreVisibility: publicScores ? 'public' : 'private',
           maxNominationsPerMember: unlimitedCap ? null : 3,
+          ...(unusedList ? { entries: [], itemSourceEditable: true } : {}),
         }),
       ),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
@@ -156,6 +158,23 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test('an unused published list with editable source and preset controls is accessible', async () => {
+    const wrapper = await renderAt(
+      '/admin/lists/best-sci-fi',
+      true,
+      false,
+      false,
+      false,
+      null,
+      true,
+    );
+    await wrapper.get('input[value=preset]').setValue(true);
+    await flushPromises();
+    expect(wrapper.get('input[value=seeded]').attributes('disabled')).toBeDefined();
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
   test.each(['/lists/best-sci-fi', '/lists/best-sci-fi/results'])(
     'TV series state at %s is accessible',
     async (path) => {

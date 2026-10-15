@@ -44,6 +44,7 @@ interface ListRecordV2 {
   readonly archivedAt?: string | null;
   /** Added after v2 shipped; absent means public. */
   readonly visibility?: Visibility;
+  readonly entryWriteToken?: string;
 }
 
 /** v1: a single optional required role. Still read; never written. */
@@ -109,6 +110,7 @@ const listToRecord = (list: List): ListRecordV2 => ({
   createdAt: list.createdAt.toISOString(),
   archivedAt: list.archivedAt?.toISOString() ?? null,
   visibility: list.visibility,
+  ...(list.entryWriteToken === undefined ? {} : { entryWriteToken: list.entryWriteToken }),
 });
 
 const upgradeList = (data: unknown): ListRecordV2 => {
@@ -139,6 +141,7 @@ const listFromRecord = (data: unknown): List => {
     createdAt: new Date(record.createdAt),
     visibility: record.visibility ?? 'public',
     archivedAt: record.archivedAt == null ? null : new Date(record.archivedAt),
+    ...(record.entryWriteToken === undefined ? {} : { entryWriteToken: record.entryWriteToken }),
   };
 };
 
@@ -217,6 +220,14 @@ export const createBlobsListRepository = (store: Store): ListRepository => ({
   save: (list, expectedVersion) =>
     writeVersioned(store, `list/${list.id}`, listToRecord(list), expectedVersion),
   all: () => readAll(store, 'list/', listFromRecord),
+  async beginEntryWrite(id, token) {
+    await store.setJSON(`entry-write/${id}/${token}`, { v: 1 });
+  },
+  endEntryWrite: (id, token) => store.delete(`entry-write/${id}/${token}`),
+  async hasEntryWrites(id) {
+    const { blobs } = await store.list({ prefix: `entry-write/${id}/` });
+    return blobs.length > 0;
+  },
 });
 
 export const createBlobsSlugIndex = (store: Store): SlugIndex => ({

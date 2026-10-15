@@ -36,6 +36,45 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test('an eligible published list can change only its item source', async () => {
+    const list = openTmdbList({ entries: [], itemSourceEditable: true });
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(list),
+      [`PUT /api/lists/${list.id}`]: () =>
+        Response.json({ ...list, itemSource: { kind: 'freeform' } }),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.get('#editor-items').attributes('disabled')).toBeUndefined();
+    expect(editor.get('#editor-rating').attributes('disabled')).toBeDefined();
+    expect(editor.get('#editor-roles').attributes('disabled')).toBeDefined();
+    await editor.get('input[value=freeform]').setValue(true);
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    const body = calls.find((call) => call.method === 'PUT')?.body;
+    expect(body).toMatchObject({ itemSource: { kind: 'freeform' } });
+    expect(body).not.toHaveProperty('entryMode');
+    expect(body).not.toHaveProperty('scale');
+    editor.unmount();
+  });
+
+  test('restores an unsaved published source selection without unlocking other settings', async () => {
+    sessionStorage.setItem(
+      'draft:editor:best-sci-fi',
+      JSON.stringify({ sourceKind: 'freeform', scaleMin: 99 }),
+    );
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList({ itemSourceEditable: true })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect((editor.get('input[value=freeform]').element as HTMLInputElement).checked).toBe(true);
+    expect(editor.get('#editor-rating').attributes('disabled')).toBeDefined();
+    editor.unmount();
+  });
+
   test('offers TVDB only when available and sends the selected series source', async () => {
     const calls = stubApi({
       'GET /api/catalog/sources': () =>

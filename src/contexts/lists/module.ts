@@ -50,7 +50,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
   return {
     createList: makeCreateList({ ...shared, ids: deps.ids }),
     editList: makeEditList(shared),
-    scheduleList: makeScheduleList(shared),
+    scheduleList: makeScheduleList({ ...shared, ids: deps.ids }),
     archiveList: makeArchiveList(shared),
     closeVoting: makeCloseVoting(shared),
     setVisibility: makeSetVisibility(shared),

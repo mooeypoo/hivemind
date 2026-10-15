@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { admin, fakeApi } from './fake-api.ts';
+import { admin, fakeApi, list } from './fake-api.ts';
 
 /**
  * Real-browser layout checks that happy-dom can't make: no page scrolls sideways, down to the
@@ -24,6 +24,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test.use({ colorScheme });
 
     for (const width of widths) {
+      test(`unused list source controls at ${String(width)} px fit on screen`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.route('**/api/lists/films', (route) =>
+          route.fulfill({ json: { ...list, entries: [], itemSourceEditable: true } }),
+        );
+        await page.goto('/admin/lists/films');
+        await expect(page.locator('#editor-items input[value=preset]')).toBeEnabled();
+        await expect(page.locator('#editor-rating input').first()).toBeDisabled();
+        await page.getByRole('radio', { name: 'Preset list (CSV)' }).check();
+        await expect(page.getByRole('radio', { name: /^Rate them all/ })).toBeDisabled();
+        await expectNoSidewaysScroll(page);
+      });
+
       test(`signed out, ${String(width)} px: the welcome page fits`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await fakeApi(page, null);

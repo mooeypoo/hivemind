@@ -150,6 +150,8 @@ export interface ListsDto {
 
 /** `GET /api/lists/:list` (id or slug) */
 export interface ListDetailDto extends ListDto {
+  /** Admin-only ability, checked again at save time; withdrawn entries also lock the source. */
+  readonly itemSourceEditable: boolean;
   readonly entries: readonly EntryDto[];
   /** Archived movie lists: when movie details will be removed (TMDB terms). */
   readonly snapshotsExpireAt: string | null;

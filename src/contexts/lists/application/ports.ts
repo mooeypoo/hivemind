@@ -14,6 +14,9 @@ export interface ListRepository {
   /** Creates when `expectedVersion` is null; otherwise updates only if unchanged. False on a lost race. */
   save(list: List, expectedVersion: string | null): Promise<boolean>;
   all(): Promise<List[]>;
+  beginEntryWrite(id: ListId, token: string): Promise<void>;
+  endEntryWrite(id: ListId, token: string): Promise<void>;
+  hasEntryWrites(id: ListId): Promise<boolean>;
 }
 
 /** Slugs are unique: a slug is claimed before a list may use it. */

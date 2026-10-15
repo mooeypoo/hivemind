@@ -41,6 +41,7 @@ export const entryDto = (entry: EntryView): EntryDto => ({
 
 export const listDetailDto = (detail: ListDetail): ListDetailDto => ({
   ...listDto(detail),
+  itemSourceEditable: detail.itemSourceEditable,
   entries: detail.entries.map(entryDto),
   snapshotsExpireAt: detail.snapshotsExpireAt?.toISOString() ?? null,
 });

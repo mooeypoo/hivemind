@@ -40,10 +40,22 @@ class Table<T> {
 
 export class InMemoryListRepository implements ListRepository {
   private readonly table = new Table<List>();
+  private readonly entryWrites = new Map<ListId, Set<string>>();
   get = (id: ListId) => this.table.get(id);
   save = (list: List, expectedVersion: string | null) =>
     this.table.save(list.id, list, expectedVersion);
   all = () => Promise.resolve(this.table.values());
+  beginEntryWrite = (id: ListId, token: string) => {
+    const writes = this.entryWrites.get(id) ?? new Set<string>();
+    writes.add(token);
+    this.entryWrites.set(id, writes);
+    return Promise.resolve();
+  };
+  endEntryWrite = (id: ListId, token: string) => {
+    this.entryWrites.get(id)?.delete(token);
+    return Promise.resolve();
+  };
+  hasEntryWrites = (id: ListId) => Promise.resolve((this.entryWrites.get(id)?.size ?? 0) > 0);
 }
 
 export class InMemorySlugIndex implements SlugIndex {

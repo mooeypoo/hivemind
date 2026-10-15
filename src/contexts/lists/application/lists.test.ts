@@ -127,6 +127,184 @@ describe('Admin-only use cases', () => {
 });
 
 describe('creating and editing', () => {
+  test.each([1, 12])('changes an unused published list source on day %s', async (day) => {
+    const list = await openList();
+    clock.set(at(day));
+    const edited = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: { kind: 'freeform' } },
+    });
+    expect(edited.ok && edited.value.itemSource).toEqual({ kind: 'freeform' });
+    const detail = await makeGetList(deps)(admin, { list: list.id });
+    expect(detail.ok && detail.value.itemSourceEditable).toBe(true);
+  });
+
+  test('active and withdrawn entries both lock the item source', async () => {
+    const list = await openList();
+    await nominate(ada, '78');
+    for (const withdrawn of [false, true]) {
+      if (withdrawn) expect((await withdraw(ada)).ok).toBe(true);
+      const edited = await makeEditList(deps)(admin, {
+        list: list.id,
+        edit: { itemSource: { kind: 'freeform' } },
+      });
+      expect(!edited.ok && edited.error.code).toBe('lists.source-has-entries');
+      const detail = await makeGetList(deps)(admin, { list: list.id });
+      expect(detail.ok && detail.value.itemSourceEditable).toBe(false);
+    }
+  });
+
+  test('a source edit winning during catalog resolution rejects the old-source nomination', async () => {
+    const list = await openList();
+    const resolve = deps.catalog.resolve.bind(deps.catalog);
+    deps.catalog.resolve = async (source, key) => {
+      const item = await resolve(source, key);
+      const edit = await makeEditList(deps)(admin, {
+        list: list.id,
+        edit: { itemSource: { kind: 'freeform' } },
+      });
+      expect(edit.ok).toBe(true);
+      return item;
+    };
+    const nominated = await nominate(ada, '78');
+    expect(!nominated.ok && nominated.error.kind).toBe('conflict');
+    expect(await deps.entries.forList(list.id)).toEqual([]);
+    expect(await deps.ledgers.forList(list.id)).toEqual([]);
+    expect(await deps.lists.hasEntryWrites(list.id)).toBe(false);
+  });
+
+  test('an admitted nomination blocks source editing until its entry exists', async () => {
+    const list = await openList();
+    const createEntry = deps.entries.create;
+    deps.entries.create = async (entry) => {
+      const edit = await makeEditList(deps)(admin, {
+        list: list.id,
+        edit: { itemSource: { kind: 'freeform' } },
+      });
+      expect(!edit.ok && edit.error.code).toBe('lists.source-write-in-progress');
+      return createEntry(entry);
+    };
+    expect((await nominate(ada, '78')).ok).toBe(true);
+    expect(await deps.lists.hasEntryWrites(list.id)).toBe(false);
+  });
+
+  test('a rejected nomination does not lock an empty list source', async () => {
+    const list = await openList();
+    deps.ledgers.save = () => Promise.resolve(false);
+    expect((await nominate(ada, '78')).ok).toBe(false);
+    expect(await deps.lists.hasEntryWrites(list.id)).toBe(false);
+    const edit = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: { kind: 'freeform' } },
+    });
+    expect(edit.ok).toBe(true);
+  });
+
+  test('uncertain adapter failures retain protection rather than admit a conflicting source', async () => {
+    const list = await openList();
+    deps.entries.create = () => Promise.reject(new Error('Entry write interrupted'));
+    await expect(nominate(ada, '78')).rejects.toThrow('Entry write interrupted');
+    expect(await deps.lists.hasEntryWrites(list.id)).toBe(true);
+    const edit = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: { kind: 'freeform' } },
+    });
+    expect(!edit.ok && edit.error.code).toBe('lists.source-write-in-progress');
+  });
+
+  test('a nomination admitted after the emptiness checks invalidates the source edit ETag', async () => {
+    const list = await openList();
+    const forList = deps.entries.forList;
+    let injectNomination = true;
+    deps.entries.forList = async (id) => {
+      const entries = await forList(id);
+      if (injectNomination) {
+        injectNomination = false;
+        expect((await nominate(ada, '78')).ok).toBe(true);
+      }
+      return entries;
+    };
+    const edit = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: { kind: 'freeform' } },
+    });
+    expect(!edit.ok && edit.error.code).toBe('lists.source-has-entries');
+    expect((await deps.lists.get(list.id))?.value.config.itemSource).toEqual({
+      kind: 'tmdb-movie',
+    });
+  });
+
+  test('unavailable sources are rejected and unchanged source fields stay legal with entries', async () => {
+    const list = await openList();
+    const unavailable = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: { kind: 'unavailable' } },
+    });
+    expect(!unavailable.ok && unavailable.error.code).toBe('catalog.source-unavailable');
+    await nominate(ada, '78');
+    const unchanged = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: config.itemSource, description: 'Updated' },
+    });
+    expect(unchanged.ok).toBe(true);
+    const member = await makeGetList(deps)(ada, { list: list.id });
+    expect(member.ok && member.value.itemSourceEditable).toBe(false);
+  });
+
+  test('source changes never unlock finished or published seeded lists', async () => {
+    const list = await openList();
+    clock.set(at(21));
+    const closed = await makeEditList(deps)(admin, {
+      list: list.id,
+      edit: { itemSource: { kind: 'freeform' } },
+    });
+    expect(!closed.ok && closed.error.code).toBe('lists.locked');
+    await makeArchiveList(deps)(admin, { list: list.id });
+    const archived = await makeGetList(deps)(admin, { list: list.id });
+    expect(archived.ok && archived.value.itemSourceEditable).toBe(false);
+
+    clock.set(at(1));
+    deps.catalog.seedItems = () => Promise.resolve({ ok: true, value: [] });
+    const seeded = await openList({
+      slug: 'empty-seeded',
+      itemSource: { kind: 'preset', presetId: 'albums' },
+      entryMode: 'seeded',
+    });
+    const edit = await makeEditList(deps)(admin, {
+      list: seeded.id,
+      edit: { itemSource: { kind: 'preset', presetId: 'other' } },
+    });
+    expect(!edit.ok && edit.error.details).toEqual(['itemSource']);
+    const detail = await makeGetList(deps)(admin, { list: seeded.id });
+    expect(detail.ok && detail.value.itemSourceEditable).toBe(false);
+  });
+
+  test('publication and restoration protect their entry writes from source edits', async () => {
+    const created = await create({
+      itemSource: { kind: 'preset', presetId: 'albums' },
+      entryMode: 'seeded',
+    });
+    if (!created.ok) throw new Error('fixture');
+    const createEntry = deps.entries.create;
+    deps.entries.create = async (entry) => {
+      const edit = await makeEditList(deps)(admin, {
+        list: entry.listId,
+        edit: { itemSource: { kind: 'freeform' }, entryMode: 'nominations' },
+      });
+      expect(!edit.ok && edit.error.code).toBe('lists.source-write-in-progress');
+      return createEntry(entry);
+    };
+    expect((await scheduleIt(created.value.id)).ok).toBe(true);
+    const exported = await makeExportForBackup(deps)(created.value.id);
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    const restored = await makeRestoreFromBackup(deps)(exported.value[0].backup, {
+      keepMember: () => Promise.resolve(true),
+    });
+    expect(restored.ok).toBe(true);
+    expect(await deps.lists.hasEntryWrites(created.value.id)).toBe(false);
+    if (restored.ok) expect(await deps.lists.hasEntryWrites(restored.value.listId)).toBe(false);
+  });
+
   test('creates a draft and refuses a taken slug', async () => {
     const created = await create();
     expect(created.ok && created.value.lifecycle).toBe('draft');

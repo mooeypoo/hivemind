@@ -52,6 +52,13 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       </li>
     </ul>
 
+    <p>
+      The site also keeps random operation tokens to prevent item-source changes from racing with
+      entries being added or restored. They contain no member identity or scores. Active write
+      markers are normally removed after completion; an interrupted write may leave its marker for
+      an operator to check.
+    </p>
+
     <h2>What we never store</h2>
     <ul>
       <li>Your email address. We never ask Discord for it.</li>

@@ -42,6 +42,30 @@ const draft = newList(
 );
 
 describe('Blobs lists repositories', () => {
+  test('entry admissions change the ETag and independent markers clean up separately', async () => {
+    const store = blobs.store('source-admission');
+    const repo = createBlobsListRepository(store);
+    await repo.save(draft, null);
+    const before = await repo.get(listId);
+    if (before === null) throw new Error('fixture');
+    await repo.beginEntryWrite(listId, 'a');
+    await repo.beginEntryWrite(listId, 'b');
+    expect(await store.get('entry-write/l1/a', { type: 'json' })).toEqual({ v: 1 });
+    expect(await repo.hasEntryWrites(listId)).toBe(true);
+    expect(await repo.save({ ...draft, entryWriteToken: 'a' }, before.version)).toBe(true);
+    expect(
+      await repo.save(
+        { ...draft, config: { ...draft.config, itemSource: { kind: 'freeform' } } },
+        before.version,
+      ),
+    ).toBe(false);
+    expect((await repo.get(listId))?.value.entryWriteToken).toBe('a');
+    await repo.endEntryWrite(listId, 'a');
+    expect(await repo.hasEntryWrites(listId)).toBe(true);
+    await repo.endEntryWrite(listId, 'b');
+    expect(await repo.hasEntryWrites(listId)).toBe(false);
+  });
+
   test('lists round-trip with their schedule and use optimistic concurrency', async () => {
     const repo = createBlobsListRepository(blobs.store('lists'));
     expect(await repo.save(draft, null)).toBe(true);
