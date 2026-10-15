@@ -27,6 +27,7 @@ const site: SiteDto = {
   community: { name: 'Board Game Night', iconUrl: null, inviteUrl: 'https://discord.gg/example' },
   offersMovieData: false,
   offersTvData: false,
+  offersGameData: false,
   demo: false,
   backups: true,
 };

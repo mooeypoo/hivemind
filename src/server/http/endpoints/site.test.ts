@@ -33,6 +33,7 @@ describe('GET /api/site', () => {
         community: { name: 'Test Community', iconUrl: null, inviteUrl: null },
         offersMovieData: true,
         offersTvData: false,
+        offersGameData: false,
         demo: false,
         backups: true,
       },
@@ -71,6 +72,19 @@ describe('GET /api/site', () => {
     expect(result.body.offersTvData).toBe(true);
     expect(result.body.offersMovieData).toBe(false);
     expect(JSON.stringify(result.body)).not.toContain('secret-tv-key');
+  });
+
+  test('reports IGDB independently and never exposes application credentials', async () => {
+    h = await startHarness({
+      ...testConfig,
+      tmdbReadToken: null,
+      igdb: { clientId: 'game-client', clientSecret: 'game-secret' },
+    });
+    const result = await read<SiteDto>(await getSite(request('GET', '/api/site'), h.app));
+    expect(result.body.offersGameData).toBe(true);
+    expect(result.body.offersMovieData).toBe(false);
+    expect(result.body.offersTvData).toBe(false);
+    expect(JSON.stringify(result.body)).not.toMatch(/game-client|game-secret/);
   });
 });
 

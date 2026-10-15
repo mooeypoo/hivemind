@@ -14,6 +14,7 @@ import StandingsBoard from '../components/StandingsBoard.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import TmdbAttribution from '../components/TmdbAttribution.vue';
 import TvdbAttribution from '../components/TvdbAttribution.vue';
+import IgdbAttribution from '../components/IgdbAttribution.vue';
 import { usePageTitle } from '../lib/page-title.ts';
 
 const route = useRoute();
@@ -123,5 +124,6 @@ const canNominate = computed(
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />
     <TvdbAttribution v-if="list.itemSource.kind === 'tvdb-series'" />
+    <IgdbAttribution v-if="list.itemSource.kind === 'igdb-game'" />
   </article>
 </template>

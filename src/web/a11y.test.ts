@@ -33,6 +33,7 @@ const siteInfo: SiteDto = {
   },
   offersMovieData: true,
   offersTvData: true,
+  offersGameData: true,
   demo: false,
   backups: true,
 };
@@ -50,7 +51,7 @@ const renderAt = async (
   demo = false,
   publicScores = false,
   unlimitedCap = false,
-  tvSeries = false,
+  mediaSource: 'tvdb-series' | 'igdb-game' | null = null,
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -64,14 +65,14 @@ const renderAt = async (
     'GET /api/lists/best-sci-fi': () =>
       Response.json(
         list({
-          ...(tvSeries
+          ...(mediaSource !== null
             ? {
-                itemSource: { kind: 'tvdb-series' as const },
+                itemSource: { kind: mediaSource },
                 entries: [
                   {
                     ...entry('a', 'A TV Show'),
                     item: {
-                      source: 'tvdb-series',
+                      source: mediaSource,
                       externalId: '123',
                       title: 'A TV Show',
                       subtitle: '2020',
@@ -79,6 +80,9 @@ const renderAt = async (
                       overview: 'A series synopsis.',
                       creator: 'A Creator',
                       cast: ['An Actor'],
+                      ...(mediaSource === 'igdb-game'
+                        ? { developer: 'A Studio', publisher: 'A Publisher' }
+                        : {}),
                     },
                   },
                 ],
@@ -126,7 +130,7 @@ const renderAt = async (
     'GET /api/lists/closed/leaderboard': () =>
       Response.json({ hidden: true, revealsAt: '2026-01-10T00:00:00.000Z' }),
     'GET /api/catalog/sources': () =>
-      Response.json({ sources: ['tmdb-movie', 'tvdb-series', 'freeform', 'preset'] }),
+      Response.json({ sources: ['tmdb-movie', 'tvdb-series', 'igdb-game', 'freeform', 'preset'] }),
     'GET /api/roles': () =>
       Response.json({
         labels: [{ roleId: '900000000000000077', name: 'Film Club' }],
@@ -155,9 +159,25 @@ describe('every page passes automated accessibility checks', () => {
   test.each(['/lists/best-sci-fi', '/lists/best-sci-fi/results'])(
     'TV series state at %s is accessible',
     async (path) => {
-      const wrapper = await renderAt(path, true, false, false, false, true);
+      const wrapper = await renderAt(path, true, false, false, false, 'tvdb-series');
       expect(wrapper.text()).toContain('TheTVDB');
       await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
+
+  test.each(['/lists/best-sci-fi', '/lists/best-sci-fi/results'])(
+    'game state at %s is accessible',
+    async (path) => {
+      const wrapper = await renderAt(path, true, false, false, false, 'igdb-game');
+      expect(wrapper.text()).toContain('Game data and artwork from');
+      await expectAccessible(document.body);
+      if (path === '/lists/best-sci-fi') {
+        await wrapper.get('.entry__art').trigger('click');
+        await flushPromises();
+        expect(document.body.textContent).toContain('A Studio');
+        await expectAccessible(document.body);
+      }
       wrapper.unmount();
     },
   );
@@ -188,7 +208,7 @@ describe('every page passes automated accessibility checks', () => {
     wrapper.unmount();
   });
 
-  test.each(['tmdb-movie', 'tvdb-series'])(
+  test.each(['tmdb-movie', 'tvdb-series', 'igdb-game'])(
     'the %s nomination review dialog is accessible',
     async (source) => {
       const wrapper = await renderAt('/lists/best-sci-fi', true);
@@ -453,6 +473,7 @@ describe('site-wide content', () => {
       community: null,
       offersMovieData: false,
       offersTvData: false,
+      offersGameData: false,
       demo: false,
       backups: false,
     };

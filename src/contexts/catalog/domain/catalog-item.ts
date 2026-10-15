@@ -1,12 +1,13 @@
 import type { Brand } from '../../../shared/kernel/index.ts';
 
-export type ItemSourceKind = 'tmdb-movie' | 'tvdb-series' | 'freeform' | 'preset';
+export type ItemSourceKind = 'tmdb-movie' | 'tvdb-series' | 'igdb-game' | 'freeform' | 'preset';
 export type PresetId = Brand<string, 'PresetId'>;
 
 /** Where a list's items come from. Chosen when the list is created. */
 export type ItemSourceRef =
   | { readonly kind: 'tmdb-movie' }
   | { readonly kind: 'tvdb-series' }
+  | { readonly kind: 'igdb-game' }
   | { readonly kind: 'freeform' }
   | { readonly kind: 'preset'; readonly presetId: PresetId };
 
@@ -24,5 +25,7 @@ export interface CatalogItem {
   readonly overview?: string;
   readonly director?: string;
   readonly creator?: string;
+  readonly developer?: string;
+  readonly publisher?: string;
   readonly cast?: readonly string[];
 }

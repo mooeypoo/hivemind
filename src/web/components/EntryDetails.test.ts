@@ -22,6 +22,35 @@ const entry: EntryDto = {
 };
 
 describe('EntryDetails', () => {
+  test('shows game synopsis and developer/publisher companies with their own labels', () => {
+    const dialog = mount(EntryDetails, {
+      props: {
+        entry: {
+          ...entry,
+          item: {
+            source: 'igdb-game',
+            externalId: '1942',
+            title: 'A game',
+            subtitle: '2015',
+            imageUrl: null,
+            overview: 'A game synopsis.',
+            developer: 'A Studio',
+            publisher: 'A Publisher',
+          },
+        },
+        scale: { min: 1, max: 10 },
+      },
+      attachTo: document.body,
+    });
+    expect(dialog.text()).toContain('A game synopsis.');
+    expect(dialog.text()).toContain('Developer');
+    expect(dialog.text()).toContain('A Studio');
+    expect(dialog.text()).toContain('Publisher');
+    expect(dialog.text()).toContain('A Publisher');
+    expect(dialog.text()).not.toContain('Director');
+    dialog.unmount();
+  });
+
   test('shows series synopsis, creator, and cast without labeling creators as directors', () => {
     const item = {
       source: 'tvdb-series',

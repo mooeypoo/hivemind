@@ -42,11 +42,12 @@ export type LoginOutcomeCode =
 
 // ---- Catalog ----
 
-export type ItemSourceKind = 'tmdb-movie' | 'tvdb-series' | 'freeform' | 'preset';
+export type ItemSourceKind = 'tmdb-movie' | 'tvdb-series' | 'igdb-game' | 'freeform' | 'preset';
 
 export type ItemSourceDto =
   | { readonly kind: 'tmdb-movie' }
   | { readonly kind: 'tvdb-series' }
+  | { readonly kind: 'igdb-game' }
   | { readonly kind: 'freeform' }
   | { readonly kind: 'preset'; readonly presetId: string };
 
@@ -59,6 +60,8 @@ export interface CatalogItemDto {
   readonly overview?: string;
   readonly director?: string;
   readonly creator?: string;
+  readonly developer?: string;
+  readonly publisher?: string;
   readonly cast?: readonly string[];
 }
 
@@ -256,6 +259,7 @@ export interface SiteDto {
   /** Whether movie lists (TMDB) are offered, for the attribution line. */
   readonly offersMovieData: boolean;
   readonly offersTvData: boolean;
+  readonly offersGameData: boolean;
   /** Demo mode: pretend sign-in with sample data. Never true in production. */
   readonly demo: boolean;
   /** Whether backups are set up (`BACKUP_KEY`). */

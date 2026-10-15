@@ -11,6 +11,7 @@ export const lifecycleLabel: Record<Lifecycle, string> = {
 export const sourceLabel: Record<ItemSourceKind, string> = {
   'tmdb-movie': 'Movies (TMDB)',
   'tvdb-series': 'TV shows (TheTVDB)',
+  'igdb-game': 'Games (IGDB)',
   freeform: 'Free text',
   preset: 'Preset list (CSV)',
 };

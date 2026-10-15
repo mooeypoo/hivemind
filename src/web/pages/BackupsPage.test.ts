@@ -49,6 +49,7 @@ beforeEach(() => {
     community: null,
     offersMovieData: true,
     offersTvData: false,
+    offersGameData: false,
     demo: false,
     backups: true,
   };
@@ -63,6 +64,7 @@ describe('BackupsPage', () => {
       community: null,
       offersMovieData: true,
       offersTvData: false,
+      offersGameData: false,
       demo: false,
       backups: false,
     };

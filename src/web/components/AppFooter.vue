@@ -34,6 +34,10 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
         TV series data from <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>, used under
         its API terms.
       </template>
+      <template v-if="site.info?.offersGameData === true">
+        Game data and artwork from <a href="https://www.igdb.com/" rel="noopener">IGDB</a>, used
+        under Twitch's developer terms.
+      </template>
     </p>
   </footer>
 </template>

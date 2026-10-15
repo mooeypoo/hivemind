@@ -5,14 +5,31 @@ defineProps<{ item: CatalogItemDto }>();
 </script>
 
 <template>
-  <div v-if="item.source === 'tmdb-movie' || item.source === 'tvdb-series'" class="movie-metadata">
+  <div
+    v-if="['tmdb-movie', 'tvdb-series', 'igdb-game'].includes(item.source)"
+    class="movie-metadata"
+  >
     <p v-if="item.subtitle !== null" class="entry-details__subtitle">{{ item.subtitle }}</p>
     <p v-if="item.overview != null" class="entry-details__overview">{{ item.overview }}</p>
     <p v-else class="meta">No overview available.</p>
     <dl
-      v-if="item.director != null || item.creator != null || item.cast != null"
+      v-if="
+        item.director != null ||
+        item.creator != null ||
+        item.cast != null ||
+        item.developer != null ||
+        item.publisher != null
+      "
       class="entry-details__credits"
     >
+      <div v-if="item.developer != null">
+        <dt>Developer</dt>
+        <dd>{{ item.developer }}</dd>
+      </div>
+      <div v-if="item.publisher != null">
+        <dt>Publisher</dt>
+        <dd>{{ item.publisher }}</dd>
+      </div>
       <div v-if="item.creator != null">
         <dt>Created by</dt>
         <dd>{{ item.creator }}</dd>

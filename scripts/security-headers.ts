@@ -7,6 +7,7 @@
 export const IMAGE_HOSTS = [
   'https://image.tmdb.org',
   'https://artworks.thetvdb.com',
+  'https://images.igdb.com',
   'https://cdn.discordapp.com',
 ] as const;
 

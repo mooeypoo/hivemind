@@ -40,7 +40,11 @@ const emit = defineEmits<{ open: [] }>();
       </h3>
       <p
         v-if="
-          entry.item.subtitle !== null || entry.item.director != null || entry.item.creator != null
+          entry.item.subtitle !== null ||
+          entry.item.director != null ||
+          entry.item.creator != null ||
+          entry.item.developer != null ||
+          entry.item.publisher != null
         "
         class="entry__subtitle"
       >
@@ -48,7 +52,10 @@ const emit = defineEmits<{ open: [] }>();
         <span
           v-if="
             entry.item.subtitle !== null &&
-            (entry.item.director != null || entry.item.creator != null)
+            (entry.item.director != null ||
+              entry.item.creator != null ||
+              entry.item.developer != null ||
+              entry.item.publisher != null)
           "
           aria-hidden="true"
         >
@@ -56,6 +63,12 @@ const emit = defineEmits<{ open: [] }>();
         </span>
         <span v-if="entry.item.creator != null">Created by {{ entry.item.creator }}</span>
         <span v-else-if="entry.item.director != null">Directed by {{ entry.item.director }}</span>
+        <span v-else-if="entry.item.developer != null">
+          Developed by {{ entry.item.developer }}
+        </span>
+        <span v-else-if="entry.item.publisher != null">
+          Published by {{ entry.item.publisher }}
+        </span>
       </p>
       <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
       <p v-else-if="entry.nominatedBy !== null" class="entry__meta">
