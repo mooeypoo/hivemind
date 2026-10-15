@@ -30,6 +30,22 @@ const imageUrl = (value: unknown): string | null => {
   }
 };
 
+const SERIES_POSTER = 2;
+
+// Search shows the highest-scored poster; a series' `image` can be an older one.
+const topPoster = (artworks: unknown): string | null => {
+  if (!Array.isArray(artworks)) return null;
+  const posters = artworks
+    .map(record)
+    .filter((artwork) => artwork.type === SERIES_POSTER && imageUrl(artwork.image) !== null)
+    .sort(
+      (first, second) =>
+        (typeof second.score === 'number' ? second.score : 0) -
+        (typeof first.score === 'number' ? first.score : 0),
+    );
+  return posters[0] === undefined ? null : imageUrl(posters[0].image);
+};
+
 const toItem = (value: unknown, extended: boolean): CatalogItem | null => {
   const show = record(value);
   const externalId = String(extended ? show.id : show.tvdb_id);
@@ -67,7 +83,9 @@ const toItem = (value: unknown, extended: boolean): CatalogItem | null => {
     externalId,
     title: extended ? title : text(translations.eng) || title,
     subtitle: /^\d{4}/.test(year) ? year.slice(0, 4) : null,
-    imageUrl: imageUrl(extended ? show.image : show.thumbnail) ?? imageUrl(show.image_url),
+    imageUrl: extended
+      ? (topPoster(show.artworks) ?? imageUrl(show.image))
+      : (imageUrl(show.thumbnail) ?? imageUrl(show.image_url)),
     ...(overview === '' ? {} : { overview }),
     ...(creator === '' ? {} : { creator }),
     ...(cast.length === 0 ? {} : { cast }),

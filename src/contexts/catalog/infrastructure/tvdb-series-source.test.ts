@@ -122,6 +122,32 @@ describe('TVDB series source', () => {
     expect(await source.resolve(ref, '123')).toEqual(err(catalogErrors.itemNotFound));
   });
 
+  test('uses the highest-scored poster, as search does, over the series image', async () => {
+    const top = 'https://artworks.thetvdb.com/banners/v4/series/280619/posters/61acea8cc0aab.jpg';
+    const fetchFn = fakeFetch(() =>
+      Response.json({
+        status: 'success',
+        data: {
+          id: 280619,
+          name: 'The Expanse',
+          image: 'https://artworks.thetvdb.com/banners/posters/280619-4.jpg',
+          artworks: [
+            {
+              type: 2,
+              score: 100017,
+              image: 'https://artworks.thetvdb.com/banners/posters/280619-4.jpg',
+            },
+            { type: 3, score: 900000, image: 'https://artworks.thetvdb.com/banners/fanart/1.jpg' },
+            { type: 2, score: 999999, image: 'https://untrusted.example/poster.jpg' },
+            { type: 2, score: 100021, image: top },
+          ],
+        },
+      }),
+    );
+    const result = await createTvdbSeriesSource('key', fetchFn).resolve(ref, '280619');
+    expect(result.ok && result.value.imageUrl).toBe(top);
+  });
+
   test('omits missing credits and images from unapproved hosts', async () => {
     const fetchFn = fakeFetch(() =>
       Response.json({
