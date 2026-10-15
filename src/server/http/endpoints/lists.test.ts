@@ -126,7 +126,7 @@ describe('GET /api/catalog/sources', () => {
         (await call<SourcesDto>(availableSources, 'GET', '/api/catalog/sources', admin)).body
           .sources,
       ).toEqual(sources);
-      for (const kind of ['tmdb-movie', 'tvdb-series'] as const) {
+      for (const kind of ['tmdb-movie', 'tvdb-series', 'igdb-game'] as const) {
         if (sources.some((source) => source === kind)) continue;
         const created = await call<ErrorDto>(createList, 'POST', '/api/lists', admin, {
           title: 'Unavailable',
@@ -138,6 +138,111 @@ describe('GET /api/catalog/sources', () => {
       }
     },
   );
+});
+
+describe('an IGDB game list, end to end', () => {
+  test('offers games independently, snapshots fresh details, rates and restores companies in backups', async () => {
+    await h.close();
+    let lookups = 0;
+    h = await startHarness(
+      {
+        ...testConfig,
+        tmdbReadToken: null,
+        igdb: { clientId: 'game-client', clientSecret: 'game-secret' },
+      },
+      {
+        'id.twitch.tv': () =>
+          Response.json({ access_token: 'game-token', expires_in: 3600, token_type: 'bearer' }),
+        'api.igdb.com': () =>
+          Response.json([
+            {
+              id: 123,
+              name: 'A Game',
+              summary: ++lookups === 1 ? 'Search synopsis.' : 'Fresh synopsis.',
+              first_release_date: 1431993600,
+              cover: { image_id: 'co123' },
+              involved_companies: [
+                { developer: true, company: { name: 'A Studio' } },
+                { publisher: true, company: { name: 'A Publisher' } },
+              ],
+            },
+          ]),
+      },
+    );
+    admin = await signInAs(h, { id: SITE_ADMIN_ID });
+    ada = await signInAs(h, { id: '900000000000000010', username: 'ada' });
+    expect(
+      (await call<SourcesDto>(availableSources, 'GET', '/api/catalog/sources', admin)).body.sources,
+    ).toEqual(['igdb-game', 'freeform', 'preset']);
+    const list = await openList({
+      title: 'Best Games',
+      slug: 'best-games',
+      itemSource: { kind: 'igdb-game' },
+    });
+    const search = await call<SearchResultsDto>(
+      searchForList,
+      'GET',
+      `/api/lists/${list.id}/search?q=game`,
+      ada,
+    );
+    expect(search.status).toBe(200);
+    expect(search.body.items[0]).toMatchObject({
+      source: 'igdb-game',
+      overview: 'Search synopsis.',
+      developer: 'A Studio',
+      publisher: 'A Publisher',
+    });
+    const nominated = await call<EntryDto>(nominate, 'POST', `/api/lists/${list.id}/entries`, ada, {
+      externalId: '123',
+    });
+    expect(nominated.status).toBe(201);
+    expect(nominated.body).toMatchObject({
+      id: 'igdb-game.123',
+      item: {
+        overview: 'Fresh synopsis.',
+        developer: 'A Studio',
+        publisher: 'A Publisher',
+        imageUrl: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co123.jpg',
+      },
+    });
+    const detail = await call<ListDetailDto>(getList, 'GET', `/api/lists/${list.id}`, ada);
+    expect(detail.body.entries[0]?.item).toEqual(nominated.body.item);
+    expect(
+      (
+        await call(changeScore, 'PUT', `/api/lists/${list.id}/ballot`, ada, {
+          entryId: nominated.body.id,
+          score: 8,
+        })
+      ).status,
+    ).toBe(200);
+    const board = await call<LeaderboardDto>(
+      getLeaderboard,
+      'GET',
+      `/api/lists/${list.id}/leaderboard`,
+      ada,
+    );
+    expect(!board.body.hidden && board.body.rows[0]?.item).toEqual(nominated.body.item);
+    const file = await call<unknown>(
+      exportBackup,
+      'GET',
+      '/api/admin/backup?list=best-games',
+      admin,
+    );
+    expect(file.status).toBe(200);
+    expect((await call(importBackup, 'POST', '/api/admin/backup', admin, file.body)).status).toBe(
+      200,
+    );
+    const copy = await call<ListDetailDto>(getList, 'GET', '/api/lists/best-games-2', admin);
+    expect(copy.body.visibility).toBe('hidden');
+    expect(copy.body.itemSource).toEqual({ kind: 'igdb-game' });
+    expect(copy.body.entries[0]?.item).toEqual(nominated.body.item);
+    await call(setVisibility, 'PUT', '/api/lists/best-games-2/visibility', admin, {
+      visibility: 'public',
+    });
+    const ballot = await call<BallotDto>(getMyBallot, 'GET', '/api/lists/best-games-2/ballot', ada);
+    expect(ballot.status).toBe(200);
+    expect(ballot.body.scores[nominated.body.id]).toBe(8);
+  });
 });
 
 describe('a TVDB series list, end to end', () => {

@@ -33,6 +33,45 @@ afterEach(() => {
 });
 
 describe('NominatePanel', () => {
+  test('shows game companies in search and reviews fresh game details before nomination', async () => {
+    const item = {
+      source: 'igdb-game',
+      externalId: '123',
+      title: 'A Game',
+      subtitle: '2020',
+      imageUrl: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co123.jpg',
+      overview: 'Search synopsis.',
+      developer: 'A Studio',
+      publisher: 'A Publisher',
+    };
+    const calls = stubApi({
+      'GET /api/lists/list-1/search': () => Response.json({ items: [item] }),
+      'GET /api/lists/list-1/item': () => Response.json({ ...item, overview: 'Fresh synopsis.' }),
+      'POST /api/lists/list-1/entries': () =>
+        Response.json(
+          { id: 'igdb-game.123', item, nominatedBy: null, isMine: true, nominatedAt: '' },
+          { status: 201 },
+        ),
+    });
+    const panel = mount(NominatePanel, {
+      props: { list: openTmdbList({ itemSource: { kind: 'igdb-game' } }) },
+    });
+    await panel.get('input[type=search]').setValue('game');
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    expect(panel.get('.result').text()).toContain('Developer: A Studio');
+    expect(panel.get('.result').text()).toContain('Publisher: A Publisher');
+    expect(panel.get('.result img').attributes('src')).toBe(item.imageUrl);
+    await panel.get('.result button').trigger('click');
+    await flushPromises();
+    expect(panel.get('dialog').text()).toContain('Fresh synopsis.');
+    expect(panel.get('dialog').text()).toContain('A Studio');
+    await panel.get('dialog .button--primary').trigger('click');
+    await flushPromises();
+    expect(calls[2]).toMatchObject({ method: 'POST', body: { externalId: '123' } });
+    panel.unmount();
+  });
+
   test('reviews TV series details and creator credits before nominating', async () => {
     const item = {
       source: 'tvdb-series',

@@ -11,6 +11,22 @@ const valid = {
 };
 
 describe('loadConfig', () => {
+  test.each([
+    ['', '', false],
+    ['client', '', false],
+    ['', 'secret', false],
+    [' client ', ' secret ', true],
+  ])('enables IGDB only with both credentials: %j / %j', (clientId, clientSecret, enabled) => {
+    const result = loadConfig({
+      ...valid,
+      IGDB_CLIENT_ID: clientId,
+      IGDB_CLIENT_SECRET: clientSecret,
+    });
+    expect(result.ok && result.value.igdb).toEqual(
+      enabled ? { clientId: 'client', clientSecret: 'secret' } : null,
+    );
+  });
+
   test('accepts a complete environment; TMDB is optional', () => {
     const result = loadConfig(valid);
     expect(result.ok && result.value.tmdbReadToken).toBeNull();

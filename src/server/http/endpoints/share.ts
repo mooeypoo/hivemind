@@ -68,7 +68,7 @@ export const sharePage = async (request: Request, app: App): Promise<Response> =
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
         'Content-Security-Policy':
-          "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://image.tmdb.org https://artworks.thetvdb.com https://cdn.discordapp.com data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+          "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://image.tmdb.org https://artworks.thetvdb.com https://images.igdb.com https://cdn.discordapp.com data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
         'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',

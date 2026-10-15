@@ -68,6 +68,29 @@ describe('ListEditor', () => {
       'preset',
     ]);
     expect(editor.find('input[value=tvdb-series]').exists()).toBe(false);
+    expect(editor.find('input[value=igdb-game]').exists()).toBe(false);
+  });
+
+  test('offers IGDB only when available and sends the selected game source', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': () =>
+        Response.json({ sources: ['igdb-game', 'freeform', 'preset'] }),
+      'GET /api/roles': roles,
+      'POST /api/lists': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', itemSource: { kind: 'igdb-game' } }), {
+          status: 201,
+        }),
+    });
+    const editor = await mountAt('/admin/lists/new');
+    expect(editor.text()).toContain('Games (IGDB)');
+    await editor.get('input[value=igdb-game]').setValue(true);
+    await editor.get('#title').setValue('Best Games');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      itemSource: { kind: 'igdb-game' },
+    });
+    editor.unmount();
   });
 
   test('the address follows the title until you edit it', async () => {

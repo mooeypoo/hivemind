@@ -89,7 +89,7 @@ const nominate = async (body: { externalId: string } | { title: string }) => {
   return true;
 };
 
-// Search (TMDB and preset pools)
+// Search
 const search = async () => {
   const q = query.value.trim();
   if (q === '') {
@@ -285,6 +285,12 @@ const nominateSelected = async () => {
                 item.subtitle
               }}</span>
               <span v-if="item.overview != null" class="result__overview">{{ item.overview }}</span>
+              <span v-if="item.developer != null" class="result__subtitle">
+                Developer: {{ item.developer }}
+              </span>
+              <span v-if="item.publisher != null" class="result__subtitle">
+                Publisher: {{ item.publisher }}
+              </span>
             </span>
             <span v-if="inList.has(`${item.source}:${item.externalId}`)" class="tag"
               >Already in the list</span
@@ -295,13 +301,13 @@ const nominateSelected = async () => {
               class="button"
               :disabled="busy"
               @click="
-                item.source === 'tmdb-movie' || item.source === 'tvdb-series'
+                ['tmdb-movie', 'tvdb-series', 'igdb-game'].includes(item.source)
                   ? review(item)
                   : nominate({ externalId: item.externalId })
               "
             >
               {{
-                item.source === 'tmdb-movie' || item.source === 'tvdb-series'
+                ['tmdb-movie', 'tvdb-series', 'igdb-game'].includes(item.source)
                   ? 'Review'
                   : 'Nominate'
               }}

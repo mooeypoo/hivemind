@@ -118,6 +118,47 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expectNoSidewaysScroll(page);
       });
 
+      test(`IGDB game review, rating and results at ${String(width)} px fit on screen`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin, { games: true });
+        await page.goto('/lists/films');
+        await expect(page.getByText('Games (IGDB)')).toBeVisible();
+        await page.getByRole('button', { name: 'Rate one by one' }).click();
+        const stage = page.getByRole('dialog', { name: 'Rate one by one' });
+        await expect(stage.getByText('Developer', { exact: true })).toBeVisible();
+        await expect(stage.getByText('Publisher', { exact: true })).toBeVisible();
+        await expect(stage.getByText(/A game synopsis/)).toBeVisible();
+        expect(
+          await stage.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth),
+        ).toBeGreaterThan(0);
+        await expectNoSidewaysScroll(page);
+        await stage.getByRole('button', { name: 'Stop' }).click();
+        await page.getByRole('tab', { name: 'Nominate' }).click();
+        await page.getByRole('searchbox', { name: 'Search' }).fill('game');
+        await expect(page.locator('.result')).toContainText('A Development Studio');
+        await page.getByRole('button', { name: 'Review', exact: true }).click();
+        const review = page.getByRole('dialog', {
+          name: 'A Game With A Very Long Title For A Small Screen',
+        });
+        await expect(review.getByText('Developer', { exact: true })).toBeVisible();
+        await expect(review.getByText('Publisher', { exact: true })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+        await review.getByRole('button', { name: 'Cancel', exact: true }).click();
+        await page.goto('/lists/films/results');
+        await expect(page.locator('.podium')).toContainText('A Development Studio');
+        await page.locator('.podium').getByRole('button').first().click();
+        const details = page.getByRole('dialog', {
+          name: 'A Game With A Very Long Title For A Small Screen',
+        });
+        await expect(details.getByText(/A game synopsis/)).toBeVisible();
+        await expect(details.getByText('Publisher', { exact: true })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+        await details.getByRole('button', { name: 'Close', exact: true }).click();
+        await expect(page.getByRole('link', { name: 'IGDB', exact: true }).first()).toBeVisible();
+      });
+
       test(`compact movie standings at ${String(width)} px fit and open details`, async ({
         page,
       }) => {

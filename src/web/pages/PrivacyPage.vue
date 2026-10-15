@@ -45,6 +45,11 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         creators and two cast members where available) from TheTVDB. These describe the shows, not
         you, and are kept with the list, including after it is archived.
       </li>
+      <li v-if="site.info?.offersGameData === true">
+        <strong>Details of nominated games</strong> (title, release year, cover address, synopsis,
+        and developer and publisher companies where available) from IGDB. These describe games, not
+        you, and are kept with the list, including after it is archived.
+      </li>
     </ul>
 
     <h2>What we never store</h2>
@@ -105,6 +110,12 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       identity or scores. Posters load from TheTVDB's artwork service, which receives your IP
       address when your browser requests an image.
     </p>
+    <p v-if="site.info?.offersGameData === true">
+      Game searches and selected game IDs are sent to IGDB by our server, without your Discord
+      identity or scores. Covers load from IGDB's image service, which receives your IP address when
+      your browser requests an image. Twitch application tokens are kept only in server memory and
+      renewed when needed; they do not identify community members.
+    </p>
 
     <h2 id="download">Download my data</h2>
     <p>
@@ -149,6 +160,13 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         TV series data and artwork come from
         <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>
         and are used under its API terms, separately from the software's license.
+      </li>
+      <li v-if="site.info?.offersGameData === true">
+        Game data and artwork come from <a href="https://www.igdb.com/" rel="noopener">IGDB</a>,
+        under the
+        <a href="https://www.twitch.tv/p/en/legal/developer-agreement/" rel="noopener"
+          >Twitch Developer Services Agreement</a
+        >, separately from the software's license.
       </li>
     </ul>
 

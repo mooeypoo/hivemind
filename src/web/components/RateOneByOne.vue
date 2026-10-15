@@ -49,7 +49,7 @@ const next = () => {
         <h3 class="one-by-one__title">{{ entry.item.title }}</h3>
         <p v-if="entry.item.subtitle !== null" class="meta">{{ entry.item.subtitle }}</p>
         <div
-          v-if="entry.item.source === 'tmdb-movie' || entry.item.source === 'tvdb-series'"
+          v-if="['tmdb-movie', 'tvdb-series', 'igdb-game'].includes(entry.item.source)"
           class="one-by-one__movie-details"
         >
           <p v-if="entry.item.overview != null" class="entry-details__overview">
@@ -57,10 +57,22 @@ const next = () => {
           </p>
           <dl
             v-if="
-              entry.item.director != null || entry.item.creator != null || entry.item.cast != null
+              entry.item.director != null ||
+              entry.item.creator != null ||
+              entry.item.cast != null ||
+              entry.item.developer != null ||
+              entry.item.publisher != null
             "
             class="entry-details__credits"
           >
+            <div v-if="entry.item.developer != null">
+              <dt>Developer</dt>
+              <dd>{{ entry.item.developer }}</dd>
+            </div>
+            <div v-if="entry.item.publisher != null">
+              <dt>Publisher</dt>
+              <dd>{{ entry.item.publisher }}</dd>
+            </div>
             <div v-if="entry.item.creator != null">
               <dt>Created by</dt>
               <dd>{{ entry.item.creator }}</dd>

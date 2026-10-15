@@ -15,6 +15,7 @@ export interface AppConfig {
   /** Null when no list uses the `tmdb-movie` source. */
   readonly tmdbReadToken: string | null;
   readonly tvdbReadToken: string | null;
+  readonly igdb: { readonly clientId: string; readonly clientSecret: string } | null;
   /** How the site shows which Discord community it belongs to. Both optional. */
   readonly community: { readonly inviteCode: string | null; readonly name: string | null };
   /** `DEMO_MODE=true`. Demo mode also requires a non-production deploy; see composition. */
@@ -49,6 +50,8 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
   const sessionSecret = required('SESSION_SECRET');
   const tmdbReadToken = env.TMDB_READ_TOKEN?.trim() ?? '';
   const tvdbReadToken = env.TVDB_READ_TOKEN?.trim() ?? '';
+  const igdbClientId = env.IGDB_CLIENT_ID?.trim() ?? '';
+  const igdbClientSecret = env.IGDB_CLIENT_SECRET?.trim() ?? '';
   const inviteRaw = env.DISCORD_INVITE_CODE?.trim() ?? '';
   const inviteCode = inviteRaw === '' ? null : inviteCodeFrom(inviteRaw);
   const communityName = env.COMMUNITY_NAME?.trim() ?? '';
@@ -94,6 +97,10 @@ export const loadConfig = (env: Env): Result<AppConfig, string[]> => {
     sessionSecret,
     tmdbReadToken: tmdbReadToken === '' ? null : tmdbReadToken,
     tvdbReadToken: tvdbReadToken === '' ? null : tvdbReadToken,
+    igdb:
+      igdbClientId === '' || igdbClientSecret === ''
+        ? null
+        : { clientId: igdbClientId, clientSecret: igdbClientSecret },
     community: { inviteCode, name: communityName === '' ? null : communityName },
     demoRequested: env.DEMO_MODE?.trim().toLowerCase() === 'true',
     backupKey: backupKey === '' ? null : backupKey,

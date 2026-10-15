@@ -8,7 +8,13 @@ import {
 import type { ItemSourceKind } from '../domain/catalog-item.ts';
 import type { ItemSources } from './ports.ts';
 
-const ORDER: readonly ItemSourceKind[] = ['tmdb-movie', 'tvdb-series', 'freeform', 'preset'];
+const ORDER: readonly ItemSourceKind[] = [
+  'tmdb-movie',
+  'tvdb-series',
+  'igdb-game',
+  'freeform',
+  'preset',
+];
 
 /** Which sources an Admin can choose for a new list on this deployment. */
 export const makeAvailableSources =

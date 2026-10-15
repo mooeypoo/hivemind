@@ -12,6 +12,7 @@ export const getSite = async (_request: Request, app: App): Promise<Response> =>
     community: await app.identity.getCommunity(),
     offersMovieData: app.config.tmdbReadToken !== null,
     offersTvData: app.config.tvdbReadToken !== null,
+    offersGameData: app.config.igdb !== null,
     demo: app.demo,
     backups: app.backupsEnabled,
   };

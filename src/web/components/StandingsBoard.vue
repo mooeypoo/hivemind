@@ -112,6 +112,12 @@ const voters = (row: StandingRow) =>
             </button>
           </p>
           <p v-if="row.item.subtitle !== null" class="podium__subtitle">{{ row.item.subtitle }}</p>
+          <p
+            v-if="row.item.developer != null || row.item.publisher != null"
+            class="podium__subtitle"
+          >
+            {{ row.item.developer ?? row.item.publisher }}
+          </p>
           <p class="podium__score">
             <strong>{{ row.score?.toFixed(1) }}</strong>
             <span><span class="visually-hidden"> · </span>{{ votesText(row.votes) }}</span>
@@ -177,6 +183,12 @@ const voters = (row: StandingRow) =>
               </span>
               <span v-if="row.item.creator != null">Created by {{ row.item.creator }}</span>
               <span v-else-if="row.item.director != null">Directed by {{ row.item.director }}</span>
+            </span>
+            <span
+              v-if="row.item.developer != null || row.item.publisher != null"
+              class="ranking__metadata meta"
+            >
+              {{ row.item.developer ?? row.item.publisher }}
             </span>
             <span v-if="row.nominatedBy !== null" class="standing__nominator">
               Nominated by {{ row.nominatedBy }}
@@ -275,6 +287,12 @@ const voters = (row: StandingRow) =>
                   >Directed by {{ row.item.director }}</span
                 >
               </span>
+              <span
+                v-if="row.item.developer != null || row.item.publisher != null"
+                class="ranking__metadata meta"
+              >
+                {{ row.item.developer ?? row.item.publisher }}
+              </span>
               <span class="visually-hidden">, </span>
               <span class="tag">{{ needsText(row) }}</span>
               <span v-if="row.nominatedBy !== null" class="standing__nominator">
@@ -356,6 +374,12 @@ const voters = (row: StandingRow) =>
                 <span v-else-if="row.item.director != null"
                   >Directed by {{ row.item.director }}</span
                 >
+              </span>
+              <span
+                v-if="row.item.developer != null || row.item.publisher != null"
+                class="ranking__metadata meta"
+              >
+                {{ row.item.developer ?? row.item.publisher }}
               </span>
               <span v-if="row.nominatedBy !== null" class="standing__nominator">
                 Nominated by {{ row.nominatedBy }}

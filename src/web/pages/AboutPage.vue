@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CommunityBadge from '../components/CommunityBadge.vue';
+import IgdbAttribution from '../components/IgdbAttribution.vue';
 import { usePageTitle } from '../lib/page-title.ts';
 import { site } from '../state/site.ts';
 
@@ -54,5 +55,6 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
       TV series data and artwork from <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>,
       used under its API terms. Available credits vary by series.
     </p>
+    <IgdbAttribution v-if="site.info?.offersGameData === true" />
   </article>
 </template>

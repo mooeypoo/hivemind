@@ -13,6 +13,8 @@ export interface ItemSnapshot {
   readonly overview?: string;
   readonly director?: string;
   readonly creator?: string;
+  readonly developer?: string;
+  readonly publisher?: string;
   readonly cast?: readonly string[];
 }
 

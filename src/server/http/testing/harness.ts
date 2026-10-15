@@ -19,6 +19,7 @@ export const testConfig: AppConfig = {
   sessionSecret: 'test-session-secret-at-least-32-chars',
   tmdbReadToken: 'tmdb-test-token',
   tvdbReadToken: null,
+  igdb: null,
   community: { inviteCode: null, name: 'Test Community' },
   demoRequested: false,
   backupKey: 'test-backup-key-at-least-32-characters!!',
