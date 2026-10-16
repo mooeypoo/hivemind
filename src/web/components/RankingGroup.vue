@@ -16,6 +16,8 @@ const props = defineProps<{
   myScores?: Readonly<Record<string, number>> | undefined;
   publicScores?: PublicScoresDto | undefined;
   canVote?: boolean | undefined;
+  canDelete?: boolean | undefined;
+  canSetAside?: boolean | undefined;
   scoreState?:
     | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
     | undefined;
@@ -27,6 +29,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   rate: [event: { entryId: string; score: number | null }];
+  delete: [entry: EntryDto];
+  setAside: [entry: EntryDto];
 }>();
 
 const visible = computed(() => (props.board.hidden ? null : props.board));
@@ -120,7 +124,11 @@ const voters = (row: StandingRow) =>
               {{ row.item.title }}
             </button>
           </p>
-          <SetAsideNotice :reason="reasons.get(row.entryId)" />
+          <SetAsideNotice
+            :reason="reasons.get(row.entryId)"
+            :item-title="row.item.title"
+            @open="selectedId = row.entryId"
+          />
           <p v-if="row.item.subtitle !== null" class="podium__subtitle">{{ row.item.subtitle }}</p>
           <p
             v-if="row.item.developer != null || row.item.publisher != null"
@@ -177,7 +185,11 @@ const voters = (row: StandingRow) =>
             <button type="button" class="standing__title-button" @click="selectedId = row.entryId">
               {{ row.item.title }}
             </button>
-            <SetAsideNotice :reason="reasons.get(row.entryId)" />
+            <SetAsideNotice
+              :reason="reasons.get(row.entryId)"
+              :item-title="row.item.title"
+              @open="selectedId = row.entryId"
+            />
             <span
               v-if="
                 row.item.subtitle !== null || row.item.director != null || row.item.creator != null
@@ -277,7 +289,11 @@ const voters = (row: StandingRow) =>
               >
                 {{ row.item.title }}
               </button>
-              <SetAsideNotice :reason="reasons.get(row.entryId)" />
+              <SetAsideNotice
+                :reason="reasons.get(row.entryId)"
+                :item-title="row.item.title"
+                @open="selectedId = row.entryId"
+              />
               <span
                 v-if="
                   row.item.subtitle !== null ||
@@ -366,7 +382,11 @@ const voters = (row: StandingRow) =>
               >
                 {{ row.item.title }}
               </button>
-              <SetAsideNotice :reason="reasons.get(row.entryId)" />
+              <SetAsideNotice
+                :reason="reasons.get(row.entryId)"
+                :item-title="row.item.title"
+                @open="selectedId = row.entryId"
+              />
               <span
                 v-if="
                   row.item.subtitle !== null ||
@@ -441,7 +461,17 @@ const voters = (row: StandingRow) =>
         selectedId !== null && canVote && scoreState !== undefined ? scoreState(selectedId) : null
       "
       :final-score="selectedId === null ? undefined : myScores?.[selectedId]"
+      :can-delete="canDelete === true"
+      :can-set-aside="canSetAside === true"
       @close="selectedId = null"
+      @delete="
+        selectedId = null;
+        emit('delete', $event);
+      "
+      @set-aside="
+        selectedId = null;
+        emit('setAside', $event);
+      "
       @change="
         selectedId !== null ? emit('rate', { entryId: selectedId, score: $event }) : undefined
       "

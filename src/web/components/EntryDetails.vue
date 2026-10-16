@@ -41,7 +41,7 @@ const emit = defineEmits<{
       />
       <div class="entry-details__info">
         <MovieMetadata :item="entry.item" />
-        <SetAsideNotice :reason="entry.setAsideReason" />
+        <SetAsideNotice :reason="entry.setAsideReason" show-reason />
         <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
         <p v-else-if="entry.nominatedBy !== null" class="entry__meta">
           Nominated by {{ entry.nominatedBy }}

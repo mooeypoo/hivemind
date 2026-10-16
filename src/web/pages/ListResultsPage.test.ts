@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import type { LeaderboardDto, ListDetailDto } from '../../server/http/contracts.ts';
 import { openTmdbList, stubApi } from '../testing/fixtures.ts';
+import { session } from '../state/session.ts';
 import ListResultsPage from './ListResultsPage.vue';
 
 const Blank = { render: () => null };
@@ -20,6 +21,22 @@ const entry = (id: string, title: string, nominatedBy: string | null) => ({
   nominatedBy,
   isMine: false,
   nominatedAt: '2026-01-01T00:00:00.000Z',
+});
+const rootBoard = (): Extract<LeaderboardDto, { hidden: false }> => ({
+  hidden: false,
+  computedAt: new Date().toISOString(),
+  minVotes: 2,
+  rows: [
+    {
+      entryId: 'a',
+      item: item('Root'),
+      rank: 1,
+      score: 8,
+      votes: 3,
+      provisional: false,
+      votesNeeded: 0,
+    },
+  ],
 });
 
 const mountWith = async (list: ListDetailDto, board: LeaderboardDto) => {
@@ -68,9 +85,181 @@ const placeText = (place: { element: Element }) =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  session.me = null;
 });
 
 describe('ListResultsPage', () => {
+  test.each([
+    ['open', true, false, true, true],
+    ['closed', true, false, true, true],
+    ['archived', true, false, false, true],
+    ['open', false, false, false, false],
+    ['open', true, true, false, false],
+  ] as const)(
+    'entry management on %s lists (Admin: %s, paused: %s)',
+    async (lifecycle, isAdmin, participationPaused, canSetAside, canDelete) => {
+      session.me = { id: 'viewer', displayName: 'Viewer', avatarUrl: '/favicon.svg', isAdmin };
+      const page = await mountWith(
+        games({
+          lifecycle,
+          participationPaused,
+          entries: [{ ...entry('a', 'Root', null), deletionToken: 'incarnation' }],
+        }),
+        rootBoard(),
+      );
+      await page.get('.standing__title-button').trigger('click');
+      expect(page.find('button[aria-label="Permanently delete Root"]').exists()).toBe(canDelete);
+      expect(page.findAll('button').some((button) => button.text() === 'Set aside...')).toBe(
+        canSetAside,
+      );
+      page.unmount();
+    },
+  );
+
+  test('set-aside changes and deletion from results refresh all results data', async () => {
+    session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+    const root = { ...entry('a', 'Root', null), deletionToken: 'incarnation' };
+    let detail = games({ entries: [root] });
+    let board = rootBoard();
+    const page = await mountWith(detail, board);
+    const calls = stubApi({
+      'GET /api/lists/games': () => Response.json(detail),
+      'GET /api/lists/games/leaderboard': () => Response.json(board),
+      'GET /api/lists/games/ballot': () => Response.json({ listId: detail.id, scores: {} }),
+      'GET /api/lists/games/scores': () => Response.json({ visible: false }),
+      'PUT /api/lists/list-1/entries/set-aside': ({ body }) => {
+        expect(body).toEqual({
+          entryId: 'a',
+          token: 'incarnation',
+          expectedReason: null,
+          reason: 'Outside the criteria',
+        });
+        const updated = { ...root, setAsideReason: 'Outside the criteria' };
+        detail = { ...detail, entries: [updated] };
+        return Response.json(updated);
+      },
+      'POST /api/lists/list-1/entries/delete': ({ body }) => {
+        expect(body).toEqual({ entryId: 'a', token: 'incarnation', confirmation: 'Root' });
+        detail = { ...detail, entries: [] };
+        board = { ...rootBoard(), rows: [] };
+        return new Response(null, { status: 204 });
+      },
+    });
+    await page.get('.standing__title-button').trigger('click');
+    await page
+      .findAll('button')
+      .find((button) => button.text() === 'Set aside...')
+      ?.trigger('click');
+    await page.get('textarea').setValue('Outside the criteria');
+    await page.get('form').trigger('submit');
+    await flushPromises();
+    expect(page.find('.podium .set-aside-notice__reason').exists()).toBe(false);
+    expect(page.get('.podium .set-aside-notice').text()).toContain('Set aside');
+    await page.get('.standing__title-button').trigger('click');
+    await page.get('button[aria-label="Permanently delete Root"]').trigger('click');
+    const confirm = page.get('.dialog__actions .button--danger');
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await page.get('.dialog__confirm input').setValue('Root');
+    await confirm.trigger('click');
+    await flushPromises();
+    expect(page.find('.standing__title-button').exists()).toBe(false);
+    expect(calls.filter((call) => call.url.endsWith('/leaderboard'))).toHaveLength(2);
+    expect(calls.filter((call) => call.url.endsWith('/ballot'))).toHaveLength(2);
+    page.unmount();
+  });
+
+  test.each(['separate', 'combined'])(
+    'Admins can restore set-aside entries from the %s results',
+    async (mode) => {
+      session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+      const root = {
+        ...entry('a', 'Root', null),
+        deletionToken: 'incarnation',
+        setAsideReason: 'Outside criteria',
+      };
+      let detail = games({ lifecycle: 'closed', entries: [root] });
+      const ranked = rootBoard();
+      let board: LeaderboardDto = { ...ranked, groups: { main: [], setAside: ranked.rows } };
+      const page = await mountWith(detail, board);
+      const calls = stubApi({
+        'GET /api/lists/games': () => Response.json(detail),
+        'GET /api/lists/games/leaderboard': () => Response.json(board),
+        'GET /api/lists/games/ballot': () => Response.json({ listId: detail.id, scores: { a: 8 } }),
+        'GET /api/lists/games/scores': () => Response.json({ visible: false }),
+        'PUT /api/lists/list-1/entries/set-aside': ({ body }) => {
+          expect(body).toEqual({
+            entryId: 'a',
+            token: 'incarnation',
+            expectedReason: 'Outside criteria',
+            reason: null,
+          });
+          const updated = { ...root, setAsideReason: null };
+          detail = { ...detail, entries: [updated] };
+          board = rootBoard();
+          return Response.json(updated);
+        },
+      });
+      if (mode === 'combined') await page.get('input[value=combined]').setValue(true);
+      await page.get('.standing__title-button').trigger('click');
+      expect(page.find('button[aria-label="Permanently delete Root"]').exists()).toBe(true);
+      await page
+        .findAll('button')
+        .find((button) => button.text() === 'Edit set-aside status...')
+        ?.trigger('click');
+      expect(page.text()).toContain('changes the final standings');
+      await page
+        .findAll('button')
+        .find((button) => button.text() === 'Return to main ranking')
+        ?.trigger('click');
+      await flushPromises();
+      expect(page.find('.set-aside-ranking').exists()).toBe(false);
+      expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+      page.unmount();
+    },
+  );
+
+  test('pending deletion on results reports cleanup errors and can be retried', async () => {
+    session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+    let detail = games({
+      lifecycle: 'archived',
+      participationPaused: true,
+      entryDeletion: { entryId: 'a', token: 'incarnation', title: 'Root' },
+    });
+    const page = await mountWith(detail, rootBoard());
+    let attempts = 0;
+    stubApi({
+      'GET /api/lists/games': () => Response.json(detail),
+      'GET /api/lists/games/leaderboard': () => Response.json(rootBoard()),
+      'GET /api/lists/games/ballot': () => Response.json({ listId: detail.id, scores: {} }),
+      'GET /api/lists/games/scores': () => Response.json({ visible: false }),
+      'POST /api/lists/list-1/entries/delete': () => {
+        attempts += 1;
+        if (attempts === 1)
+          return Response.json(
+            {
+              error: { code: 'lists.deletion-busy', message: 'Earlier writes must finish.' },
+            },
+            { status: 409 },
+          );
+        detail = { ...detail, participationPaused: false, entryDeletion: null, entries: [] };
+        return new Response(null, { status: 204 });
+      },
+    });
+    await page.get('.notice button').trigger('click');
+    expect(page.text()).toContain('Deletion changes its final results');
+    await page.get('.dialog__confirm input').setValue('Root');
+    const confirm = page.get('.dialog__actions .button--danger');
+    await confirm.trigger('click');
+    await flushPromises();
+    expect(page.text()).toContain('Earlier writes must finish.');
+    expect(page.find('.notice button').exists()).toBe(true);
+    await confirm.trigger('click');
+    await flushPromises();
+    expect(attempts).toBe(2);
+    expect(page.find('.notice button').exists()).toBe(false);
+    page.unmount();
+  });
+
   test('shows the same standings as the list: provisional entries wait below the ranking, no personal scores', async () => {
     const page = await mountWith(games(), {
       hidden: false,

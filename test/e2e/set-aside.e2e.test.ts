@@ -21,12 +21,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
         const pick = list.entries[0];
         if (pick === undefined) throw new Error('fixture');
         let reason: string | null = null;
+        let deleted = false;
         const detail = () => ({
           ...list,
-          entries: list.entries.map((entry) => ({
-            ...entry,
-            setAsideReason: entry.id === pick.id ? reason : null,
-          })),
+          entries: list.entries
+            .filter((entry) => !deleted || entry.id !== pick.id)
+            .map((entry) => ({
+              ...entry,
+              setAsideReason: entry.id === pick.id ? reason : null,
+            })),
         });
         const rows = list.entries.map((entry, index) => ({
           entryId: entry.id,
@@ -44,7 +47,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
               hidden: false,
               computedAt: new Date().toISOString(),
               minVotes: 3,
-              rows,
+              rows: rows.filter((row) => !deleted || row.entryId !== pick.id),
               ...(reason === null
                 ? {}
                 : {
@@ -73,8 +76,18 @@ for (const colorScheme of ['light', 'dark'] as const) {
           reason = body.reason;
           await route.fulfill({ json: { ...pick, setAsideReason: reason } });
         });
-        await page.goto('/lists/films');
+        await page.route('**/api/lists/list-1/entries/delete', async (route) => {
+          expect(route.request().postDataJSON()).toEqual({
+            entryId: pick.id,
+            token: pick.deletionToken,
+            confirmation: pick.item.title,
+          });
+          deleted = true;
+          await route.fulfill({ status: 204 });
+        });
+        await page.goto('/lists/films?tab=standings');
         await page
+          .locator('.list-standings')
           .getByRole('button', { name: `Open full details for ${pick.item.title}`, exact: true })
           .click();
         await page.getByRole('button', { name: 'Set aside...', exact: true }).click();
@@ -88,8 +101,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await fits(page);
         await editor.getByRole('button', { name: 'Set aside', exact: true }).click();
         await expect(editor).not.toBeVisible();
-        await expect(page.locator('.entry .set-aside-notice__reason')).toHaveText(explanation);
-        await page.getByRole('tab', { name: 'Standings', exact: true }).click();
+        await expect(page.locator('.set-aside-ranking .set-aside-notice__reason')).toHaveCount(0);
+        await page.locator('.set-aside-ranking .set-aside-notice__why').click();
+        const details = page.getByRole('dialog', { name: pick.item.title, exact: true });
+        await expect(details.locator('.set-aside-notice__reason')).toHaveText(explanation);
+        await fits(page);
+        await details.getByRole('button', { name: 'Close', exact: true }).click();
         await expect(page.locator('.set-aside-ranking')).toContainText(pick.item.title);
         await expect(page.locator('.set-aside-ranking .podium')).toHaveCount(0);
         await fits(page);
@@ -104,7 +121,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await fits(page);
         await page.getByRole('radio', { name: 'Combine ranking', exact: true }).check();
         await expect(page.locator('.set-aside-ranking')).toHaveCount(0);
-        await expect(page.locator('.podium .set-aside-notice__reason')).toHaveText(explanation);
+        await expect(page.locator('.podium .set-aside-notice__reason')).toHaveCount(0);
+        const why = page.locator('.podium .set-aside-notice__why');
+        await why.focus();
+        await page.keyboard.press('Enter');
+        await expect(details.locator('.set-aside-notice__reason')).toHaveText(explanation);
+        await fits(page);
+        await details.getByRole('button', { name: 'Close', exact: true }).click();
+        await expect(why).toBeFocused();
         await options.locator('summary').click();
         await expect(options).not.toHaveAttribute('open');
         await expect(page.locator('.set-aside-ranking')).toHaveCount(0);
@@ -118,30 +142,42 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(
           page.getByRole('radio', { name: 'Separate rankings', exact: true }),
         ).toBeChecked();
-        await expect(page.locator('.set-aside-ranking')).toContainText(explanation);
+        await expect(page.locator('.set-aside-ranking .set-aside-notice__reason')).toHaveCount(0);
         await fits(page);
         await page
           .locator('.set-aside-ranking')
-          .getByRole('button', { name: pick.item.title, exact: true })
+          .getByRole('button', { name: `Why was ${pick.item.title} set aside?`, exact: true })
           .click();
         await expect(page.getByRole('dialog').filter({ hasText: 'Set-aside rank' })).toBeVisible();
+        await expect(details.locator('.set-aside-notice__reason')).toHaveText(explanation);
         await fits(page);
-        await page.getByRole('button', { name: 'Close', exact: true }).click();
-        await page.getByRole('link', { name: 'Back to the list', exact: true }).click();
-        await expect(page.locator('.entry').last()).toContainText(pick.item.title);
-        await page
-          .getByRole('button', { name: `Open full details for ${pick.item.title}`, exact: true })
-          .click();
-        await expect(
-          page.getByRole('dialog', { name: pick.item.title, exact: true }),
-        ).toBeVisible();
         await page.getByRole('button', { name: 'Edit set-aside status...', exact: true }).click();
         await page.getByRole('button', { name: 'Return to main ranking', exact: true }).click();
-        await expect(page.locator('.entry .set-aside-notice')).toHaveCount(0);
-        await page.getByRole('tab', { name: 'Standings', exact: true }).click();
+        await expect(page.locator('.set-aside-ranking')).toHaveCount(0);
         await expect(
           page.getByRole('radio', { name: 'Separate rankings', exact: true }),
         ).toHaveCount(0);
+        await page
+          .getByRole('button', { name: `Open full details for ${pick.item.title}`, exact: true })
+          .click();
+        await page
+          .getByRole('button', { name: `Permanently delete ${pick.item.title}`, exact: true })
+          .click();
+        const confirmation = page.getByRole('dialog', {
+          name: `Permanently delete ${pick.item.title}?`,
+          exact: true,
+        });
+        await expect(confirmation).toBeVisible();
+        await expect(
+          confirmation.getByRole('button', { name: 'Delete entry permanently' }),
+        ).toBeDisabled();
+        await fits(page);
+        await confirmation.getByRole('textbox').fill(pick.item.title);
+        await confirmation.getByRole('button', { name: 'Delete entry permanently' }).click();
+        await expect(confirmation).not.toBeVisible();
+        await expect(page.getByRole('button', { name: pick.item.title, exact: true })).toHaveCount(
+          0,
+        );
         await fits(page);
       });
     }

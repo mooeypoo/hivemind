@@ -10,12 +10,18 @@ const props = defineProps<{
   myScores?: Readonly<Record<string, number>> | undefined;
   publicScores?: PublicScoresDto | undefined;
   canVote?: boolean | undefined;
+  canDelete?: boolean | undefined;
+  canSetAside?: boolean | undefined;
   scoreState?:
     | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
     | undefined;
   headingLevel?: 'h2' | 'h3' | undefined;
 }>();
-const emit = defineEmits<{ rate: [event: { entryId: string; score: number | null }] }>();
+const emit = defineEmits<{
+  rate: [event: { entryId: string; score: number | null }];
+  delete: [entry: EntryDto];
+  setAside: [entry: EntryDto];
+}>();
 const mode = ref<'separate' | 'combined'>('separate');
 const id = useId();
 const groups = computed(() => (props.board.hidden ? undefined : props.board.groups));
@@ -70,6 +76,8 @@ const asideBoard = computed((): LeaderboardDto =>
       :show-unrated="groups !== undefined"
       :heading-level="separate ? (headingLevel === 'h2' ? 'h3' : 'h4') : headingLevel"
       @rate="emit('rate', $event)"
+      @delete="emit('delete', $event)"
+      @set-aside="emit('setAside', $event)"
     />
     <section v-if="separate" class="set-aside-ranking" :aria-labelledby="`${id}-aside`">
       <component :is="headingLevel ?? 'h3'" :id="`${id}-aside`">
@@ -87,6 +95,8 @@ const asideBoard = computed((): LeaderboardDto =>
         rank-label="Set-aside rank"
         quiet
         @rate="emit('rate', $event)"
+        @delete="emit('delete', $event)"
+        @set-aside="emit('setAside', $event)"
       />
     </section>
   </div>

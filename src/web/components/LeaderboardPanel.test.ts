@@ -121,7 +121,10 @@ describe('LeaderboardPanel', () => {
       'Set-aside entries are ranked in their own group below the main list.',
     );
     expect(panel.findAll('.podium__place')).toHaveLength(1);
-    expect(panel.get('.set-aside-ranking').text()).toContain(aside.setAsideReason);
+    expect(panel.get('.set-aside-ranking').text()).not.toContain(aside.setAsideReason);
+    await panel.get('.set-aside-ranking .set-aside-notice__why').trigger('click');
+    expect(panel.get('.set-aside-notice__reason').text()).toBe(aside.setAsideReason);
+    await panel.get('dialog[open] .dialog__actions button:last-child').trigger('click');
     expect(panel.get('[aria-label="Set-aside rank 1"]').text()).toBe('1');
     await panel.get('input[value=combined]').setValue(true);
     expect(panel.get('.ranking-options > summary').text()).toBe('Ranking view: Combine ranking');
@@ -130,7 +133,10 @@ describe('LeaderboardPanel', () => {
     expect(panel.text()).toContain('Set-aside entries are included in the main list’s ranking.');
     expect(panel.find('.set-aside-ranking').exists()).toBe(false);
     expect(panel.findAll('.podium__place')).toHaveLength(2);
-    expect(panel.text()).toContain(aside.setAsideReason);
+    expect(panel.find('.podium .set-aside-notice__reason').exists()).toBe(false);
+    await panel.get('.podium .set-aside-notice__why').trigger('click');
+    expect(panel.get('.set-aside-notice__reason').text()).toBe(aside.setAsideReason);
+    await panel.get('dialog[open] .dialog__actions button:last-child').trigger('click');
     panel.get<HTMLDetailsElement>('.ranking-options').element.open = true;
     await panel.get('.ranking-options').trigger('toggle');
     await panel.get('input[value=separate]').setValue(true);
@@ -139,7 +145,7 @@ describe('LeaderboardPanel', () => {
   });
 
   test.each(['provisional', 'unrated'] as const)(
-    'set-aside %s entries stay visible with their reason',
+    'set-aside %s entries keep reasons in details in both views',
     async (state) => {
       const marked = row(
         'b',
@@ -165,12 +171,17 @@ describe('LeaderboardPanel', () => {
       });
       expect(panel.text()).toContain('All entries have been set aside');
       expect(panel.get('.set-aside-ranking').text()).toContain('Wingspan');
-      expect(panel.get('.set-aside-ranking').text()).toContain('<b>Not in scope</b>');
+      expect(panel.find('.set-aside-notice__reason').exists()).toBe(false);
+      await panel.get('.set-aside-notice__why').trigger('click');
+      expect(panel.get('.set-aside-notice__reason').text()).toBe('<b>Not in scope</b>');
       expect(panel.find('.set-aside-notice b').exists()).toBe(false);
+      await panel.get('dialog[open] .dialog__actions button:last-child').trigger('click');
       expect(panel.find('.podium').exists()).toBe(false);
       await panel.get('input[value=combined]').setValue(true);
       expect(panel.text()).toContain('Wingspan');
-      expect(panel.get('.set-aside-notice').text()).toContain('<b>Not in scope</b>');
+      expect(panel.find('.set-aside-notice__reason').exists()).toBe(false);
+      await panel.get('.set-aside-notice__why').trigger('click');
+      expect(panel.get('.set-aside-notice__reason').text()).toBe('<b>Not in scope</b>');
       panel.unmount();
     },
   );
