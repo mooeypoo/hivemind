@@ -42,11 +42,16 @@ export interface BallotsBackup {
     listId: string,
     sealed: string,
     keepMember: (memberId: string) => Promise<boolean>,
-  ): Promise<{
-    readonly restored: number;
-    readonly membersLeftOut: readonly string[];
-    readonly unreadable: boolean;
-  }>;
+  ): Promise<
+    Result<
+      {
+        readonly restored: number;
+        readonly membersLeftOut: readonly string[];
+        readonly unreadable: boolean;
+      },
+      DomainError
+    >
+  >;
 }
 
 export interface ErasureCheck {

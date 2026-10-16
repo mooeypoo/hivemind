@@ -182,6 +182,35 @@ describe('config', () => {
 });
 
 describe('editing', () => {
+  test.each(['05T00:00:00', '12T00:00:00'])(
+    'an unused nomination list can change its source at %s without unlocking other config',
+    (at) => {
+      const result = editList(published(), { itemSource: { kind: 'freeform' } }, t(at), {
+        itemSourceEditable: true,
+      });
+      expect(result.ok && result.value.config.itemSource).toEqual({ kind: 'freeform' });
+      const locked = editList(
+        published(),
+        { itemSource: { kind: 'freeform' }, scale: { min: 0, max: 5 } },
+        t(at),
+        { itemSourceEditable: true },
+      );
+      expect(!locked.ok && locked.error.details).toEqual(['scale']);
+    },
+  );
+
+  test('source permission never unlocks entry mode or a finished list', () => {
+    const seeded = editList(published(), { entryMode: 'seeded' }, t('12T00:00:00'), {
+      itemSourceEditable: true,
+    });
+    expect(!seeded.ok && seeded.error.details).toEqual(['entryMode']);
+    expect(
+      editList(published(), { itemSource: { kind: 'freeform' } }, t('21T00:00:00'), {
+        itemSourceEditable: true,
+      }).ok,
+    ).toBe(false);
+  });
+
   test('a draft can change any part of its config', () => {
     const result = editList(draft, { title: 'New', scale: { min: 0, max: 5 } }, t('01T00:00:00'));
     expect(result.ok && result.value.config.title).toBe('New');

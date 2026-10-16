@@ -5,6 +5,7 @@ import {
   withConflictRetry,
   type Actor,
   type Clock,
+  type IdGenerator,
   type DomainError,
   type Result,
 } from '../../../shared/kernel/index.ts';
@@ -14,6 +15,7 @@ import { publish, type List, type Schedule } from '../domain/list.ts';
 import { findList } from './find-list.ts';
 import type { Catalog, EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
+import { withEntryWrite } from './entry-write.ts';
 
 export interface ScheduleListDeps {
   readonly lists: ListRepository;
@@ -21,6 +23,7 @@ export interface ScheduleListDeps {
   readonly entries: EntryRepository;
   readonly catalog: Catalog;
   readonly clock: Clock;
+  readonly ids: IdGenerator;
 }
 
 const SEED_BATCH = 20;
@@ -37,18 +40,20 @@ export const makeScheduleList =
       if (!admin.ok) return admin;
       const found = await findList(deps, admin.value, input.list);
       if (!found.ok) return found;
-      const now = deps.clock.now();
-      const published = publish(found.value.value, input.schedule, now);
-      if (!published.ok) return published;
+      return withEntryWrite(deps.lists, found.value.value, deps.ids.next(), async (current) => {
+        const now = deps.clock.now();
+        const published = publish(current.value, input.schedule, now);
+        if (!published.ok) return published;
 
-      if (published.value.config.entryMode === 'seeded') {
-        const seeded = await seed(deps, published.value, now);
-        if (!seeded.ok) return seeded;
-      }
-      if (!(await deps.lists.save(published.value, found.value.version))) {
-        return err(listsErrors.conflict);
-      }
-      return ok(toListView(published.value, admin.value, now, 0));
+        if (published.value.config.entryMode === 'seeded') {
+          const seeded = await seed(deps, published.value, now);
+          if (!seeded.ok) return seeded;
+        }
+        if (!(await deps.lists.save(published.value, current.version))) {
+          return err(listsErrors.conflict);
+        }
+        return ok(toListView(published.value, admin.value, now, 0));
+      });
     });
 
 const seed = async (

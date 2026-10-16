@@ -76,5 +76,5 @@ export const api = {
   get: <T>(path: string, options?: RequestOptions) => call<T>('GET', path, options),
   post: <T>(path: string, body?: unknown) => call<T>('POST', path, { body }),
   put: <T>(path: string, body: unknown) => call<T>('PUT', path, { body }),
-  delete: <T>(path: string) => call<T>('DELETE', path),
+  delete: <T>(path: string, body?: unknown) => call<T>('DELETE', path, { body }),
 };

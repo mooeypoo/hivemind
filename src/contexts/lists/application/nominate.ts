@@ -13,7 +13,7 @@ import {
 import { entryIdFor, isActiveEntry, type Entry, type EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
 import { emptyLedger, release, reserve, type NominationLedger } from '../domain/ledger.ts';
-import { mayParticipate, nominationsOpen, type List } from '../domain/list.ts';
+import { mayParticipate, nominationsOpen, visibleTo, type List } from '../domain/list.ts';
 import { findList } from './find-list.ts';
 import type {
   Catalog,
@@ -24,6 +24,7 @@ import type {
 } from './ports.ts';
 import { toEntryView, type EntryView } from './views.ts';
 import { activeLedger } from './nomination-ledger.ts';
+import { withEntryWrite } from './entry-write.ts';
 
 export interface NominateDeps {
   readonly lists: ListRepository;
@@ -70,40 +71,47 @@ export const makeNominate =
       snapshotPurgedAt: null,
     };
 
-    const reserved = await withConflictRetry(() =>
-      updateLedger(deps, member.value, list, (ledger) =>
-        reserve(
-          ledger,
-          entry.id,
-          list.config.maxNominationsPerMember,
-          entry.nominationId ?? undefined,
-        ),
-      ),
-    );
-    if (!reserved.ok) return reserved;
-
-    const created = await withConflictRetry(async () => {
-      const current = await deps.entries.get(list.id, entry.id);
-      if (current !== null && isActiveEntry(current.value))
-        return err(listsErrors.alreadyNominated);
-      const saved =
-        current === null
-          ? await deps.entries.create(entry)
-          : await deps.entries.save(
-              { ...entry, withdrawnNominationIds: current.value.withdrawnNominationIds ?? [] },
-              current.version,
-            );
-      return saved ? ok(undefined) : err(listsErrors.conflict);
-    });
-    if (!created.ok) {
-      await withConflictRetry(() =>
+    return withEntryWrite(deps.lists, list, deps.ids.next(), async (currentList) => {
+      const list = currentList.value;
+      const now = deps.clock.now();
+      if (!visibleTo(list, member.value.isAdmin)) return err(listsErrors.notFound);
+      if (!mayParticipate(list, member.value.roleIds)) return err(listsErrors.roleRequired);
+      if (!nominationsOpen(list, now)) return err(listsErrors.nominationsClosed);
+      const reserved = await withConflictRetry(() =>
         updateLedger(deps, member.value, list, (ledger) =>
-          ok(release(ledger, entry.id, entry.nominationId ?? undefined)),
+          reserve(
+            ledger,
+            entry.id,
+            list.config.maxNominationsPerMember,
+            entry.nominationId ?? undefined,
+          ),
         ),
       );
-      return created;
-    }
-    return ok(toEntryView(entry, list, member.value, now));
+      if (!reserved.ok) return reserved;
+
+      const created = await withConflictRetry(async () => {
+        const current = await deps.entries.get(list.id, entry.id);
+        if (current !== null && isActiveEntry(current.value))
+          return err(listsErrors.alreadyNominated);
+        const saved =
+          current === null
+            ? await deps.entries.create(entry)
+            : await deps.entries.save(
+                { ...entry, withdrawnNominationIds: current.value.withdrawnNominationIds ?? [] },
+                current.version,
+              );
+        return saved ? ok(undefined) : err(listsErrors.conflict);
+      });
+      if (!created.ok) {
+        await withConflictRetry(() =>
+          updateLedger(deps, member.value, list, (ledger) =>
+            ok(release(ledger, entry.id, entry.nominationId ?? undefined)),
+          ),
+        );
+        return created;
+      }
+      return ok(toEntryView(entry, list, member.value, now));
+    });
   };
 
 const updateLedger = async (

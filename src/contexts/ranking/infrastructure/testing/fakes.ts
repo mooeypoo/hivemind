@@ -1,4 +1,10 @@
-import { domainError, err, ok } from '../../../../shared/kernel/index.ts';
+import {
+  domainError,
+  err,
+  ok,
+  type DomainError,
+  type Result,
+} from '../../../../shared/kernel/index.ts';
 import type {
   LeaderboardCache,
   ListSource,
@@ -17,6 +23,9 @@ const item = (title: string): ItemSnapshot => ({
 
 /** One list, `l1`, whose entries, ballots and settings tests change directly. */
 export class FakeRankingSources implements ListSource, ScoreSource {
+  withWrite<T>(_listId: string, work: () => Promise<Result<T, DomainError>>) {
+    return work();
+  }
   settings: Omit<RankingContext, 'entryIds'> = {
     listId: 'l1',
     resultsVisibility: 'live',

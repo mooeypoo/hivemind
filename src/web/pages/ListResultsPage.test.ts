@@ -138,7 +138,7 @@ describe('ListResultsPage', () => {
     vi.useFakeTimers();
     const calls: unknown[] = [];
     stubApi({
-      'GET /api/lists/games': () => Response.json(games()),
+      'GET /api/lists/games': () => Response.json(games({ writeRevision: 'after-deletion' })),
       'GET /api/lists/games/leaderboard': () =>
         Response.json({
           hidden: false,
@@ -162,6 +162,7 @@ describe('ListResultsPage', () => {
     const original = globalThis.fetch;
     vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) => {
       if (init.method === 'PUT') {
+        expect(input).toBe('/api/lists/list-1/ballot');
         calls.push(JSON.parse(init.body as string));
         return Promise.resolve(Response.json({ listId: 'games', scores: { a: 8 } }));
       }
@@ -195,7 +196,7 @@ describe('ListResultsPage', () => {
       await vi.advanceTimersByTimeAsync(250);
       await flushPromises();
 
-      expect(calls).toEqual([{ entryId: 'a', score: 8 }]);
+      expect(calls).toEqual([{ entryId: 'a', score: 8, revision: 'after-deletion' }]);
     } finally {
       vi.useRealTimers();
       page.unmount();

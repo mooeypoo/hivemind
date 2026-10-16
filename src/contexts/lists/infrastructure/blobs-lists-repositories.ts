@@ -44,6 +44,10 @@ interface ListRecordV2 {
   readonly archivedAt?: string | null;
   /** Added after v2 shipped; absent means public. */
   readonly visibility?: Visibility;
+  readonly entryWriteToken?: string;
+  readonly deletionRequested?: boolean;
+  readonly entryDeletion?: List['entryDeletion'];
+  readonly entryDeletionRevision?: string;
 }
 
 /** v1: a single optional required role. Still read; never written. */
@@ -109,6 +113,12 @@ const listToRecord = (list: List): ListRecordV2 => ({
   createdAt: list.createdAt.toISOString(),
   archivedAt: list.archivedAt?.toISOString() ?? null,
   visibility: list.visibility,
+  ...(list.entryWriteToken === undefined ? {} : { entryWriteToken: list.entryWriteToken }),
+  ...(list.deletionRequested === undefined ? {} : { deletionRequested: list.deletionRequested }),
+  ...(list.entryDeletion === undefined ? {} : { entryDeletion: list.entryDeletion }),
+  ...(list.entryDeletionRevision === undefined
+    ? {}
+    : { entryDeletionRevision: list.entryDeletionRevision }),
 });
 
 const upgradeList = (data: unknown): ListRecordV2 => {
@@ -139,6 +149,14 @@ const listFromRecord = (data: unknown): List => {
     createdAt: new Date(record.createdAt),
     visibility: record.visibility ?? 'public',
     archivedAt: record.archivedAt == null ? null : new Date(record.archivedAt),
+    ...(record.entryWriteToken === undefined ? {} : { entryWriteToken: record.entryWriteToken }),
+    ...(record.deletionRequested === undefined
+      ? {}
+      : { deletionRequested: record.deletionRequested }),
+    ...(record.entryDeletion === undefined ? {} : { entryDeletion: record.entryDeletion }),
+    ...(record.entryDeletionRevision === undefined
+      ? {}
+      : { entryDeletionRevision: record.entryDeletionRevision }),
   };
 };
 
@@ -212,11 +230,41 @@ const versioned = async <T>(store: Store, key: string, map: (data: unknown) => T
   return entry === null ? null : { value: map(entry.data), version: entry.version };
 };
 
+const deletedList = (data: unknown): boolean =>
+  typeof data === 'object' &&
+  data !== null &&
+  'v' in data &&
+  data.v === 3 &&
+  'deleted' in data &&
+  data.deleted === true;
+
 export const createBlobsListRepository = (store: Store): ListRepository => ({
-  get: (id) => versioned(store, `list/${id}`, listFromRecord),
+  async get(id) {
+    const entry = await readVersioned(store, `list/${id}`);
+    return entry === null || deletedList(entry.data)
+      ? null
+      : { value: listFromRecord(entry.data), version: entry.version };
+  },
   save: (list, expectedVersion) =>
     writeVersioned(store, `list/${list.id}`, listToRecord(list), expectedVersion),
-  all: () => readAll(store, 'list/', listFromRecord),
+  async all() {
+    const lists = await readAll(store, 'list/', (data) =>
+      deletedList(data) ? null : listFromRecord(data),
+    );
+    return lists.filter((list) => list !== null);
+  },
+  async delete(id) {
+    // Retaining only a fence prevents delayed creates/updates from resurrecting this ID.
+    await store.setJSON(`list/${id}`, { v: 3, deleted: true });
+  },
+  async beginEntryWrite(id, token) {
+    await store.setJSON(`entry-write/${id}/${token}`, { v: 1 });
+  },
+  endEntryWrite: (id, token) => store.delete(`entry-write/${id}/${token}`),
+  async hasEntryWrites(id) {
+    const { blobs } = await store.list({ prefix: `entry-write/${id}/` });
+    return blobs.length > 0;
+  },
 });
 
 export const createBlobsSlugIndex = (store: Store): SlugIndex => ({
@@ -224,11 +272,25 @@ export const createBlobsSlugIndex = (store: Store): SlugIndex => ({
     const data = (await store.get(`slug/${slug}`, { type: 'json' })) as { listId?: string } | null;
     return typeof data?.listId === 'string' ? (data.listId as ListId) : null;
   },
-  claim: (slug, id) => writeVersioned(store, `slug/${slug}`, { v: 1, listId: id }, null),
-  release: (slug) => store.delete(`slug/${slug}`),
+  async claim(slug, id) {
+    const current = await readVersioned(store, `slug/${slug}`);
+    if (current !== null && (current.data as { listId: unknown }).listId !== null) return false;
+    return writeVersioned(store, `slug/${slug}`, { v: 1, listId: id }, current?.version ?? null);
+  },
+  async release(slug, owner) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const current = await readVersioned(store, `slug/${slug}`);
+      if (current === null || (current.data as { listId: unknown }).listId !== owner) return;
+      if (await writeVersioned(store, `slug/${slug}`, { v: 1, listId: null }, current.version)) {
+        return;
+      }
+    }
+    throw new Error('Slug release conflicted twice; retry the operation.');
+  },
 });
 
 export const createBlobsEntryRepository = (store: Store): EntryRepository => ({
+  delete: (listId, entryId) => store.delete(`entry/${listId}/${entryId}`),
   create: (entry) =>
     writeVersioned(store, `entry/${entry.listId}/${entry.id}`, entryToRecord(entry), null),
   get: (listId, entryId) => versioned(store, `entry/${listId}/${entryId}`, entryFromRecord),

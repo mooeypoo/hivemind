@@ -81,6 +81,17 @@ export interface List {
   /** When it was archived; snapshot retention counts from here. */
   readonly archivedAt: Date | null;
   readonly visibility: Visibility;
+  /** Changes on entry-write admission, fencing source edits against in-flight nominations. */
+  readonly entryWriteToken?: string;
+  readonly deletionRequested?: boolean;
+  readonly entryDeletion?: {
+    readonly entryId: string;
+    readonly token: string;
+    readonly title: string;
+    readonly phase: 'cleaning' | 'finishing';
+  } | null;
+  /** Changes when an entry is permanently deleted; old admitted work cannot target its replacement. */
+  readonly entryDeletionRevision?: string;
 }
 
 export const DEFAULT_SCALE: Scale = { min: 1, max: 10 };
@@ -204,7 +215,12 @@ const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSO
  * All config is editable in `draft`. Once published, description and an extension of `closesAt`
  * may change; an active finite nomination cap may be removed, but never added or restored.
  */
-export const editList = (list: List, edit: ListEdit, now: Date): Result<List, DomainError> => {
+export const editList = (
+  list: List,
+  edit: ListEdit,
+  now: Date,
+  options: { readonly itemSourceEditable: boolean } = { itemSourceEditable: false },
+): Result<List, DomainError> => {
   const lifecycle = lifecycleOf(list, now);
   const { closesAt, ...configEdit } = edit;
 
@@ -216,7 +232,16 @@ export const editList = (list: List, edit: ListEdit, now: Date): Result<List, Do
         const current = list.config[field as keyof ListConfig];
         const removesCap =
           field === 'maxNominationsPerMember' && current !== null && value === null;
-        return !EDITABLE_WHEN_LIVE.has(field) && !removesCap && !sameValue(value, current);
+        const changesUnusedSource =
+          field === 'itemSource' &&
+          list.config.entryMode === 'nominations' &&
+          options.itemSourceEditable;
+        return (
+          !EDITABLE_WHEN_LIVE.has(field) &&
+          !removesCap &&
+          !changesUnusedSource &&
+          !sameValue(value, current)
+        );
       })
       .map(([field]) => field);
     if (locked.length > 0) return err(lockedFields(locked));
@@ -274,7 +299,8 @@ export const setVisibility = (list: List, visibility: Visibility): List => ({
 
 /** Whether this member may see the list at all: drafts and hidden lists are Admin-only. */
 export const visibleTo = (list: List, isAdmin: boolean): boolean =>
-  isAdmin || (list.phase !== 'draft' && list.visibility === 'public');
+  isAdmin ||
+  (list.deletionRequested !== true && list.phase !== 'draft' && list.visibility === 'public');
 
 /** When retention starts for an archived list. Lists archived before `archivedAt` existed use their close. */
 export const archivedSince = (list: List): Date | null =>

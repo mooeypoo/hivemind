@@ -113,6 +113,9 @@ onMounted(async () => {
   </section>
 
   <template v-else>
+    <p v-if="route.query.deleted === '1'" class="notice" role="status">
+      List deleted. Its address is available again.
+    </p>
     <header class="index-head">
       <div>
         <p class="eyebrow">{{ site.info?.community?.name ?? 'Community lists' }}</p>

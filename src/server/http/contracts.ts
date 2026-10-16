@@ -121,6 +121,11 @@ export interface ScheduleDto {
 export type Visibility = 'public' | 'hidden';
 
 export interface ListDto extends ListConfigDto {
+  /** Send with score changes; a permanent entry deletion invalidates older list snapshots. */
+  readonly writeRevision?: string | null;
+  readonly participationPaused?: boolean;
+  /** Pending permanent deletion: Admins may resume it, members cannot access it. */
+  readonly deleting?: boolean;
   readonly id: string;
   readonly lifecycle: Lifecycle;
   readonly schedule: ScheduleDto | null;
@@ -132,6 +137,16 @@ export interface ListDto extends ListConfigDto {
   };
 }
 
+export interface DeleteListRequest {
+  readonly confirmation: string;
+}
+
+export interface DeleteEntryRequest {
+  readonly entryId: string;
+  readonly token: string;
+  readonly confirmation: string;
+}
+
 export interface EntryDto {
   readonly id: string;
   readonly item: CatalogItemDto;
@@ -141,6 +156,8 @@ export interface EntryDto {
   readonly nominatedAt: string;
   /** Present only for the caller's own nomination while withdrawal is allowed. */
   readonly withdrawalToken?: string | null;
+  /** Admin-only confirmation token, specific to this nomination/seeded entry. */
+  readonly deletionToken?: string | null;
 }
 
 /** `GET /api/lists` */
@@ -150,6 +167,16 @@ export interface ListsDto {
 
 /** `GET /api/lists/:list` (id or slug) */
 export interface ListDetailDto extends ListDto {
+  /** Admin-only management of retained withdrawals, never included in rankings. */
+  readonly withdrawnEntries?: readonly EntryDto[];
+  /** Admin-only retry information; no entry/member data in the ordinary list summary. */
+  readonly entryDeletion?: {
+    readonly entryId: string;
+    readonly token: string;
+    readonly title: string;
+  } | null;
+  /** Admin-only ability, checked again at save time; withdrawn entries also lock the source. */
+  readonly itemSourceEditable: boolean;
   readonly entries: readonly EntryDto[];
   /** Archived movie lists: when movie details will be removed (TMDB terms). */
   readonly snapshotsExpireAt: string | null;
@@ -206,6 +233,7 @@ export interface BallotDto {
 export interface ChangeScoreRequest {
   readonly entryId: string;
   readonly score: number | null;
+  readonly revision?: string | null;
 }
 
 /** `GET /api/lists/:list/scores`; names are returned only for visible public scores. */

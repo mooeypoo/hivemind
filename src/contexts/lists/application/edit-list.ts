@@ -11,7 +11,7 @@ import {
 import { listsErrors } from '../domain/errors.ts';
 import { editList, type ListEdit } from '../domain/list.ts';
 import { findList } from './find-list.ts';
-import type { Catalog, ListRepository, SlugIndex } from './ports.ts';
+import type { Catalog, EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
 
 export interface EditListDeps {
@@ -19,6 +19,7 @@ export interface EditListDeps {
   readonly slugs: SlugIndex;
   readonly catalog: Catalog;
   readonly clock: Clock;
+  readonly entries: EntryRepository;
 }
 
 export const makeEditList =
@@ -32,7 +33,20 @@ export const makeEditList =
       const before = found.value.value;
       const now = deps.clock.now();
 
-      const edited = editList(before, input.edit, now);
+      const changesSource =
+        input.edit.itemSource !== undefined &&
+        JSON.stringify(input.edit.itemSource) !== JSON.stringify(before.config.itemSource);
+      const changesEntryMode =
+        input.edit.entryMode !== undefined && input.edit.entryMode !== before.config.entryMode;
+      if (changesSource || changesEntryMode) {
+        if (await deps.lists.hasEntryWrites(before.id)) {
+          return err(listsErrors.sourceWriteInProgress);
+        }
+        if ((await deps.entries.forList(before.id)).length > 0) {
+          return err(listsErrors.sourceHasEntries);
+        }
+      }
+      const edited = editList(before, input.edit, now, { itemSourceEditable: changesSource });
       if (!edited.ok) return edited;
       const after = edited.value;
 
@@ -51,9 +65,9 @@ export const makeEditList =
         return err(listsErrors.slugTaken);
       }
       if (!(await deps.lists.save(after, found.value.version))) {
-        if (slugChanged) await deps.slugs.release(after.config.slug);
+        if (slugChanged) await deps.slugs.release(after.config.slug, after.id);
         return err(listsErrors.conflict);
       }
-      if (slugChanged) await deps.slugs.release(before.config.slug);
+      if (slugChanged) await deps.slugs.release(before.config.slug, before.id);
       return ok(toListView(after, admin.value, now, 0));
     });

@@ -38,7 +38,7 @@ export const makeCreateList =
     const list = newList(deps.ids.next() as ListId, config.value, now);
     if (!(await deps.slugs.claim(list.config.slug, list.id))) return err(listsErrors.slugTaken);
     if (!(await deps.lists.save(list, null))) {
-      await deps.slugs.release(list.config.slug);
+      await deps.slugs.release(list.config.slug, list.id);
       return err(listsErrors.conflict);
     }
     return ok(toListView(list, admin.value, now, 0));

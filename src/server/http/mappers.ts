@@ -11,6 +11,9 @@ const scheduleDto = (schedule: Schedule | null): ScheduleDto | null =>
       };
 
 export const listDto = (view: ListView): ListDto => ({
+  deleting: view.deleting,
+  writeRevision: view.writeRevision,
+  participationPaused: view.participationPaused,
   id: view.id,
   title: view.title,
   slug: view.slug,
@@ -37,10 +40,21 @@ export const entryDto = (entry: EntryView): EntryDto => ({
   isMine: entry.isMine,
   nominatedAt: entry.nominatedAt.toISOString(),
   withdrawalToken: entry.withdrawalToken,
+  deletionToken: entry.deletionToken,
 });
 
 export const listDetailDto = (detail: ListDetail): ListDetailDto => ({
   ...listDto(detail),
+  itemSourceEditable: detail.itemSourceEditable,
+  entryDeletion:
+    detail.entryDeletion == null
+      ? null
+      : {
+          entryId: detail.entryDeletion.entryId,
+          token: detail.entryDeletion.token,
+          title: detail.entryDeletion.title,
+        },
   entries: detail.entries.map(entryDto),
+  withdrawnEntries: detail.withdrawnEntries.map(entryDto),
   snapshotsExpireAt: detail.snapshotsExpireAt?.toISOString() ?? null,
 });

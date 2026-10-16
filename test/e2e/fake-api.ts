@@ -35,6 +35,7 @@ const entry = (id: string, title: string, subtitle: string | null): EntryDto => 
   isMine: id === 'b',
   nominatedAt: '2026-01-01T00:00:00.000Z',
   withdrawalToken: id === 'b' ? 'claim-b' : null,
+  deletionToken: `entry-${id}`,
 });
 
 export const list: ListDetailDto = {
@@ -59,6 +60,7 @@ export const list: ListDetailDto = {
     closesAt: '2099-01-01T00:00:00.000Z',
   },
   viewer: { canParticipate: true, canNominate: true, nominationsUsed: 1 },
+  itemSourceEditable: false,
   entries: [
     entry('a', 'Eternal Sunshine of the Spotless Mind', '2004'),
     entry('b', 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', '1964'),

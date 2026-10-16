@@ -1,10 +1,50 @@
 import { domainError, type DomainError } from '../../../shared/kernel/index.ts';
 
 export const listsErrors = {
+  entryDeletionBusy: domainError(
+    'conflict',
+    'lists.entry-deletion-busy',
+    'An entry is being permanently deleted. Nominations, scores and list changes are paused until an Admin finishes deletion.',
+  ),
+  entryConfirmationMismatch: domainError(
+    'invalid',
+    'lists.entry-confirmation-mismatch',
+    'Type the entry title exactly to confirm permanent deletion.',
+  ),
+  immutableIdRequired: domainError(
+    'invalid',
+    'lists.immutable-id-required',
+    'Permanent deletion requires the original list ID, not its reusable address.',
+  ),
+  deleting: domainError(
+    'conflict',
+    'lists.deleting',
+    'This list is being permanently deleted. Only retrying deletion is allowed.',
+  ),
+  deletionBusy: domainError(
+    'conflict',
+    'lists.deletion-busy',
+    'Deletion has started, but earlier writes must finish before cleanup. Retry deletion shortly. If this persists, an operator must check unfinished writes.',
+  ),
+  confirmationMismatch: domainError(
+    'invalid',
+    'lists.confirmation-mismatch',
+    'Type the current list address exactly to confirm permanent deletion.',
+  ),
   notFound: domainError('not-found', 'lists.not-found', 'That list does not exist.'),
   slugTaken: domainError('conflict', 'lists.slug-taken', 'Another list already uses that slug.'),
   notADraft: domainError('invalid', 'lists.not-a-draft', 'Only a draft list can be scheduled.'),
   locked: domainError('invalid', 'lists.locked', 'This list can no longer be edited.'),
+  sourceHasEntries: domainError(
+    'invalid',
+    'lists.source-has-entries',
+    'The item source cannot change because this list has entries, including withdrawn entries.',
+  ),
+  sourceWriteInProgress: domainError(
+    'conflict',
+    'lists.source-write-in-progress',
+    "An unfinished entry write is protecting this list's item source. Try again after it finishes. If this persists, an operator must check the unfinished write.",
+  ),
   notScheduled: domainError(
     'invalid',
     'lists.not-scheduled',
@@ -77,6 +117,6 @@ export const lockedFields = (fields: readonly string[]): DomainError =>
   domainError(
     'invalid',
     'lists.locked-fields',
-    'Once a list is published, only its description, a later closing time, and removing its nomination cap can change.',
+    'Once a list is published, only its description, a later closing time, removing its nomination cap, and the item source of an unused nomination list can change.',
     fields,
   );

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   startLocalBlobs,
   type LocalBlobs,
@@ -42,6 +42,82 @@ const draft = newList(
 );
 
 describe('Blobs lists repositories', () => {
+  test('permanent deletion keeps only an ID fence and prevents stale aggregate resurrection', async () => {
+    const store = blobs.store('deleted-list-fence');
+    const repo = createBlobsListRepository(store);
+    await repo.save(draft, null);
+    const before = await repo.get(listId);
+    if (before === null) throw new Error('fixture');
+    await repo.save({ ...draft, deletionRequested: true }, before.version);
+    expect((await repo.get(listId))?.value.deletionRequested).toBe(true);
+    await repo.delete(listId);
+    expect(await repo.get(listId)).toBeNull();
+    expect(await repo.all()).toEqual([]);
+    expect(await store.get(`list/${listId}`, { type: 'json' })).toEqual({ v: 3, deleted: true });
+    expect(await repo.save(draft, null)).toBe(false);
+    expect(await repo.save(draft, before.version)).toBe(false);
+  });
+
+  test('a delayed old-owner slug release cannot erase a replacement claim', async () => {
+    const store = blobs.store('slug-deletion-race');
+    const slugs = createBlobsSlugIndex(store);
+    const replacement = 'replacement' as ListId;
+    expect(await slugs.claim('reusable', listId)).toBe(true);
+    const write = store.setJSON.bind(store);
+    let interleave = true;
+    const spy = vi.spyOn(store, 'setJSON').mockImplementation(async (...args) => {
+      const [key, value] = args;
+      if (
+        key === 'slug/reusable' &&
+        typeof value === 'object' &&
+        value !== null &&
+        'listId' in value &&
+        value.listId === null &&
+        interleave
+      ) {
+        interleave = false;
+        await slugs.release('reusable', listId);
+        expect(await slugs.claim('reusable', replacement)).toBe(true);
+      }
+      return write(...args);
+    });
+    try {
+      await slugs.release('reusable', listId);
+      expect(await slugs.lookup('reusable')).toBe(replacement);
+      await slugs.release('reusable', listId);
+      expect(await slugs.lookup('reusable')).toBe(replacement);
+      await slugs.release('reusable', replacement);
+      expect(await slugs.lookup('reusable')).toBeNull();
+      expect(await slugs.claim('reusable', listId)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('entry admissions change the ETag and independent markers clean up separately', async () => {
+    const store = blobs.store('source-admission');
+    const repo = createBlobsListRepository(store);
+    await repo.save(draft, null);
+    const before = await repo.get(listId);
+    if (before === null) throw new Error('fixture');
+    await repo.beginEntryWrite(listId, 'a');
+    await repo.beginEntryWrite(listId, 'b');
+    expect(await store.get('entry-write/l1/a', { type: 'json' })).toEqual({ v: 1 });
+    expect(await repo.hasEntryWrites(listId)).toBe(true);
+    expect(await repo.save({ ...draft, entryWriteToken: 'a' }, before.version)).toBe(true);
+    expect(
+      await repo.save(
+        { ...draft, config: { ...draft.config, itemSource: { kind: 'freeform' } } },
+        before.version,
+      ),
+    ).toBe(false);
+    expect((await repo.get(listId))?.value.entryWriteToken).toBe('a');
+    await repo.endEntryWrite(listId, 'a');
+    expect(await repo.hasEntryWrites(listId)).toBe(true);
+    await repo.endEntryWrite(listId, 'b');
+    expect(await repo.hasEntryWrites(listId)).toBe(false);
+  });
+
   test('lists round-trip with their schedule and use optimistic concurrency', async () => {
     const repo = createBlobsListRepository(blobs.store('lists'));
     expect(await repo.save(draft, null)).toBe(true);
@@ -107,7 +183,7 @@ describe('Blobs lists repositories', () => {
     expect(await slugs.claim('taken', listId)).toBe(true);
     expect(await slugs.claim('taken', 'l2' as ListId)).toBe(false);
     expect(await slugs.lookup('taken')).toBe(listId);
-    await slugs.release('taken');
+    await slugs.release('taken', listId);
     expect(await slugs.lookup('taken')).toBeNull();
   });
 

@@ -67,6 +67,12 @@ export const scheduleBody = z.strictObject({
 });
 
 export const visibilityBody = z.strictObject({ visibility: z.enum(['public', 'hidden']) });
+export const deleteListBody = z.strictObject({ confirmation: z.string().min(1).max(60) });
+export const deleteEntryBody = z.strictObject({
+  entryId: z.string().min(1).max(1000),
+  token: z.string().min(1).max(200),
+  confirmation: z.string().min(1).max(1000),
+});
 
 export const scoreVisibilityBody = z.strictObject({
   scoreVisibility: z.enum(['private', 'public']),
@@ -89,6 +95,7 @@ export const importPresetBody = z.strictObject({ csv: z.string().min(1).max(100_
 export const changeScoreBody = z.strictObject({
   entryId: z.string().min(1).max(300),
   score: z.number().nullable(),
+  revision: z.string().min(1).max(200).nullable().optional(),
 });
 
 export const saveRoleLabelsBody = z.strictObject({

@@ -11,6 +11,7 @@ import { lifecycleOf, visibleTo, type ListId, type ResultsVisibility } from '../
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 
 export interface RankingContextView {
+  readonly writeRevision: string | null;
   readonly listId: ListId;
   readonly resultsVisibility: ResultsVisibility;
   /** Voting has ended: closed, or archived. Final results may be shown. */
@@ -43,8 +44,11 @@ export const makeRankingContext =
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
     if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
+    if (list.deletionRequested === true) return err(listsErrors.deleting);
+    if (list.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
     return ok({
       listId: list.id,
+      writeRevision: list.entryDeletionRevision ?? null,
       resultsVisibility: list.config.resultsVisibility,
       votingEnded: ['closed', 'archived'].includes(lifecycleOf(list, deps.clock.now())),
       closesAt: list.schedule?.closesAt ?? null,

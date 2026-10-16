@@ -131,8 +131,16 @@ export const makeImportLists =
       const votes =
         keyMatched && sealed !== null
           ? await deps.ballots.restoreBallots(restored.value.listId, sealed, keepMember)
-          : { restored: 0, membersLeftOut: [], unreadable: false };
-      const leftOut = new Set([...restored.value.membersLeftOut, ...votes.membersLeftOut]);
+          : ok({ restored: 0, membersLeftOut: [], unreadable: false });
+      if (!votes.ok) {
+        results.push({
+          ok: false,
+          title,
+          problem: votes.error.message,
+        });
+        continue;
+      }
+      const leftOut = new Set([...restored.value.membersLeftOut, ...votes.value.membersLeftOut]);
       results.push({
         ok: true,
         title: restored.value.title,
@@ -140,7 +148,7 @@ export const makeImportLists =
         renamed: restored.value.renamed,
         hidden: restored.value.hidden,
         entries: restored.value.entries,
-        votesRestored: votes.restored,
+        votesRestored: votes.value.restored,
         membersLeftOut: leftOut.size,
       });
     }

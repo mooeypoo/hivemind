@@ -28,8 +28,9 @@ const refreshPublicScores = async () => {
   const result = await api.get<PublicScoresDto>(`${path()}/scores`);
   if (result.ok) publicScores.value = result.data;
 };
-const ballot = useBallot(() => list.value?.slug ?? String(route.params.slug), {
+const ballot = useBallot(() => list.value?.id ?? '', {
   onSaved: () => void refreshPublicScores(),
+  revision: () => list.value?.writeRevision ?? null,
 });
 const { scores, saving, errors } = ballot;
 const scoreState = (entryId: string) => ({

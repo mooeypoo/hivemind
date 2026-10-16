@@ -7,7 +7,7 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { findList } from './find-list.ts';
-import { archivedSince, visibleTo, type ListId } from '../domain/list.ts';
+import { archivedSince, lifecycleOf, visibleTo, type ListId } from '../domain/list.ts';
 import type {
   Catalog,
   EntryRepository,
@@ -46,9 +46,13 @@ export const makeGetList =
   ): Promise<Result<ListDetail, DomainError>> => {
     const member = requireMember(actor);
     if (!member.ok) return member;
-    const found = await findList(deps, member.value, input.list);
+    const found = await findList(deps, member.value, input.list, {
+      allowDeleting: member.value.isAdmin,
+      allowEntryDeletion: true,
+    });
     if (!found.ok) return found;
     const list = found.value.value;
+    const writingEntries = member.value.isAdmin && (await deps.lists.hasEntryWrites(list.id));
     const [entries, ledger] = await Promise.all([
       deps.entries.forList(list.id),
       deps.ledgers.get(member.value.memberId, list.id),
@@ -60,7 +64,22 @@ export const makeGetList =
         deps.clock.now(),
         ledger === null ? 0 : (await activeLedger(deps.entries, ledger.value)).entryIds.length,
       ),
+      itemSourceEditable:
+        member.value.isAdmin &&
+        list.deletionRequested !== true &&
+        list.entryDeletion == null &&
+        !writingEntries &&
+        entries.length === 0 &&
+        (list.phase === 'draft' ||
+          (list.config.entryMode === 'nominations' &&
+            ['scheduled', 'open'].includes(lifecycleOf(list, deps.clock.now())))),
       snapshotsExpireAt: expiry(list, deps.catalog),
+      entryDeletion: member.value.isAdmin ? (list.entryDeletion ?? null) : null,
+      withdrawnEntries: member.value.isAdmin
+        ? entries
+            .filter((entry) => !isActiveEntry(entry))
+            .map((entry) => toEntryView(entry, list, member.value, deps.clock.now()))
+        : [],
       entries: entries
         .filter(isActiveEntry)
         .sort(

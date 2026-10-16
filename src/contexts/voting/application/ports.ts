@@ -2,6 +2,7 @@ import type { DomainError, MemberId, Result, RoleId } from '../../../shared/kern
 import type { Ballot, BallotEntryId, BallotListId, Scale } from '../domain/ballot.ts';
 
 export interface ListVotingRules {
+  readonly writeRevision?: string | null;
   readonly listId: BallotListId;
   readonly isOpen: boolean;
   readonly scale: Scale;
@@ -14,6 +15,11 @@ export interface ListVotingRules {
 
 /** What voting asks lists (upstream). Implemented over the lists module in infrastructure. */
 export interface ListReader {
+  withWrite<T>(
+    listId: string,
+    work: () => Promise<Result<T, DomainError>>,
+    revision?: string | null,
+  ): Promise<Result<T, DomainError>>;
   /** By list id or slug. Not found for drafts and hidden lists, unless the viewer is an Admin. */
   rulesFor(
     list: string,

@@ -26,6 +26,7 @@ import {
   type Visibility,
 } from '../domain/list.ts';
 import type { EntryRepository, LedgerRepository, ListRepository, SlugIndex } from './ports.ts';
+import { listsErrors } from '../domain/errors.ts';
 
 /** A list as stored in a backup file: plain JSON, dates as ISO strings. */
 export interface ListBackup {
@@ -136,12 +137,16 @@ export const makeExportForBackup =
   > => {
     let lists: List[];
     if (ref === null) {
-      lists = await deps.lists.all();
+      lists = (await deps.lists.all()).filter(
+        (list) => list.deletionRequested !== true && list.entryDeletion == null,
+      );
     } else {
       const byId = await deps.lists.get(ref as ListId);
       const id = byId === null ? await deps.slugs.lookup(ref) : null;
       const found = byId ?? (id === null ? null : await deps.lists.get(id));
       if (found === null) return err(notFound);
+      if (found.value.deletionRequested === true) return err(listsErrors.deleting);
+      if (found.value.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
       lists = [found.value];
     }
     lists.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -215,58 +220,68 @@ export const makeRestoreFromBackup =
       createdAt: new Date(backup.list.createdAt),
       archivedAt: backup.list.archivedAt === null ? null : new Date(backup.list.archivedAt),
     };
-    if (!(await deps.lists.save(list, null))) {
-      await deps.slugs.release(slug);
-      return err(invalidBackup(['the list could not be saved']));
-    }
+    const writeToken = deps.ids.next();
+    let completed = false;
+    try {
+      await deps.lists.beginEntryWrite(id, writeToken);
+      if (!(await deps.lists.save(list, null))) {
+        await deps.slugs.release(slug, id);
+        completed = true;
+        return err(invalidBackup(['the list could not be saved']));
+      }
 
-    const kept = new Map<string, boolean>();
-    const keep = async (memberId: string) => {
-      const known = kept.get(memberId);
-      if (known !== undefined) return known;
-      const decision = await options.keepMember(memberId);
-      kept.set(memberId, decision);
-      return decision;
-    };
-
-    const entryIds = new Set<EntryId>();
-    for (const saved of backup.entries) {
-      const nominator = saved.nominatedBy;
-      const entry: Entry = {
-        id: entryIdFor(saved.item),
-        listId: id,
-        item: saved.item,
-        nominatedBy:
-          nominator !== null && (await keep(nominator.memberId))
-            ? { memberId: nominator.memberId as MemberId, displayName: nominator.displayName }
-            : null,
-        nominatedAt: new Date(saved.nominatedAt),
-        snapshotPurgedAt: saved.snapshotPurgedAt === null ? null : new Date(saved.snapshotPurgedAt),
-        withdrawnAt: saved.withdrawnAt == null ? null : new Date(saved.withdrawnAt),
+      const kept = new Map<string, boolean>();
+      const keep = async (memberId: string) => {
+        const known = kept.get(memberId);
+        if (known !== undefined) return known;
+        const decision = await options.keepMember(memberId);
+        kept.set(memberId, decision);
+        return decision;
       };
-      if (await deps.entries.create(entry)) entryIds.add(entry.id);
-    }
-    for (const ledger of backup.nominators) {
-      if (!(await keep(ledger.memberId))) continue;
-      await deps.ledgers.save(
-        {
-          memberId: ledger.memberId as MemberId,
-          listId: id,
-          entryIds: ledger.entryIds.filter((entryId) =>
-            entryIds.has(entryId as EntryId),
-          ) as EntryId[],
-        },
-        null,
-      );
-    }
 
-    return ok({
-      listId: id,
-      title: list.config.title,
-      slug,
-      renamed,
-      hidden: list.visibility === 'hidden',
-      entries: entryIds.size,
-      membersLeftOut: [...kept].filter(([, isKept]) => !isKept).map(([memberId]) => memberId),
-    });
+      const entryIds = new Set<EntryId>();
+      for (const saved of backup.entries) {
+        const nominator = saved.nominatedBy;
+        const entry: Entry = {
+          id: entryIdFor(saved.item),
+          listId: id,
+          item: saved.item,
+          nominatedBy:
+            nominator !== null && (await keep(nominator.memberId))
+              ? { memberId: nominator.memberId as MemberId, displayName: nominator.displayName }
+              : null,
+          nominatedAt: new Date(saved.nominatedAt),
+          snapshotPurgedAt:
+            saved.snapshotPurgedAt === null ? null : new Date(saved.snapshotPurgedAt),
+          withdrawnAt: saved.withdrawnAt == null ? null : new Date(saved.withdrawnAt),
+        };
+        if (await deps.entries.create(entry)) entryIds.add(entry.id);
+      }
+      for (const ledger of backup.nominators) {
+        if (!(await keep(ledger.memberId))) continue;
+        await deps.ledgers.save(
+          {
+            memberId: ledger.memberId as MemberId,
+            listId: id,
+            entryIds: ledger.entryIds.filter((entryId) =>
+              entryIds.has(entryId as EntryId),
+            ) as EntryId[],
+          },
+          null,
+        );
+      }
+
+      completed = true;
+      return ok({
+        listId: id,
+        title: list.config.title,
+        slug,
+        renamed,
+        hidden: list.visibility === 'hidden',
+        entries: entryIds.size,
+        membersLeftOut: [...kept].filter(([, isKept]) => !isKept).map(([memberId]) => memberId),
+      });
+    } finally {
+      if (completed) await deps.lists.endEntryWrite(id, writeToken);
+    }
   };

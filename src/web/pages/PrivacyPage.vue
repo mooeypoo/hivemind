@@ -52,6 +52,13 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       </li>
     </ul>
 
+    <p>
+      The site also keeps random operation tokens to prevent item-source changes and permanent list
+      or entry deletion from racing with entry, ballot and leaderboard writes. They contain no
+      member identity or scores. Active write markers are normally removed after completion; an
+      interrupted write may leave its marker for an operator to check.
+    </p>
+
     <h2>What we never store</h2>
     <ul>
       <li>Your email address. We never ask Discord for it.</li>
@@ -73,6 +80,38 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       scores while the item is withdrawn. If you or another member nominates the same item in the
       same list, its earlier scores return. Download my data includes your retained scores, and
       Delete my data removes them.
+    </p>
+    <p>
+      Admins can inspect retained withdrawn items in an Admin-only section to permanently delete
+      them. They do not appear in the main list or ranking.
+    </p>
+
+    <h2>When an Admin deletes a list</h2>
+    <p>
+      Admins can permanently delete a list, including an archived one. This removes its entries,
+      withdrawn nominations, nomination records, all members' scores for that list and its cached
+      ranking. It does not delete member accounts or shared imported presets. Once deletion starts,
+      the list is unavailable to members; interrupted cleanup can be retried by an Admin.
+    </p>
+    <p>
+      After cleanup, only a non-personal marker at the old list ID and an empty address reservation
+      remain to prevent stale requests from restoring data or affecting a replacement list. No
+      title, entry, nominator identity or score is retained in these markers. Previously downloaded
+      backups are not erased and can restore a separate copy.
+    </p>
+
+    <h2>When an Admin deletes an entry</h2>
+    <p>
+      Permanent entry deletion removes the item, its nomination records and everyone's scores for
+      it, including scores retained after withdrawal. It frees the nomination allowance and
+      recalculates the ranking. If nominated again, the item starts without earlier scores. Deleting
+      from a closed or archived list changes its final results.
+    </p>
+    <p>
+      Nominations and scores pause for that list while cleanup finishes. During an interrupted
+      deletion, its entry ID, title and confirmation token remain so an Admin can retry. After
+      completion only a random list revision token remains to reject stale writes; no deleted entry
+      details, nominator or score remain. Previously downloaded backups are not erased.
     </p>
 
     <h2>Shared links</h2>

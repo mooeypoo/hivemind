@@ -15,11 +15,13 @@ defineProps<{
   score?: { value: number | null; saving: boolean; error: string | null } | null;
   /** The viewer's final score on a closed list. */
   finalScore?: number | undefined;
+  canDelete?: boolean;
 }>();
 const emit = defineEmits<{
   close: [];
   change: [value: number | null];
   withdraw: [entry: EntryDto];
+  delete: [entry: EntryDto];
 }>();
 </script>
 
@@ -82,6 +84,15 @@ const emit = defineEmits<{
         @click="emit('withdraw', entry)"
       >
         Withdraw nomination
+      </button>
+      <button
+        v-if="canDelete === true && entry?.deletionToken != null"
+        type="button"
+        class="button button--danger"
+        :aria-label="`Permanently delete ${entry.item.title}`"
+        @click="emit('delete', entry)"
+      >
+        Delete entry...
       </button>
       <button type="button" class="button" @click="emit('close')">Close</button>
     </template>

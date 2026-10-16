@@ -70,6 +70,7 @@ const list: ListDetailDto = {
   description: 'Nominate the games your group keeps coming back to, then rate everyone’s picks.',
   lifecycle: 'open',
   entries,
+  itemSourceEditable: false,
   snapshotsExpireAt: null,
 };
 const lists: ListDto[] = [

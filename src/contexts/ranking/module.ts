@@ -2,6 +2,7 @@ import type { Store } from '@netlify/blobs';
 import type { Clock } from '../../shared/kernel/index.ts';
 import { makeDropStaleLeaderboards } from './application/drop-stale-leaderboards.ts';
 import { makeGetLeaderboard } from './application/get-leaderboard.ts';
+import { makeDeleteListData } from './application/delete-list-data.ts';
 import { createBlobsLeaderboardCache } from './infrastructure/blobs-leaderboard-cache.ts';
 import {
   createListSource,
@@ -22,6 +23,7 @@ export interface RankingModuleDeps {
 export const createRankingModule = (deps: RankingModuleDeps) => {
   const cache = createBlobsLeaderboardCache(deps.store);
   return {
+    deleteListData: makeDeleteListData({ cache }),
     getLeaderboard: makeGetLeaderboard({
       lists: createListSource(deps.lists),
       scores: createScoreSource(deps.voting),

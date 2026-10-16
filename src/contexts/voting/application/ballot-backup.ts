@@ -1,6 +1,6 @@
-import type { MemberId } from '../../../shared/kernel/index.ts';
+import { ok, type MemberId } from '../../../shared/kernel/index.ts';
 import type { Ballot, BallotListId } from '../domain/ballot.ts';
-import type { BallotRepository } from './ports.ts';
+import type { BallotRepository, ListReader } from './ports.ts';
 
 /**
  * Seals ballots so a backup file never shows anyone's scores. Implemented in infrastructure
@@ -41,6 +41,16 @@ export interface BallotsRestored {
   /** The ballots couldn't be opened: another key, or the file was altered. */
   readonly unreadable: boolean;
 }
+
+export const makeGuardedRestoreBallots = (deps: {
+  readonly ballots: BallotRepository;
+  readonly sealer: BallotSealer | null;
+  readonly lists: ListReader;
+}) => {
+  const restore = makeRestoreBallots(deps);
+  return (listId: string, sealed: string, keepMember: (memberId: string) => Promise<boolean>) =>
+    deps.lists.withWrite(listId, async () => ok(await restore(listId, sealed, keepMember)));
+};
 
 /** Opens sealed ballots and restores those of members `keepMember` accepts, into `listId`. */
 export const makeRestoreBallots =

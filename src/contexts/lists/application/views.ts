@@ -14,6 +14,9 @@ import {
 } from '../domain/list.ts';
 
 export interface ListView extends ListConfig {
+  readonly writeRevision: string | null;
+  readonly participationPaused: boolean;
+  readonly deleting: boolean;
   readonly id: ListId;
   readonly lifecycle: Lifecycle;
   readonly schedule: Schedule | null;
@@ -34,9 +37,13 @@ export interface EntryView {
   readonly isMine: boolean;
   readonly nominatedAt: Date;
   readonly withdrawalToken: string | null;
+  readonly deletionToken: string | null;
 }
 
 export interface ListDetail extends ListView {
+  readonly withdrawnEntries: readonly EntryView[];
+  readonly entryDeletion: List['entryDeletion'];
+  readonly itemSourceEditable: boolean;
   readonly entries: readonly EntryView[];
   /** For an archived list whose source limits retention: when item details will be removed. */
   readonly snapshotsExpireAt: Date | null;
@@ -48,9 +55,15 @@ export const toListView = (
   now: Date,
   nominationsUsed: number,
 ): ListView => {
-  const canParticipate = mayParticipate(list, actor.roleIds);
+  const canParticipate =
+    list.deletionRequested !== true &&
+    list.entryDeletion == null &&
+    mayParticipate(list, actor.roleIds);
   return {
     ...list.config,
+    writeRevision: list.entryDeletionRevision ?? null,
+    deleting: list.deletionRequested === true,
+    participationPaused: list.entryDeletion != null,
     id: list.id,
     lifecycle: lifecycleOf(list, now),
     schedule: list.schedule,
@@ -79,4 +92,5 @@ export const toEntryView = (
     entry.nominatedBy?.memberId === actor.memberId && nominationsOpen(list, now)
       ? nominationToken(entry)
       : null,
+  deletionToken: actor.isAdmin ? nominationToken(entry) : null,
 });

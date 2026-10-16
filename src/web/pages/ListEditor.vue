@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type {
   CreateListRequest,
+  DeleteListRequest,
   ItemSourceKind,
   ListDetailDto,
   ListDto,
@@ -88,6 +89,15 @@ const form = reactive<Form>({
 });
 
 const existing = ref<ListDto | null>(null);
+const sourcePermission = ref(false);
+const itemSourceEditable = computed(
+  () =>
+    sourcePermission.value &&
+    existing.value?.deleting !== true &&
+    (existing.value?.lifecycle === 'draft' ||
+      (existing.value?.entryMode === 'nominations' &&
+        (existing.value.lifecycle === 'scheduled' || existing.value.lifecycle === 'open'))),
+);
 /** Archived movie lists: when TMDB details will be removed. */
 const snapshotsExpireAt = ref<string | null>(null);
 
@@ -104,14 +114,20 @@ const sources = ref<readonly ItemSourceKind[]>([]);
 const error = ref<ApiError | null>(null);
 const status = ref('');
 const busy = ref(false);
+const deletionError = ref<ApiError | null>(null);
+const deleting = computed(() => existing.value?.deleting === true);
 const csv = ref('');
 const csvError = ref<ApiError | null>(null);
 usePageTitle(() => (existing.value === null ? 'New list' : `Edit ${existing.value.title}`));
 
-/** Once published, only description, a later close, and removal of a finite cap may change. */
+/** Publishing locks settings except for the server-authorized source exception below. */
 const locked = computed(() => existing.value !== null && existing.value.lifecycle !== 'draft');
+const sourceLocked = computed(() => existing.value !== null && !itemSourceEditable.value);
 const finished = computed(
-  () => existing.value?.lifecycle === 'closed' || existing.value?.lifecycle === 'archived',
+  () =>
+    deleting.value ||
+    existing.value?.lifecycle === 'closed' ||
+    existing.value?.lifecycle === 'archived',
 );
 
 const fillFrom = (list: ListDto) => {
@@ -163,14 +179,29 @@ const load = async () => {
       return;
     }
     existing.value = result.data;
+    sourcePermission.value = result.data.itemSourceEditable;
     snapshotsExpireAt.value = result.data.snapshotsExpireAt;
     fillFrom(result.data);
   } else {
     existing.value = null;
+    sourcePermission.value = false;
   }
 
   const draft = loadDraft(draftKey.value);
   if (draft !== null && typeof draft === 'object' && !locked.value) Object.assign(form, draft);
+  if (
+    draft !== null &&
+    typeof draft === 'object' &&
+    locked.value &&
+    itemSourceEditable.value &&
+    'sourceKind' in draft
+  ) {
+    const savedKind = sources.value.find((kind) => kind === draft.sourceKind);
+    if (savedKind !== undefined) form.sourceKind = savedKind;
+    if ('presetId' in draft && (draft.presetId === null || typeof draft.presetId === 'string')) {
+      form.presetId = draft.presetId;
+    }
+  }
 };
 onMounted(load);
 watch(routeSlug, load);
@@ -271,7 +302,12 @@ const save = async () => {
       ? { maxNominationsPerMember: null }
       : {};
   const body = locked.value
-    ? { description: form.description, ...endChange(), ...removeNominationCap }
+    ? {
+        description: form.description,
+        ...endChange(),
+        ...removeNominationCap,
+        ...(itemSourceEditable.value ? { itemSource: config().itemSource } : {}),
+      }
     : config();
   const list = await run(
     () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
@@ -297,7 +333,26 @@ const schedule = async () => {
   if (list !== null) await afterSave(list);
 };
 
-const confirming = ref<'close' | 'archive' | 'private-scores' | null>(null);
+const confirming = ref<'close' | 'archive' | 'private-scores' | 'delete' | null>(null);
+
+const deleteList = async () => {
+  const list = existing.value;
+  if (list === null || busy.value) return;
+  busy.value = true;
+  deletionError.value = null;
+  const body: DeleteListRequest = { confirmation: list.slug };
+  const result = await api.delete<undefined>(`/api/lists/${encodeURIComponent(list.id)}`, body);
+  busy.value = false;
+  if (!result.ok) {
+    deletionError.value = result.error;
+    // A lost response may follow a persisted deletion intent. Never offer normal edits here.
+    existing.value = { ...list, deleting: true };
+    return;
+  }
+  clearDraft(draftKey.value);
+  confirming.value = null;
+  await router.replace({ name: 'lists', query: { deleted: '1' } });
+};
 
 const archive = async () => {
   if (existing.value === null) return;
@@ -413,6 +468,10 @@ const importCsv = async () => {
       />
     </header>
 
+    <p v-if="deleting" class="notice" role="status">
+      Deletion in progress. Members can no longer access this list. Normal edits and participation
+      are blocked; retry deletion below to finish cleanup and release its address.
+    </p>
     <p v-if="locked && !finished" class="notice">
       This list is published, so its settings are fixed. You can still change the description and
       when voting ends (later, or not at all).<template
@@ -420,11 +479,14 @@ const importCsv = async () => {
       >
         You can also remove its nomination cap, but you can’t add one back.</template
       >
+      <template v-if="itemSourceEditable">
+        You can also change the item source until the first entry is added.
+      </template>
     </p>
-    <p v-if="existing?.lifecycle === 'closed'" class="notice">
+    <p v-if="existing?.lifecycle === 'closed' && !deleting" class="notice">
       Voting has closed, so the list can’t be edited. You can still hide it or archive it below.
     </p>
-    <p v-if="existing?.lifecycle === 'archived'" class="notice">
+    <p v-if="existing?.lifecycle === 'archived' && !deleting" class="notice">
       This list is archived: read-only, with its final results. You can still hide it.
     </p>
     <p v-if="snapshotsExpireAt !== null" class="notice">
@@ -433,7 +495,7 @@ const importCsv = async () => {
       >, as TMDB’s terms require. Titles become “details removed”; scores and ranks stay.
     </p>
 
-    <nav class="editor-index" aria-label="List settings">
+    <nav v-if="!deleting" class="editor-index" aria-label="List settings">
       <a href="#editor-basics">Basics</a>
       <a href="#editor-items">Items</a>
       <a href="#editor-rating">Rating</a>
@@ -446,7 +508,7 @@ const importCsv = async () => {
       </a>
     </nav>
 
-    <form class="stack" @submit.prevent="existing === null ? create() : save()">
+    <form v-if="!deleting" class="stack" @submit.prevent="existing === null ? create() : save()">
       <fieldset id="editor-basics" class="card stack" :disabled="finished">
         <legend>Basics</legend>
         <label for="title">Title</label>
@@ -480,9 +542,18 @@ const importCsv = async () => {
         <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
       </fieldset>
 
-      <fieldset id="editor-items" class="card stack" :disabled="locked">
+      <fieldset id="editor-items" class="card stack" :disabled="sourceLocked">
         <legend>Items</legend>
         <p class="meta">Where do the things in this list come from?</p>
+        <p v-if="locked && itemSourceEditable" class="meta">
+          This list is unused. You can change its item source until the first entry is added.
+          Published lists keep their nomination mode.
+        </p>
+        <p v-else-if="sourceLocked && !finished" class="meta">
+          The source is locked once entries have been added, including withdrawn entries. Published
+          seeded lists also keep their source. An unfinished entry write temporarily locks the
+          source.
+        </p>
         <div class="choices" role="radiogroup" aria-label="Item source">
           <label v-for="kind in sources" :key="kind" class="choice">
             <input v-model="form.sourceKind" type="radio" name="source" :value="kind" />
@@ -519,11 +590,23 @@ const importCsv = async () => {
           <p class="meta">How should members use these items?</p>
           <div class="choices" role="radiogroup" aria-label="Entry mode">
             <label class="choice">
-              <input v-model="form.entryMode" type="radio" name="mode" value="seeded" />
+              <input
+                v-model="form.entryMode"
+                type="radio"
+                name="mode"
+                value="seeded"
+                :disabled="locked"
+              />
               Rate them all: every item is in the list from the start
             </label>
             <label class="choice">
-              <input v-model="form.entryMode" type="radio" name="mode" value="nominations" />
+              <input
+                v-model="form.entryMode"
+                type="radio"
+                name="mode"
+                value="nominations"
+                :disabled="locked"
+              />
               Nominate from them: members pick which items go in
             </label>
           </div>
@@ -792,7 +875,7 @@ const importCsv = async () => {
     </form>
 
     <section
-      v-if="existing !== null && existing.lifecycle !== 'draft'"
+      v-if="existing !== null && existing.lifecycle !== 'draft' && !deleting"
       class="card stack status-section"
       aria-labelledby="status-heading"
     >
@@ -896,6 +979,59 @@ const importCsv = async () => {
       </div>
     </section>
 
+    <section v-if="existing !== null" class="card stack" aria-labelledby="danger-heading">
+      <h2 id="danger-heading" class="danger-text">Danger zone</h2>
+      <p>
+        Permanently delete this list and all its entries and scores. Unlike archiving, deletion
+        removes the data and makes this address available again.
+      </p>
+      <p v-if="!deleting && site.info?.backups === true">
+        <a :href="`/api/admin/backup?list=${encodeURIComponent(existing.id)}`" download>
+          Download a backup before deleting
+        </a>
+      </p>
+      <div class="actions">
+        <button
+          type="button"
+          class="button button--danger"
+          :disabled="busy"
+          @click="
+            deletionError = null;
+            confirming = 'delete';
+          "
+        >
+          {{ deleting ? 'Retry deletion…' : 'Delete list…' }}
+        </button>
+      </div>
+    </section>
+
+    <ConfirmDialog
+      v-if="existing !== null"
+      :open="confirming === 'delete'"
+      :title="`Permanently delete “${existing.title}”?`"
+      confirm-label="Delete permanently"
+      :confirm-text="existing.slug"
+      :busy="busy"
+      danger
+      @confirm="deleteList"
+      @cancel="!busy && (confirming = null)"
+    >
+      <p class="danger-text"><strong>This cannot be undone in the app.</strong></p>
+      <ul>
+        <li>The list and every entry, including withdrawn nominations, will be removed.</li>
+        <li>All members' scores and nomination records for this list will be erased.</li>
+        <li>Once confirmed, deletion cannot be cancelled, even if cleanup needs a retry.</li>
+        <li>
+          The address <code>/lists/{{ existing.slug }}</code> can be reused after cleanup.
+        </li>
+      </ul>
+      <p>
+        Old shared links may then lead to a replacement list. Previously downloaded backups are not
+        erased and can restore a separate copy.
+      </p>
+      <ErrorNotice :error="deletionError" />
+    </ConfirmDialog>
+
     <ConfirmDialog
       :open="confirming === 'close'"
       title="Close voting now?"
@@ -920,15 +1056,18 @@ const importCsv = async () => {
     <ConfirmDialog
       v-if="existing !== null"
       :open="confirming === 'archive'"
-      :title="`Archive “${existing.title}” permanently?`"
-      confirm-label="Archive permanently"
+      :title="`Archive “${existing.title}”?`"
+      confirm-label="Archive list"
       :confirm-text="existing.slug"
       danger
       @confirm="archive"
       @cancel="confirming = null"
     >
       <p class="danger-text"><strong>This can’t be undone.</strong></p>
-      <p>Archiving is permanent. As soon as you confirm:</p>
+      <p>
+        Archiving preserves this list and its scores; it does not delete them. As soon as you
+        confirm:
+      </p>
       <ul>
         <li>Voting and nominations end immediately.</li>
         <li>Every score becomes final, and the results are shown to members.</li>
