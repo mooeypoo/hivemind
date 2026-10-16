@@ -75,6 +75,55 @@ describe('visibility', () => {
 });
 
 describe('cache', () => {
+  test('separate groups have independent priors and ranks; combined keeps every entry', async () => {
+    sources.settings = { ...sources.settings, minVotes: 2, setAsideEntryIds: ['b'] };
+    sources.addEntry('c', 'Gamma');
+    sources.addEntry('d', 'Delta');
+    sources.addEntry('e', 'Epsilon');
+    sources.ballots = [
+      { a: 4, b: 10, c: 2, d: 8 },
+      { a: 4, b: 10 },
+    ];
+    const view = await leaderboard();
+    if (view.hidden) throw new Error('fixture');
+    expect(view.board.groups?.main.find((row) => row.entryId === 'a')).toMatchObject({
+      rank: 1,
+      score: 4.25,
+      votes: 2,
+    });
+    expect(view.board.groups?.setAside).toMatchObject([{ entryId: 'b', rank: 1, score: 10 }]);
+    expect(view.board.rows.find((row) => row.entryId === 'b')?.rank).toBe(1);
+    expect(view.board.rows.find((row) => row.entryId === 'a')?.rank).toBe(2);
+    expect(view.board.groups?.main.find((row) => row.entryId === 'd')).toMatchObject({
+      rank: null,
+      provisional: true,
+      votesNeeded: 1,
+    });
+    expect(view.board.groups?.main.find((row) => row.entryId === 'e')?.votes).toBe(0);
+  });
+
+  test('marking and restoring invalidate the cache immediately, even with unchanged entry ids', async () => {
+    await leaderboard();
+    sources.settings = { ...sources.settings, setAsideEntryIds: ['a'] };
+    let view = await leaderboard();
+    expect(view.hidden ? null : view.board.groups?.setAside.map((row) => row.entryId)).toEqual([
+      'a',
+    ]);
+    expect(sources.builds).toBe(2);
+    sources.settings = { ...sources.settings, setAsideEntryIds: [] };
+    view = await leaderboard();
+    expect(view.hidden ? null : view.board.groups).toBeUndefined();
+    expect(sources.builds).toBe(3);
+  });
+
+  test('all entries may be set aside, with an empty main group', async () => {
+    sources.settings = { ...sources.settings, setAsideEntryIds: ['a', 'b'] };
+    sources.ballots = [{ a: 7, b: 7 }];
+    const view = await leaderboard();
+    expect(view.hidden ? null : view.board.groups?.main).toEqual([]);
+    expect(view.hidden ? null : view.board.groups?.setAside.map((row) => row.rank)).toEqual([1, 1]);
+  });
+
   test('within the TTL, new scores alone do not rebuild it', async () => {
     sources.ballots = [{ a: 9 }];
     await leaderboard();

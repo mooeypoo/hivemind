@@ -20,6 +20,7 @@ import { makeGetList, makeGetSharePreview } from './get-list.ts';
 import { makeListLists } from './list-lists.ts';
 import { makeNominate } from './nominate.ts';
 import { makeWithdrawNomination } from './withdraw-nomination.ts';
+import { makeSetEntryAside } from './set-entry-aside.ts';
 import { makeListsPersonalData } from './personal-data.ts';
 import { makeScheduleList } from './schedule-list.ts';
 import { makeSearchForList } from './search-for-list.ts';
@@ -765,6 +766,7 @@ describe('services for ranking', () => {
         strategy: 'bayesian',
         minVotes: 3,
         entryIds: ['tmdb-movie.78'],
+        setAsideEntryIds: [],
       },
     });
     expect((await makeEntriesForRanking(deps)(list.id)).map((entry) => entry.item.title)).toEqual([
@@ -836,6 +838,74 @@ describe('backups', () => {
     backup: Parameters<ReturnType<typeof makeRestoreFromBackup>>[0],
     keep: (memberId: string) => Promise<boolean> = () => Promise.resolve(true),
   ) => makeRestoreFromBackup(deps)(backup, { keepMember: keep });
+
+  test('classification survives withdrawal, re-nomination and backup restoration', async () => {
+    const list = await openList();
+    await nominate(ada, '78');
+    const entry = await deps.entries.get(list.id, 'tmdb-movie.78' as EntryId);
+    if (entry === null) throw new Error('fixture');
+    expect(
+      (
+        await makeSetEntryAside(deps)(admin, {
+          list: list.id,
+          entryId: entry.value.id,
+          token: nominationToken(entry.value),
+          expectedReason: null,
+          reason: 'Outside the criteria',
+        })
+      ).ok,
+    ).toBe(true);
+    expect(await makeRankingContext(deps)(list.id, { isAdmin: false })).toMatchObject({
+      ok: true,
+      value: { setAsideEntryIds: [entry.value.id] },
+    });
+    await withdraw(ada);
+    const exported = await exportBackup(list.id);
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    expect(exported.value[0].backup.entries[0]?.setAsideReason).toBe('Outside the criteria');
+    const copy = await restore(exported.value[0].backup);
+    if (!copy.ok) throw new Error('fixture');
+    expect((await deps.entries.forList(copy.value.listId))[0]?.setAsideReason).toBe(
+      'Outside the criteria',
+    );
+    const nominated = await nominate(bob, '78');
+    expect(nominated).toMatchObject({
+      ok: true,
+      value: { setAsideReason: 'Outside the criteria' },
+    });
+    const detail = await makeGetList(deps)(bob, { list: list.id });
+    expect(detail).toMatchObject({
+      ok: true,
+      value: { entries: [{ setAsideReason: 'Outside the criteria' }] },
+    });
+  });
+
+  test('older backups default to the main ranking; invalid explanations are refused', async () => {
+    await openList();
+    await nominate(ada, '78');
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    const backup = exported.value[0].backup;
+    const legacy = {
+      ...backup,
+      entries: backup.entries.map((entry) => {
+        const legacyEntry = { ...entry };
+        delete legacyEntry.setAsideReason;
+        return legacyEntry;
+      }),
+    };
+    const copied = await restore(legacy);
+    if (!copied.ok) throw new Error('fixture');
+    expect((await deps.entries.forList(copied.value.listId))[0]?.setAsideReason).toBeNull();
+    expect(
+      (
+        await restore({
+          ...backup,
+          entries: backup.entries.map((entry) => ({ ...entry, setAsideReason: ' ' })),
+        })
+      ).ok,
+    ).toBe(false);
+  });
 
   test('export one list (even hidden or draft) or all of them', async () => {
     await openList();

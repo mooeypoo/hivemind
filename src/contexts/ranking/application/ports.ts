@@ -13,6 +13,7 @@ export interface RankingContext {
   readonly minVotes: number;
   /** Current entry ids: cheap to read, used to notice new nominations. */
   readonly entryIds: readonly string[];
+  readonly setAsideEntryIds?: readonly string[];
 }
 
 /** What ranking reads from lists (upstream). */

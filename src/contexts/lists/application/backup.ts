@@ -11,6 +11,7 @@ import {
 } from '../../../shared/kernel/index.ts';
 import {
   entryIdFor,
+  validateSetAsideReason,
   isActiveEntry,
   type Entry,
   type EntryId,
@@ -45,6 +46,7 @@ export interface ListBackup {
     readonly archivedAt: string | null;
   };
   readonly entries: readonly {
+    readonly setAsideReason?: string | null;
     readonly item: ItemSnapshot;
     readonly nominatedBy: { readonly memberId: string; readonly displayName: string } | null;
     readonly nominatedAt: string;
@@ -100,6 +102,7 @@ const toBackup = async (deps: BackupDeps, list: List): Promise<ListBackup> => {
       archivedAt: iso(list.archivedAt),
     },
     entries: entries.map((entry) => ({
+      setAsideReason: entry.setAsideReason ?? null,
       item: entry.item,
       nominatedBy: entry.nominatedBy,
       nominatedAt: entry.nominatedAt.toISOString(),
@@ -197,6 +200,10 @@ export const makeRestoreFromBackup =
     if (backup.list.phase !== 'draft' && backup.list.schedule === null) {
       return err(invalidBackup(['a published or archived list needs a schedule']));
     }
+    for (const entry of backup.entries) {
+      const reason = validateSetAsideReason(entry.setAsideReason ?? null);
+      if (!reason.ok) return err(invalidBackup([reason.error.message]));
+    }
 
     const id = deps.ids.next() as ListId;
     const slug = await claimFreeSlug(deps.slugs, config.value.slug, id);
@@ -243,6 +250,7 @@ export const makeRestoreFromBackup =
       for (const saved of backup.entries) {
         const nominator = saved.nominatedBy;
         const entry: Entry = {
+          setAsideReason: saved.setAsideReason?.trim() ?? null,
           id: entryIdFor(saved.item),
           listId: id,
           item: saved.item,

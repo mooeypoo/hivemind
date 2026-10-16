@@ -70,6 +70,14 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       <li>Analytics, tracking, advertising, or your IP address.</li>
     </ul>
 
+    <h2>Setting entries aside</h2>
+    <p>
+      Admins can set an entry aside as outside a list's criteria, with a member-visible explanation.
+      The classification and explanation are stored with the entry and included in list backups; no
+      Admin identity or edit history is recorded. Ratings are kept and members can still rate the
+      entry. Withdrawal and re-nomination retain the classification. Explanations should describe
+      the item, not contain personal information.
+    </p>
     <h2>Withdrawing a nomination</h2>
     <p>
       While nominations are open, you can withdraw your own nomination. The item leaves the list and

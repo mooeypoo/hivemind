@@ -34,6 +34,7 @@ export const listDto = (view: ListView): ListDto => ({
 });
 
 export const entryDto = (entry: EntryView): EntryDto => ({
+  setAsideReason: entry.setAsideReason,
   id: entry.id,
   item: entry.item,
   nominatedBy: entry.nominatedBy,

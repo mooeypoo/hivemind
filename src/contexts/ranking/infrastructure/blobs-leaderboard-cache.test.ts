@@ -49,6 +49,16 @@ describe('Blobs leaderboard cache', () => {
     await cache.delete('l1');
     expect(await cache.get('l1')).toBeNull();
   });
+  test('round-trips independent groups and their classification fingerprint', async () => {
+    const cache = createBlobsLeaderboardCache(blobs.store('ranking-groups'));
+    const grouped = {
+      ...board,
+      setAsideEntryIds: ['a'],
+      groups: { main: [], setAside: board.rows },
+    };
+    await cache.put(grouped);
+    expect(await cache.get('l1')).toEqual(grouped);
+  });
 
   test('holds no member ids', async () => {
     const store = blobs.store('ranking');

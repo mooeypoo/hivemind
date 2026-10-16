@@ -35,6 +35,7 @@ export {
   searchForList,
   setVisibility,
   setScoreVisibility,
+  setEntryAside,
 } from './http/endpoints/lists.ts';
 
 /**

@@ -16,6 +16,11 @@ export interface LeaderboardRow extends RankedRow {
 
 /** A list's ranking at a moment. Holds aggregates only: no member ids. */
 export interface Leaderboard {
+  readonly setAsideEntryIds?: readonly string[];
+  readonly groups?: {
+    readonly main: readonly LeaderboardRow[];
+    readonly setAside: readonly LeaderboardRow[];
+  };
   readonly listId: string;
   readonly computedAt: Date;
   /** The entries it was built from, sorted, to notice new nominations. */
@@ -34,6 +39,8 @@ export const isFresh = (
   board: Leaderboard,
   currentEntryIds: readonly string[],
   now: Date,
+  setAsideEntryIds: readonly string[] = [],
 ): boolean =>
   now.getTime() - board.computedAt.getTime() < LEADERBOARD_TTL_SECONDS * 1000 &&
-  sameEntries(board.entryIds, [...currentEntryIds].sort());
+  sameEntries(board.entryIds, [...currentEntryIds].sort()) &&
+  sameEntries(board.setAsideEntryIds ?? [], [...setAsideEntryIds].sort());

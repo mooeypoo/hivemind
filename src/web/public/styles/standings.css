@@ -1,5 +1,70 @@
 /* Standings (StandingsBoard) on the list's Standings tab and the results page. */
 
+.ranking-options {
+  margin-bottom: 1rem;
+}
+
+.ranking-options > summary {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  padding-block: 0.65rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.ranking-options > summary:hover {
+  color: var(--text);
+}
+
+.ranking-view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ranking-view label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.ranking-view label:has(:checked) {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.ranking-view input {
+  accent-color: var(--accent);
+}
+
+.set-aside-ranking {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.set-aside-notice {
+  display: block;
+  margin-block: 0.5rem;
+  font-size: 0.9rem;
+  text-align: start;
+}
+
+.set-aside-notice__reason {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .leaderboard__header {
   display: flex;
   flex-wrap: wrap;

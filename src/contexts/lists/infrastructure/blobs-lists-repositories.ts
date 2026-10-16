@@ -59,6 +59,7 @@ interface ListRecordV1 extends Omit<ListRecordV2, 'v' | 'config'> {
 }
 
 interface EntryRecordV1 {
+  readonly setAsideReason?: string | null;
   readonly v: 1;
   readonly id: string;
   readonly listId: string;
@@ -161,6 +162,7 @@ const listFromRecord = (data: unknown): List => {
 };
 
 const entryToRecord = (entry: Entry): EntryRecordV1 => ({
+  setAsideReason: entry.setAsideReason ?? null,
   v: 1,
   id: entry.id,
   listId: entry.listId,
@@ -192,6 +194,7 @@ const entryFromRecord = (data: unknown): Entry => {
             displayName: record.nominatedBy.displayName,
           },
     nominatedAt: new Date(record.nominatedAt),
+    setAsideReason: record.setAsideReason ?? null,
     snapshotPurgedAt: record.snapshotPurgedAt == null ? null : new Date(record.snapshotPurgedAt),
     ...(record.nominationId === undefined ? {} : { nominationId: record.nominationId }),
     ...(record.withdrawnAt === undefined

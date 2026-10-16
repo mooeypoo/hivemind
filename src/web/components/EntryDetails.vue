@@ -5,6 +5,7 @@ import AppDialog from './ui/AppDialog.vue';
 import ItemArt from './ui/ItemArt.vue';
 import ScoreInput from './ui/ScoreInput.vue';
 import MovieMetadata from './MovieMetadata.vue';
+import SetAsideNotice from './SetAsideNotice.vue';
 
 defineProps<{
   entry: EntryDto | null;
@@ -16,12 +17,15 @@ defineProps<{
   /** The viewer's final score on a closed list. */
   finalScore?: number | undefined;
   canDelete?: boolean;
+  canSetAside?: boolean;
+  rankLabel?: string | undefined;
 }>();
 const emit = defineEmits<{
   close: [];
   change: [value: number | null];
   withdraw: [entry: EntryDto];
   delete: [entry: EntryDto];
+  setAside: [entry: EntryDto];
 }>();
 </script>
 
@@ -37,13 +41,14 @@ const emit = defineEmits<{
       />
       <div class="entry-details__info">
         <MovieMetadata :item="entry.item" />
+        <SetAsideNotice :reason="entry.setAsideReason" />
         <p v-if="entry.isMine" class="entry__meta"><span class="pill pill--mine">Yours</span></p>
         <p v-else-if="entry.nominatedBy !== null" class="entry__meta">
           Nominated by {{ entry.nominatedBy }}
         </p>
         <dl v-if="standing !== undefined" class="entry-details__stats">
           <div>
-            <dt>Rank</dt>
+            <dt>{{ rankLabel ?? (entry.setAsideReason != null ? 'Set-aside rank' : 'Rank') }}</dt>
             <dd>{{ standing.rank ?? '–' }}</dd>
           </div>
           <div>
@@ -77,6 +82,14 @@ const emit = defineEmits<{
       </p>
     </div>
     <template #actions>
+      <button
+        v-if="canSetAside === true && entry !== null"
+        type="button"
+        class="button"
+        @click="emit('setAside', entry)"
+      >
+        {{ entry.setAsideReason == null ? 'Set aside...' : 'Edit set-aside status...' }}
+      </button>
       <button
         v-if="entry?.withdrawalToken != null"
         type="button"

@@ -1,5 +1,12 @@
 import type { Brand, MemberId } from '../../../shared/kernel/index.ts';
 import type { ListId } from './list.ts';
+import {
+  domainError,
+  err,
+  ok,
+  type DomainError,
+  type Result,
+} from '../../../shared/kernel/index.ts';
 
 export type EntryId = Brand<string, 'EntryId'>;
 
@@ -36,7 +43,25 @@ export interface Entry {
   readonly withdrawnNominationIds?: readonly string[];
   /** Set once the item's details were removed under its source's retention terms. */
   readonly snapshotPurgedAt: Date | null;
+  /** Null or absent: main ranking. Otherwise the member-visible reason for setting it aside. */
+  readonly setAsideReason?: string | null;
 }
+
+export const validateSetAsideReason = (
+  reason: string | null,
+): Result<string | null, DomainError> => {
+  if (reason === null) return ok(null);
+  const trimmed = reason.trim();
+  return trimmed.length > 0 && trimmed.length <= 500
+    ? ok(trimmed)
+    : err(
+        domainError(
+          'invalid',
+          'lists.invalid-set-aside-reason',
+          'Provide an explanation of 1-500 characters.',
+        ),
+      );
+};
 
 /**
  * The same item always gets the same id in a list. Creating an entry only if its id is new

@@ -21,6 +21,7 @@ export interface RankingContextView {
   readonly strategy: string;
   readonly minVotes: number;
   readonly entryIds: readonly EntryId[];
+  readonly setAsideEntryIds: readonly EntryId[];
 }
 
 /**
@@ -46,6 +47,7 @@ export const makeRankingContext =
     const list = found.value;
     if (list.deletionRequested === true) return err(listsErrors.deleting);
     if (list.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
+    const entries = (await deps.entries.forList(list.id)).filter(isActiveEntry);
     return ok({
       listId: list.id,
       writeRevision: list.entryDeletionRevision ?? null,
@@ -54,7 +56,10 @@ export const makeRankingContext =
       closesAt: list.schedule?.closesAt ?? null,
       strategy: list.config.ranking.strategy,
       minVotes: list.config.ranking.minVotes,
-      entryIds: await deps.entries.idsForList(list.id),
+      entryIds: entries.map((entry) => entry.id),
+      setAsideEntryIds: entries
+        .filter((entry) => entry.setAsideReason != null)
+        .map((entry) => entry.id),
     });
   };
 

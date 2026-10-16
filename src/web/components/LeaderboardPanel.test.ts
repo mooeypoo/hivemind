@@ -93,6 +93,98 @@ afterEach(() => {
 });
 
 describe('LeaderboardPanel', () => {
+  test('separate is the default, with independent ranks and explanations; combined is reversible', async () => {
+    const aside = { ...entry('b', 'Wingspan'), setAsideReason: 'Outside this list’s criteria' };
+    const main = row('a', 'Root', 1, 6, 3);
+    const marked = row('b', 'Wingspan', 1, 10, 3);
+    const panel = mount(StandingsBoard, {
+      props: {
+        board: {
+          hidden: false,
+          computedAt: new Date().toISOString(),
+          minVotes: 2,
+          rows: [marked, { ...main, rank: 2, score: 7 }],
+          groups: { main: [main], setAside: [marked] },
+        },
+        entries: [entry('a', 'Root'), aside],
+        scale: { min: 1, max: 10 },
+      },
+    });
+    expect(panel.get<HTMLDetailsElement>('.ranking-options').element.open).toBe(false);
+    expect(panel.get('.ranking-options > summary').text()).toBe('Ranking view: Separate rankings');
+    panel.get<HTMLDetailsElement>('.ranking-options').element.open = true;
+    await panel.get('.ranking-options').trigger('toggle');
+    expect(panel.get<HTMLInputElement>('input[value=separate]').element.checked).toBe(true);
+    expect(panel.get('fieldset').text()).toContain('Separate rankings');
+    expect(panel.get('fieldset').text()).toContain('Combine ranking');
+    expect(panel.text()).toContain(
+      'Set-aside entries are ranked in their own group below the main list.',
+    );
+    expect(panel.findAll('.podium__place')).toHaveLength(1);
+    expect(panel.get('.set-aside-ranking').text()).toContain(aside.setAsideReason);
+    expect(panel.get('[aria-label="Set-aside rank 1"]').text()).toBe('1');
+    await panel.get('input[value=combined]').setValue(true);
+    expect(panel.get('.ranking-options > summary').text()).toBe('Ranking view: Combine ranking');
+    panel.get<HTMLDetailsElement>('.ranking-options').element.open = false;
+    await panel.get('.ranking-options').trigger('toggle');
+    expect(panel.text()).toContain('Set-aside entries are included in the main list’s ranking.');
+    expect(panel.find('.set-aside-ranking').exists()).toBe(false);
+    expect(panel.findAll('.podium__place')).toHaveLength(2);
+    expect(panel.text()).toContain(aside.setAsideReason);
+    panel.get<HTMLDetailsElement>('.ranking-options').element.open = true;
+    await panel.get('.ranking-options').trigger('toggle');
+    await panel.get('input[value=separate]').setValue(true);
+    expect(panel.findAll('.podium__place')).toHaveLength(1);
+    panel.unmount();
+  });
+
+  test.each(['provisional', 'unrated'] as const)(
+    'set-aside %s entries stay visible with their reason',
+    async (state) => {
+      const marked = row(
+        'b',
+        'Wingspan',
+        null,
+        state === 'unrated' ? null : 8,
+        state === 'unrated' ? 0 : 1,
+        true,
+        state === 'unrated' ? 2 : 1,
+      );
+      const panel = mount(StandingsBoard, {
+        props: {
+          board: {
+            hidden: false,
+            computedAt: new Date().toISOString(),
+            minVotes: 2,
+            rows: [marked],
+            groups: { main: [], setAside: [marked] },
+          },
+          entries: [{ ...entry('b', 'Wingspan'), setAsideReason: '<b>Not in scope</b>' }],
+          scale: { min: 1, max: 10 },
+        },
+      });
+      expect(panel.text()).toContain('All entries have been set aside');
+      expect(panel.get('.set-aside-ranking').text()).toContain('Wingspan');
+      expect(panel.get('.set-aside-ranking').text()).toContain('<b>Not in scope</b>');
+      expect(panel.find('.set-aside-notice b').exists()).toBe(false);
+      expect(panel.find('.podium').exists()).toBe(false);
+      await panel.get('input[value=combined]').setValue(true);
+      expect(panel.text()).toContain('Wingspan');
+      expect(panel.get('.set-aside-notice').text()).toContain('<b>Not in scope</b>');
+      panel.unmount();
+    },
+  );
+
+  test('no ranking-view control appears without marked entries or for sealed results', () => {
+    for (const value of [board([]), { hidden: true as const, revealsAt: null }]) {
+      const panel = mount(StandingsBoard, {
+        props: { board: value, entries: [], scale: { min: 1, max: 10 } },
+      });
+      expect(panel.find('fieldset').exists()).toBe(false);
+      panel.unmount();
+    }
+  });
+
   test.each(['ranked', 'provisional', 'unrated', 'podium'] as const)(
     '%s entries open read-only movie details from their title and art',
     async (state) => {
