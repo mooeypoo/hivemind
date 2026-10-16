@@ -1,7 +1,6 @@
 import { computed, ref, watch } from 'vue';
 import type {
   BallotDto,
-  DeleteEntryRequest,
   EntryDto,
   LeaderboardDto,
   LeaderboardRowDto,
@@ -24,8 +23,6 @@ export const useListPage = (slug: () => string) => {
   const leaderboard = ref<LeaderboardDto | null>(null);
   const withdrawing = ref(false);
   const withdrawalError = ref<ApiError | null>(null);
-  const deletingEntry = ref(false);
-  const deletionError = ref<ApiError | null>(null);
 
   const path = () => `/api/lists/${encodeURIComponent(slug())}`;
   const refreshPublicScores = async () => {
@@ -72,26 +69,6 @@ export const useListPage = (slug: () => string) => {
       return true;
     } finally {
       withdrawing.value = false;
-    }
-  };
-
-  const deleteEntry = async (input: DeleteEntryRequest): Promise<boolean> => {
-    if (deletingEntry.value || list.value === null) return false;
-    deletingEntry.value = true;
-    deletionError.value = null;
-    try {
-      const result = await api.post<undefined>(
-        `/api/lists/${encodeURIComponent(list.value.id)}/entries/delete`,
-        input,
-      );
-      await load();
-      if (!result.ok) {
-        deletionError.value = result.error;
-        return false;
-      }
-      return true;
-    } finally {
-      deletingEntry.value = false;
     }
   };
 
@@ -189,8 +166,5 @@ export const useListPage = (slug: () => string) => {
     withdraw,
     withdrawing,
     withdrawalError,
-    deleteEntry,
-    deletingEntry,
-    deletionError,
   };
 };

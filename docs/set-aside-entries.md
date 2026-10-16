@@ -44,8 +44,15 @@ for other members. Collapsing the controls preserves the selected view.
 
 ## Management and presentation
 
-The entry details dialog on the list page exposes Set aside, Edit explanation and
-Return to main ranking to Admins. Saving checks both the nomination incarnation and
+The entry details dialog exposes Set aside, Edit explanation and Return to main
+ranking to Admins from the rating list, the Standings tab and the full results page,
+including the separate set-aside group and combined rankings. The same dialogs and
+safeguards apply everywhere. Archived lists remain read-only for classification.
+Admins can also permanently delete an entry from any of these views, including on
+archived lists, with the same typed-title confirmation. Failed deletion cleanup
+refreshes the list's paused state and can be retried from either page.
+
+Saving checks both the nomination incarnation and
 the previously observed explanation to reject stale edits. Errors retain the draft.
 The editor explains that ratings remain, that the reason is member-visible, and
 that closed-list corrections affect final results.

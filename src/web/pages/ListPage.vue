@@ -9,7 +9,7 @@ import { usePageTitle } from '../lib/page-title.ts';
 import { session } from '../state/session.ts';
 import EntryCard from '../components/EntryCard.vue';
 import EntryDetails from '../components/EntryDetails.vue';
-import EntrySetAsideDialog from '../components/EntrySetAsideDialog.vue';
+import EntryManagement from '../components/EntryManagement.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import EventCountdown from '../components/EventCountdown.vue';
@@ -35,7 +35,7 @@ const { canNominateHere, isClosed, resultsSealed, unrated, ratedCount, next, req
   page;
 const { scores, saving, errors } = ballot;
 const { withdrawing, withdrawalError } = page;
-const { deletingEntry, deletionError } = page;
+const management = ref<InstanceType<typeof EntryManagement> | null>(null);
 usePageTitle(() => list.value?.title ?? null);
 
 // Tabs, kept in the address (?tab=standings) so they can be linked to.
@@ -67,22 +67,13 @@ const panelProps = (id: string) =>
 
 // Entry details and rating one by one
 const selectedId = ref<string | null>(null);
-const settingAside = ref<EntryDto | null>(null);
 const beginSetAside = (entry: EntryDto) => {
   selectedId.value = null;
-  settingAside.value = entry;
+  management.value?.beginSetAside(entry);
 };
-const savedSetAside = async (entry: EntryDto) => {
-  settingAside.value = null;
+const entriesChanged = () => {
   queue.value = [];
   rating.value = false;
-  await page.load();
-  toast.show(
-    entry.setAsideReason == null
-      ? 'Entry returned to the main ranking.'
-      : 'Set-aside explanation saved.',
-    'success',
-  );
 };
 const selected = computed(
   () => list.value?.entries.find((entry) => entry.id === selectedId.value) ?? null,
@@ -124,34 +115,18 @@ const confirmWithdrawal = async () => {
   }
 };
 
-const deletion = ref<{ entryId: string; token: string; title: string } | null>(null);
+const deletionReturnId = ref<string | null>(null);
 const beginDeletion = (entry: EntryDto) => {
-  if (entry.deletionToken == null) return;
-  deletion.value = { entryId: entry.id, token: entry.deletionToken, title: entry.item.title };
-  deletionError.value = null;
+  deletionReturnId.value = selectedId.value;
   selectedId.value = null;
+  management.value?.beginDeletion(entry);
 };
-const cancelDeletion = () => {
-  const entryId = deletion.value?.entryId;
-  selectedId.value = list.value?.entries.some((entry) => entry.id === entryId)
-    ? (entryId ?? null)
-    : null;
-  deletion.value = null;
-};
-const confirmDeletion = async () => {
-  if (deletion.value === null) return;
-  if (
-    await page.deleteEntry({
-      entryId: deletion.value.entryId,
-      token: deletion.value.token,
-      confirmation: deletion.value.title,
-    })
-  ) {
-    deletion.value = null;
-    queue.value = [];
-    rating.value = false;
-    toast.show('Entry and its scores permanently deleted.', 'success');
-  }
+const cancelDeletion = (entryId: string) => {
+  selectedId.value =
+    deletionReturnId.value === entryId && list.value?.entries.some((entry) => entry.id === entryId)
+      ? entryId
+      : null;
+  deletionReturnId.value = null;
 };
 
 const copyMemberLink = async () => {
@@ -233,10 +208,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
         v-if="session.me?.isAdmin === true && list.entryDeletion != null"
         type="button"
         class="button button--danger"
-        @click="
-          deletion = list.entryDeletion;
-          deletionError = null;
-        "
+        @click="management?.retryDeletion(list.entryDeletion)"
       >
         Retry entry deletion...
       </button>
@@ -377,9 +349,15 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
         :my-scores="scores"
         :public-scores="publicScores"
         :can-vote="canVote"
+        :can-delete="session.me?.isAdmin === true && !list.participationPaused"
+        :can-set-aside="
+          session.me?.isAdmin === true && list.lifecycle !== 'archived' && !list.participationPaused
+        "
         :score-state="canVote ? scoreState : undefined"
         @loaded="page.onLeaderboard"
         @rate="ballot.set"
+        @delete="beginDeletion"
+        @set-aside="beginSetAside"
       />
     </section>
 
@@ -424,36 +402,14 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
       @delete="beginDeletion"
       @set-aside="beginSetAside"
     />
-    <EntrySetAsideDialog
-      :entry="settingAside"
+    <EntryManagement
+      v-if="session.me?.isAdmin === true"
+      ref="management"
       :list="list"
-      @close="settingAside = null"
-      @saved="savedSetAside"
-    />
-    <ConfirmDialog
-      :open="deletion !== null"
-      :title="`Permanently delete ${deletion?.title ?? 'entry'}?`"
-      confirm-label="Delete entry permanently"
-      :confirm-text="deletion?.title ?? ''"
-      :busy="deletingEntry"
-      danger
+      :reload="page.load"
+      @changed="entriesChanged"
       @cancel="cancelDeletion"
-      @confirm="confirmDeletion"
-    >
-      <p>
-        This cannot be undone. The entry, all its scores and nomination records will be erased. Its
-        nomination allowance will be freed. If nominated again, it starts with no previous scores.
-      </p>
-      <p v-if="isClosed">
-        This list has finished voting. Deletion changes its final results and may change every rank.
-      </p>
-      <p>
-        Ranking will be recalculated. Nominations and score changes pause for this list until
-        cleanup finishes. Once started, deletion must be finished; closing this dialog does not
-        cancel it. Previously downloaded backups are not erased.
-      </p>
-      <ErrorNotice :error="deletionError" />
-    </ConfirmDialog>
+    />
     <ConfirmDialog
       :open="withdrawalEntry !== null"
       :title="`Withdraw ${withdrawalEntry?.item.title ?? 'nomination'}?`"

@@ -16,6 +16,8 @@ const props = defineProps<{
   myScores?: Readonly<Record<string, number>> | undefined;
   publicScores?: PublicScoresDto | undefined;
   canVote?: boolean | undefined;
+  canDelete?: boolean | undefined;
+  canSetAside?: boolean | undefined;
   scoreState?:
     | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
     | undefined;
@@ -27,6 +29,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   rate: [event: { entryId: string; score: number | null }];
+  delete: [entry: EntryDto];
+  setAside: [entry: EntryDto];
 }>();
 
 const visible = computed(() => (props.board.hidden ? null : props.board));
@@ -441,7 +445,17 @@ const voters = (row: StandingRow) =>
         selectedId !== null && canVote && scoreState !== undefined ? scoreState(selectedId) : null
       "
       :final-score="selectedId === null ? undefined : myScores?.[selectedId]"
+      :can-delete="canDelete === true"
+      :can-set-aside="canSetAside === true"
       @close="selectedId = null"
+      @delete="
+        selectedId = null;
+        emit('delete', $event);
+      "
+      @set-aside="
+        selectedId = null;
+        emit('setAside', $event);
+      "
       @change="
         selectedId !== null ? emit('rate', { entryId: selectedId, score: $event }) : undefined
       "

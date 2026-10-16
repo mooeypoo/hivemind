@@ -16,12 +16,15 @@ import TmdbAttribution from '../components/TmdbAttribution.vue';
 import TvdbAttribution from '../components/TvdbAttribution.vue';
 import IgdbAttribution from '../components/IgdbAttribution.vue';
 import { usePageTitle } from '../lib/page-title.ts';
+import { session } from '../state/session.ts';
+import EntryManagement from '../components/EntryManagement.vue';
 
 const route = useRoute();
 const list = ref<ListDetailDto | null>(null);
 const board = ref<LeaderboardDto | null>(null);
 const publicScores = ref<PublicScoresDto>({ visible: false });
 const error = ref<ApiError | null>(null);
+const management = ref<InstanceType<typeof EntryManagement> | null>(null);
 
 const path = () => `/api/lists/${encodeURIComponent(String(route.params.slug))}`;
 const refreshPublicScores = async () => {
@@ -40,6 +43,7 @@ const scoreState = (entryId: string) => ({
 });
 
 const load = async () => {
+  board.value = null;
   const slug = encodeURIComponent(String(route.params.slug));
   const [detail, leaderboard, own, attribution] = await Promise.all([
     api.get<ListDetailDto>(`/api/lists/${slug}`),
@@ -68,7 +72,10 @@ const final = computed(
   () => list.value?.lifecycle === 'closed' || list.value?.lifecycle === 'archived',
 );
 const canRate = computed(
-  () => list.value?.lifecycle === 'open' && list.value.viewer.canParticipate,
+  () =>
+    list.value?.lifecycle === 'open' &&
+    list.value.viewer.canParticipate &&
+    !list.value.participationPaused,
 );
 const canNominate = computed(
   () => list.value?.entryMode === 'nominations' && list.value.viewer.canNominate,
@@ -110,6 +117,17 @@ const canNominate = computed(
       </div>
     </header>
 
+    <div v-if="list.participationPaused" class="notice" role="status">
+      <p>An entry is being permanently deleted. Nominations and scores are temporarily paused.</p>
+      <button
+        v-if="session.me?.isAdmin === true && list.entryDeletion != null"
+        type="button"
+        class="button button--danger"
+        @click="management?.retryDeletion(list.entryDeletion)"
+      >
+        Retry entry deletion...
+      </button>
+    </div>
     <StandingsBoard
       v-if="board !== null"
       :board="board"
@@ -118,9 +136,21 @@ const canNominate = computed(
       :my-scores="scores"
       :public-scores="publicScores"
       :can-vote="canRate"
+      :can-delete="session.me?.isAdmin === true && !list.participationPaused"
+      :can-set-aside="
+        session.me?.isAdmin === true && list.lifecycle !== 'archived' && !list.participationPaused
+      "
       :score-state="canRate ? scoreState : undefined"
       heading-level="h2"
       @rate="ballot.set($event.entryId, $event.score)"
+      @delete="management?.beginDeletion($event)"
+      @set-aside="management?.beginSetAside($event)"
+    />
+    <EntryManagement
+      v-if="session.me?.isAdmin === true"
+      ref="management"
+      :list="list"
+      :reload="load"
     />
 
     <TmdbAttribution v-if="list.itemSource.kind === 'tmdb-movie'" />

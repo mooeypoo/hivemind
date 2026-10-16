@@ -217,25 +217,33 @@ describe('every page passes automated accessibility checks', () => {
     },
   );
 
-  test.each(['/lists/best-sci-fi', '/lists/closed'])(
-    'the set-aside editor at %s is accessible',
-    async (path) => {
-      const wrapper = await renderAt(path, true);
-      await wrapper.get('.entry__art').trigger('click');
-      await wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Set aside...')
-        ?.trigger('click');
-      await flushPromises();
-      expect(document.querySelector('dialog[open] textarea')).not.toBeNull();
-      if (path === '/lists/closed')
-        expect(document.querySelector('dialog[open]')?.textContent).toContain(
-          'changes the final standings',
-        );
-      await expectAccessible(document.body);
-      wrapper.unmount();
-    },
-  );
+  test.each([
+    '/lists/best-sci-fi',
+    '/lists/closed',
+    '/lists/best-sci-fi?tab=standings',
+    '/lists/best-sci-fi/results',
+  ])('the set-aside editor at %s is accessible', async (path) => {
+    const wrapper = await renderAt(path, true);
+    await wrapper
+      .get(
+        path === '/lists/best-sci-fi' || path === '/lists/closed'
+          ? '.entry__art'
+          : '.standing__title-button',
+      )
+      .trigger('click');
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Set aside...')
+      ?.trigger('click');
+    await flushPromises();
+    expect(document.querySelector('dialog[open] textarea')).not.toBeNull();
+    if (path === '/lists/closed')
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(
+        'changes the final standings',
+      );
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
 
   test.each([false, true])(
     'the permanent deletion dialog is accessible (pending: %s)',
@@ -516,9 +524,15 @@ describe('list page dialogs', () => {
 });
 
 describe('archiving', () => {
-  test('entry deletion confirmation passes accessibility checks', async () => {
-    const wrapper = await renderAt('/lists/best-sci-fi', true);
-    await wrapper.get('.entry__art').trigger('click');
+  test.each([
+    '/lists/best-sci-fi',
+    '/lists/best-sci-fi?tab=standings',
+    '/lists/best-sci-fi/results',
+  ])('entry deletion confirmation at %s passes accessibility checks', async (path) => {
+    const wrapper = await renderAt(path, true);
+    await wrapper
+      .get(path === '/lists/best-sci-fi' ? '.entry__art' : '.standing__title-button')
+      .trigger('click');
     await wrapper.get('button[aria-label="Permanently delete Blade Runner"]').trigger('click');
     await flushPromises();
     expect(document.querySelector('dialog[open]')?.textContent).toContain('all its scores');
@@ -526,23 +540,26 @@ describe('archiving', () => {
     wrapper.unmount();
   });
 
-  test('pending entry deletion retry passes accessibility checks', async () => {
-    const wrapper = await renderAt(
-      '/lists/best-sci-fi',
-      true,
-      false,
-      false,
-      false,
-      null,
-      false,
-      false,
-      'deleting',
-    );
-    await wrapper.get('.notice button').trigger('click');
-    await flushPromises();
-    await expectAccessible(document.body);
-    wrapper.unmount();
-  });
+  test.each(['/lists/best-sci-fi', '/lists/best-sci-fi/results'])(
+    'pending entry deletion retry at %s passes accessibility checks',
+    async (path) => {
+      const wrapper = await renderAt(
+        path,
+        true,
+        false,
+        false,
+        false,
+        null,
+        false,
+        false,
+        'deleting',
+      );
+      await wrapper.get('.notice button').trigger('click');
+      await flushPromises();
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
   test('explains plainly that it is permanent, and asks for the address to be typed', async () => {
     const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
     const dialogs = [...document.querySelectorAll('dialog')].map((d) => d.textContent);

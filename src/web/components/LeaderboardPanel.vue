@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type {
   LeaderboardDto,
+  EntryDto,
   ListDetailDto,
   PublicScoresDto,
 } from '../../server/http/contracts.ts';
@@ -16,6 +17,8 @@ const props = defineProps<{
   myScores: Readonly<Record<string, number>>;
   publicScores?: PublicScoresDto | undefined;
   canVote?: boolean | undefined;
+  canDelete?: boolean | undefined;
+  canSetAside?: boolean | undefined;
   scoreState?:
     | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
     | undefined;
@@ -23,6 +26,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   loaded: [board: LeaderboardDto];
   rate: [entryId: string, score: number | null];
+  delete: [entry: EntryDto];
+  setAside: [entry: EntryDto];
 }>();
 
 const board = ref<LeaderboardDto | null>(null);
@@ -78,9 +83,13 @@ const updated = computed(() => {
       :scale="list.scale"
       :my-scores="myScores"
       :can-vote="canVote"
+      :can-delete="canDelete"
+      :can-set-aside="canSetAside"
       :score-state="scoreState"
       v-bind="publicScores === undefined ? {} : { publicScores }"
       @rate="emit('rate', $event.entryId, $event.score)"
+      @delete="emit('delete', $event)"
+      @set-aside="emit('setAside', $event)"
     />
   </section>
 </template>
