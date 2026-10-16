@@ -110,9 +110,13 @@ describe('LeaderboardPanel', () => {
         scale: { min: 1, max: 10 },
       },
     });
+    expect(panel.get<HTMLDetailsElement>('.ranking-options').element.open).toBe(false);
+    expect(panel.get('.ranking-options > summary').text()).toBe('Ranking view: Separate rankings');
+    panel.get<HTMLDetailsElement>('.ranking-options').element.open = true;
+    await panel.get('.ranking-options').trigger('toggle');
     expect(panel.get<HTMLInputElement>('input[value=separate]').element.checked).toBe(true);
-    expect(panel.get('fieldset').text()).toContain('Rank separately');
-    expect(panel.get('fieldset').text()).toContain('Rank together');
+    expect(panel.get('fieldset').text()).toContain('Separate rankings');
+    expect(panel.get('fieldset').text()).toContain('Combine ranking');
     expect(panel.text()).toContain(
       'Set-aside entries are ranked in their own group below the main list.',
     );
@@ -120,10 +124,15 @@ describe('LeaderboardPanel', () => {
     expect(panel.get('.set-aside-ranking').text()).toContain(aside.setAsideReason);
     expect(panel.get('[aria-label="Set-aside rank 1"]').text()).toBe('1');
     await panel.get('input[value=combined]').setValue(true);
+    expect(panel.get('.ranking-options > summary').text()).toBe('Ranking view: Combine ranking');
+    panel.get<HTMLDetailsElement>('.ranking-options').element.open = false;
+    await panel.get('.ranking-options').trigger('toggle');
     expect(panel.text()).toContain('Set-aside entries are included in the main list’s ranking.');
     expect(panel.find('.set-aside-ranking').exists()).toBe(false);
     expect(panel.findAll('.podium__place')).toHaveLength(2);
     expect(panel.text()).toContain(aside.setAsideReason);
+    panel.get<HTMLDetailsElement>('.ranking-options').element.open = true;
+    await panel.get('.ranking-options').trigger('toggle');
     await panel.get('input[value=separate]').setValue(true);
     expect(panel.findAll('.podium__place')).toHaveLength(1);
     panel.unmount();

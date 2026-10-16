@@ -19,14 +19,17 @@ or its ratings. This is entry metadata, not a second List aggregate.
 
 ## Viewing rankings
 
-When there are set-aside entries, a labelled Rank separately / Rank together control appears
-on both standings surfaces. Rank separately is the default; the choice is local to the
-mounted view and does not change the list for other members.
+When there are set-aside entries, a collapsed-by-default **Ranking view** disclosure
+appears on both standings surfaces. Its summary shows the selected view; opening it
+reveals **Separate rankings** / **Combine ranking** and the explanation. These are
+secondary viewing options, not a prerequisite for reading results. Separate rankings
+is the default; the choice is local to the mounted view and does not change the list
+for other members. Collapsing the controls preserves the selected view.
 
-- **Rank separately:** main entries compete only against main entries. A quieter section
+- **Separate rankings:** main entries compete only against main entries. A quieter section
   at the end ranks set-aside entries against one another, starting at 1, without a
   second podium. Each group independently handles ties, provisional and unrated items.
-- **Rank together:** all active entries compete together; set-aside badges and explanations
+- **Combine ranking:** all active entries compete together; set-aside badges and explanations
   remain visible.
 - A short sentence explains the selected view: set-aside entries are either ranked
   in their own group below the main list or included in the main list's ranking.

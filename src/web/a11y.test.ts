@@ -205,6 +205,10 @@ describe('every page passes automated accessibility checks', () => {
       );
       expect(wrapper.get('.set-aside-ranking').text()).toContain('Outside this list’s criteria');
       await expectAccessible(document.body);
+      expect(wrapper.get<HTMLDetailsElement>('.ranking-options').element.open).toBe(false);
+      wrapper.get<HTMLDetailsElement>('.ranking-options').element.open = true;
+      await wrapper.get('.ranking-options').trigger('toggle');
+      await expectAccessible(document.body);
       await wrapper.get('input[value=combined]').setValue(true);
       await flushPromises();
       expect(wrapper.find('.set-aside-ranking').exists()).toBe(false);

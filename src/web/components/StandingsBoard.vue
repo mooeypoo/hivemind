@@ -36,16 +36,17 @@ const asideBoard = computed((): LeaderboardDto =>
 
 <template>
   <div class="standings-view">
-    <template v-if="groups !== undefined">
+    <details v-if="groups !== undefined" class="ranking-options">
+      <summary>Ranking view: {{ separate ? 'Separate rankings' : 'Combine ranking' }}</summary>
       <fieldset class="ranking-view" :aria-describedby="`${id}-help`">
-        <legend>Ranking view</legend>
+        <legend class="visually-hidden">Ranking view</legend>
         <label>
           <input v-model="mode" type="radio" :name="`${id}-mode`" value="separate" />
-          Rank separately
+          Separate rankings
         </label>
         <label>
           <input v-model="mode" type="radio" :name="`${id}-mode`" value="combined" />
-          Rank together
+          Combine ranking
         </label>
       </fieldset>
       <p :id="`${id}-help`" class="meta">
@@ -56,7 +57,7 @@ const asideBoard = computed((): LeaderboardDto =>
         }}
         Scores are recalculated for each view, so scores and positions may change.
       </p>
-    </template>
+    </details>
     <component :is="headingLevel ?? 'h3'" v-if="separate">Main ranking</component>
     <p v-if="separate && mainEntries.length === 0" class="empty">
       All entries have been set aside. There are no entries in the main ranking.
