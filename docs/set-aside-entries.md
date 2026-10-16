@@ -19,15 +19,17 @@ or its ratings. This is entry metadata, not a second List aggregate.
 
 ## Viewing rankings
 
-When there are set-aside entries, a labelled Separate / Combined control appears
-on both standings surfaces. Separate is the default; the choice is local to the
+When there are set-aside entries, a labelled Rank separately / Rank together control appears
+on both standings surfaces. Rank separately is the default; the choice is local to the
 mounted view and does not change the list for other members.
 
-- **Separate:** main entries compete only against main entries. A quieter section
+- **Rank separately:** main entries compete only against main entries. A quieter section
   at the end ranks set-aside entries against one another, starting at 1, without a
   second podium. Each group independently handles ties, provisional and unrated items.
-- **Combined:** all active entries compete together; set-aside badges and explanations
+- **Rank together:** all active entries compete together; set-aside badges and explanations
   remain visible.
+- A short sentence explains the selected view: set-aside entries are either ranked
+  in their own group below the main list or included in the main list's ranking.
 - Bayesian scores are recalculated within each displayed group, including that
   group's prior average. Scores and relative ordering can change between views.
   Set-aside ratings have no influence on the separate main ranking.

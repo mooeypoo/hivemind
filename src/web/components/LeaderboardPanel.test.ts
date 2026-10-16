@@ -111,10 +111,16 @@ describe('LeaderboardPanel', () => {
       },
     });
     expect(panel.get<HTMLInputElement>('input[value=separate]').element.checked).toBe(true);
+    expect(panel.get('fieldset').text()).toContain('Rank separately');
+    expect(panel.get('fieldset').text()).toContain('Rank together');
+    expect(panel.text()).toContain(
+      'Set-aside entries are ranked in their own group below the main list.',
+    );
     expect(panel.findAll('.podium__place')).toHaveLength(1);
     expect(panel.get('.set-aside-ranking').text()).toContain(aside.setAsideReason);
     expect(panel.get('[aria-label="Set-aside rank 1"]').text()).toBe('1');
     await panel.get('input[value=combined]').setValue(true);
+    expect(panel.text()).toContain('Set-aside entries are included in the main list’s ranking.');
     expect(panel.find('.set-aside-ranking').exists()).toBe(false);
     expect(panel.findAll('.podium__place')).toHaveLength(2);
     expect(panel.text()).toContain(aside.setAsideReason);

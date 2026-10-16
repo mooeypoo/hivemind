@@ -93,12 +93,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(page.locator('.set-aside-ranking')).toContainText(pick.item.title);
         await expect(page.locator('.set-aside-ranking .podium')).toHaveCount(0);
         await fits(page);
-        await page.getByRole('radio', { name: 'Combined', exact: true }).check();
+        await page.getByRole('radio', { name: 'Rank together', exact: true }).check();
         await expect(page.locator('.set-aside-ranking')).toHaveCount(0);
         await expect(page.locator('.podium .set-aside-notice__reason')).toHaveText(explanation);
         await fits(page);
         await page.getByRole('link', { name: 'Full results', exact: true }).click();
-        await expect(page.getByRole('radio', { name: 'Separate', exact: true })).toBeChecked();
+        await expect(
+          page.getByRole('radio', { name: 'Rank separately', exact: true }),
+        ).toBeChecked();
         await expect(page.locator('.set-aside-ranking')).toContainText(explanation);
         await fits(page);
         await page
@@ -120,7 +122,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.getByRole('button', { name: 'Return to main ranking', exact: true }).click();
         await expect(page.locator('.entry .set-aside-notice')).toHaveCount(0);
         await page.getByRole('tab', { name: 'Standings', exact: true }).click();
-        await expect(page.getByRole('radio', { name: 'Separate', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('radio', { name: 'Rank separately', exact: true })).toHaveCount(
+          0,
+        );
         await fits(page);
       });
     }

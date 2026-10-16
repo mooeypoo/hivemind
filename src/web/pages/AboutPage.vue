@@ -26,9 +26,9 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
     </p>
     <p>
       Admins can set entries aside as outside a list's criteria, with an explanation. You can still
-      rate them: they appear in a separate ranking below the main one. Choose Combined to rank all
-      entries together instead. Scores are calculated within each group, so scores and places can
-      differ between views. Admins can correct this classification after voting closes, but not
+      rate them: they appear in a separate ranking below the main one. Choose Rank together to rank
+      all entries together instead. Scores are calculated within each group, so scores and places
+      can differ between views. Admins can correct this classification after voting closes, but not
       after the list is archived.
     </p>
     <p>

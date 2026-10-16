@@ -41,20 +41,20 @@ const asideBoard = computed((): LeaderboardDto =>
         <legend>Ranking view</legend>
         <label>
           <input v-model="mode" type="radio" :name="`${id}-mode`" value="separate" />
-          Separate
+          Rank separately
         </label>
         <label>
           <input v-model="mode" type="radio" :name="`${id}-mode`" value="combined" />
-          Combined
+          Rank together
         </label>
       </fieldset>
       <p :id="`${id}-help`" class="meta">
         {{
           separate
-            ? 'Scores are calculated within each group.'
-            : 'Includes entries outside this list’s criteria.'
+            ? 'Set-aside entries are ranked in their own group below the main list.'
+            : 'Set-aside entries are included in the main list’s ranking.'
         }}
-        Combined view recalculates all entries together; scores and positions may change.
+        Scores are recalculated for each view, so scores and positions may change.
       </p>
     </template>
     <component :is="headingLevel ?? 'h3'" v-if="separate">Main ranking</component>
