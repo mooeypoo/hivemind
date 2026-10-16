@@ -203,7 +203,15 @@ describe('every page passes automated accessibility checks', () => {
         false,
         'set-aside',
       );
-      expect(wrapper.get('.set-aside-ranking').text()).toContain('Outside this list’s criteria');
+      expect(wrapper.get('.set-aside-ranking .set-aside-notice').text()).toContain('Set aside');
+      expect(wrapper.find('.set-aside-notice__reason').exists()).toBe(false);
+      await wrapper.get('.set-aside-ranking .set-aside-notice__why').trigger('click');
+      await flushPromises();
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(
+        'Outside this list’s criteria',
+      );
+      await expectAccessible(document.body);
+      await wrapper.get('dialog[open] .dialog__actions button:last-child').trigger('click');
       await expectAccessible(document.body);
       expect(wrapper.get<HTMLDetailsElement>('.ranking-options').element.open).toBe(false);
       wrapper.get<HTMLDetailsElement>('.ranking-options').element.open = true;
@@ -212,6 +220,11 @@ describe('every page passes automated accessibility checks', () => {
       await wrapper.get('input[value=combined]').setValue(true);
       await flushPromises();
       expect(wrapper.find('.set-aside-ranking').exists()).toBe(false);
+      await wrapper.get('.set-aside-notice__why').trigger('click');
+      await flushPromises();
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(
+        'Outside this list’s criteria',
+      );
       await expectAccessible(document.body);
       wrapper.unmount();
     },

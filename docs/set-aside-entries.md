@@ -57,8 +57,11 @@ the previously observed explanation to reject stale edits. Errors retain the dra
 The editor explains that ratings remain, that the reason is member-visible, and
 that closed-list corrections affect final results.
 
-Entry cards, rating dialogs and standings details identify marked entries and show
-their explanation. Places in the separate set-aside group are labelled accordingly.
+Entry cards and standings show a compact **Set aside** tag and **Why?** button,
+which opens the entry details dialog with the full explanation. Long reasons never
+expand the ranking rows or podium cards, in either separate or combined views.
+Entry details and one-by-one rating dialogs show the full explanation.
+Places in the separate set-aside group are labelled accordingly.
 Reasons are rendered as text, never HTML. Existing theme tokens and static CSS are
 used; no new dependencies or boundary rules are needed.
 

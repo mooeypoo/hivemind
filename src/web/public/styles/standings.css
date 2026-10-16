@@ -65,6 +65,24 @@
   white-space: pre-wrap;
 }
 
+.set-aside-notice__why {
+  min-width: 44px;
+  min-height: 44px;
+  margin-inline-start: 0.35rem;
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.set-aside-notice__why:hover {
+  color: var(--text);
+}
+
 .leaderboard__header {
   display: flex;
   flex-wrap: wrap;

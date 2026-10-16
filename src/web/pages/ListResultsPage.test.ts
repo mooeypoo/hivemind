@@ -153,7 +153,8 @@ describe('ListResultsPage', () => {
     await page.get('textarea').setValue('Outside the criteria');
     await page.get('form').trigger('submit');
     await flushPromises();
-    expect(page.text()).toContain('Outside the criteria');
+    expect(page.find('.podium .set-aside-notice__reason').exists()).toBe(false);
+    expect(page.get('.podium .set-aside-notice').text()).toContain('Set aside');
     await page.get('.standing__title-button').trigger('click');
     await page.get('button[aria-label="Permanently delete Root"]').trigger('click');
     const confirm = page.get('.dialog__actions .button--danger');

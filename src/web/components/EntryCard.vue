@@ -39,7 +39,11 @@ const emit = defineEmits<{ open: [] }>();
           <span class="entry__info-icon" aria-hidden="true">i</span>
         </button>
       </h3>
-      <SetAsideNotice :reason="entry.setAsideReason" />
+      <SetAsideNotice
+        :reason="entry.setAsideReason"
+        :item-title="entry.item.title"
+        @open="emit('open')"
+      />
       <p
         v-if="
           entry.item.subtitle !== null ||

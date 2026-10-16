@@ -101,9 +101,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await fits(page);
         await editor.getByRole('button', { name: 'Set aside', exact: true }).click();
         await expect(editor).not.toBeVisible();
-        await expect(page.locator('.set-aside-ranking .set-aside-notice__reason')).toHaveText(
-          explanation,
-        );
+        await expect(page.locator('.set-aside-ranking .set-aside-notice__reason')).toHaveCount(0);
+        await page.locator('.set-aside-ranking .set-aside-notice__why').click();
+        const details = page.getByRole('dialog', { name: pick.item.title, exact: true });
+        await expect(details.locator('.set-aside-notice__reason')).toHaveText(explanation);
+        await fits(page);
+        await details.getByRole('button', { name: 'Close', exact: true }).click();
         await expect(page.locator('.set-aside-ranking')).toContainText(pick.item.title);
         await expect(page.locator('.set-aside-ranking .podium')).toHaveCount(0);
         await fits(page);
@@ -118,7 +121,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await fits(page);
         await page.getByRole('radio', { name: 'Combine ranking', exact: true }).check();
         await expect(page.locator('.set-aside-ranking')).toHaveCount(0);
-        await expect(page.locator('.podium .set-aside-notice__reason')).toHaveText(explanation);
+        await expect(page.locator('.podium .set-aside-notice__reason')).toHaveCount(0);
+        const why = page.locator('.podium .set-aside-notice__why');
+        await why.focus();
+        await page.keyboard.press('Enter');
+        await expect(details.locator('.set-aside-notice__reason')).toHaveText(explanation);
+        await fits(page);
+        await details.getByRole('button', { name: 'Close', exact: true }).click();
+        await expect(why).toBeFocused();
         await options.locator('summary').click();
         await expect(options).not.toHaveAttribute('open');
         await expect(page.locator('.set-aside-ranking')).toHaveCount(0);
@@ -132,13 +142,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(
           page.getByRole('radio', { name: 'Separate rankings', exact: true }),
         ).toBeChecked();
-        await expect(page.locator('.set-aside-ranking')).toContainText(explanation);
+        await expect(page.locator('.set-aside-ranking .set-aside-notice__reason')).toHaveCount(0);
         await fits(page);
         await page
           .locator('.set-aside-ranking')
-          .getByRole('button', { name: pick.item.title, exact: true })
+          .getByRole('button', { name: `Why was ${pick.item.title} set aside?`, exact: true })
           .click();
         await expect(page.getByRole('dialog').filter({ hasText: 'Set-aside rank' })).toBeVisible();
+        await expect(details.locator('.set-aside-notice__reason')).toHaveText(explanation);
         await fits(page);
         await page.getByRole('button', { name: 'Edit set-aside status...', exact: true }).click();
         await page.getByRole('button', { name: 'Return to main ranking', exact: true }).click();

@@ -124,7 +124,11 @@ const voters = (row: StandingRow) =>
               {{ row.item.title }}
             </button>
           </p>
-          <SetAsideNotice :reason="reasons.get(row.entryId)" />
+          <SetAsideNotice
+            :reason="reasons.get(row.entryId)"
+            :item-title="row.item.title"
+            @open="selectedId = row.entryId"
+          />
           <p v-if="row.item.subtitle !== null" class="podium__subtitle">{{ row.item.subtitle }}</p>
           <p
             v-if="row.item.developer != null || row.item.publisher != null"
@@ -181,7 +185,11 @@ const voters = (row: StandingRow) =>
             <button type="button" class="standing__title-button" @click="selectedId = row.entryId">
               {{ row.item.title }}
             </button>
-            <SetAsideNotice :reason="reasons.get(row.entryId)" />
+            <SetAsideNotice
+              :reason="reasons.get(row.entryId)"
+              :item-title="row.item.title"
+              @open="selectedId = row.entryId"
+            />
             <span
               v-if="
                 row.item.subtitle !== null || row.item.director != null || row.item.creator != null
@@ -281,7 +289,11 @@ const voters = (row: StandingRow) =>
               >
                 {{ row.item.title }}
               </button>
-              <SetAsideNotice :reason="reasons.get(row.entryId)" />
+              <SetAsideNotice
+                :reason="reasons.get(row.entryId)"
+                :item-title="row.item.title"
+                @open="selectedId = row.entryId"
+              />
               <span
                 v-if="
                   row.item.subtitle !== null ||
@@ -370,7 +382,11 @@ const voters = (row: StandingRow) =>
               >
                 {{ row.item.title }}
               </button>
-              <SetAsideNotice :reason="reasons.get(row.entryId)" />
+              <SetAsideNotice
+                :reason="reasons.get(row.entryId)"
+                :item-title="row.item.title"
+                @open="selectedId = row.entryId"
+              />
               <span
                 v-if="
                   row.item.subtitle !== null ||
