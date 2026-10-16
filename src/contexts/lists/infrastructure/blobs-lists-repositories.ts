@@ -46,6 +46,8 @@ interface ListRecordV2 {
   readonly visibility?: Visibility;
   readonly entryWriteToken?: string;
   readonly deletionRequested?: boolean;
+  readonly entryDeletion?: List['entryDeletion'];
+  readonly entryDeletionRevision?: string;
 }
 
 /** v1: a single optional required role. Still read; never written. */
@@ -113,6 +115,10 @@ const listToRecord = (list: List): ListRecordV2 => ({
   visibility: list.visibility,
   ...(list.entryWriteToken === undefined ? {} : { entryWriteToken: list.entryWriteToken }),
   ...(list.deletionRequested === undefined ? {} : { deletionRequested: list.deletionRequested }),
+  ...(list.entryDeletion === undefined ? {} : { entryDeletion: list.entryDeletion }),
+  ...(list.entryDeletionRevision === undefined
+    ? {}
+    : { entryDeletionRevision: list.entryDeletionRevision }),
 });
 
 const upgradeList = (data: unknown): ListRecordV2 => {
@@ -147,6 +153,10 @@ const listFromRecord = (data: unknown): List => {
     ...(record.deletionRequested === undefined
       ? {}
       : { deletionRequested: record.deletionRequested }),
+    ...(record.entryDeletion === undefined ? {} : { entryDeletion: record.entryDeletion }),
+    ...(record.entryDeletionRevision === undefined
+      ? {}
+      : { entryDeletionRevision: record.entryDeletionRevision }),
   };
 };
 

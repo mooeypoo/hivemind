@@ -15,8 +15,12 @@ export const makeWithListWrite =
   async <T>(
     listId: string,
     work: () => Promise<Result<T, DomainError>>,
+    revision?: string | null,
   ): Promise<Result<T, DomainError>> => {
     const current = await deps.lists.get(listId as ListId);
     if (current === null) return err(listsErrors.notFound);
+    if (revision !== undefined && revision !== (current.value.entryDeletionRevision ?? null)) {
+      return err(listsErrors.conflict);
+    }
     return withEntryWrite(deps.lists, current.value, deps.ids.next(), work);
   };

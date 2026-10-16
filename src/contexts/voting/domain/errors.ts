@@ -1,6 +1,11 @@
 import { domainError } from '../../../shared/kernel/index.ts';
 
 export const votingErrors = {
+  listChanged: domainError(
+    'conflict',
+    'voting.list-changed',
+    'An entry was permanently deleted since you loaded this list. Reload the page before rating.',
+  ),
   closed: domainError('forbidden', 'voting.closed', 'Voting is not open for this list right now.'),
   roleRequired: domainError(
     'forbidden',

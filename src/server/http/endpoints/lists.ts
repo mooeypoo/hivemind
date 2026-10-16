@@ -16,6 +16,7 @@ import { domainErrorResponse, json, noContent } from '../respond.ts';
 import {
   createListBody,
   deleteListBody,
+  deleteEntryBody,
   editListBody,
   nominateBody,
   refreshDetailsQuery,
@@ -29,6 +30,19 @@ import {
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
   result.ok ? json(map(result.value), status) : domainErrorResponse(result.error);
+
+/** `POST /api/lists/:list/entries/delete` — immutable list ID and entry incarnation. */
+export const deleteEntry = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, deleteEntryBody);
+  if (!body.ok) return body.response;
+  const result = await app.deleteEntry(await actorOf(request, app), {
+    listId: listParam(request),
+    ...body.data,
+  });
+  return result.ok ? noContent() : domainErrorResponse(result.error);
+};
 
 /** `DELETE /api/lists/:list` — immutable list ID only, never a reusable slug. */
 export const deleteList = async (request: Request, app: App): Promise<Response> => {

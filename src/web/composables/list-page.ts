@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue';
 import type {
   BallotDto,
+  DeleteEntryRequest,
   EntryDto,
   LeaderboardDto,
   LeaderboardRowDto,
@@ -23,6 +24,8 @@ export const useListPage = (slug: () => string) => {
   const leaderboard = ref<LeaderboardDto | null>(null);
   const withdrawing = ref(false);
   const withdrawalError = ref<ApiError | null>(null);
+  const deletingEntry = ref(false);
+  const deletionError = ref<ApiError | null>(null);
 
   const path = () => `/api/lists/${encodeURIComponent(slug())}`;
   const refreshPublicScores = async () => {
@@ -31,6 +34,7 @@ export const useListPage = (slug: () => string) => {
   };
   const ballot = useBallot(() => list.value?.id ?? '', {
     onSaved: () => void refreshPublicScores(),
+    revision: () => list.value?.writeRevision ?? null,
   });
 
   const load = async () => {
@@ -71,6 +75,26 @@ export const useListPage = (slug: () => string) => {
     }
   };
 
+  const deleteEntry = async (input: DeleteEntryRequest): Promise<boolean> => {
+    if (deletingEntry.value || list.value === null) return false;
+    deletingEntry.value = true;
+    deletionError.value = null;
+    try {
+      const result = await api.post<undefined>(
+        `/api/lists/${encodeURIComponent(list.value.id)}/entries/delete`,
+        input,
+      );
+      await load();
+      if (!result.ok) {
+        deletionError.value = result.error;
+        return false;
+      }
+      return true;
+    } finally {
+      deletingEntry.value = false;
+    }
+  };
+
   /** Called by the standings panel whenever it loads. */
   const onLeaderboard = (board: LeaderboardDto) => {
     leaderboard.value = board;
@@ -93,7 +117,10 @@ export const useListPage = (slug: () => string) => {
 
   const lifecycle = computed(() => list.value?.lifecycle);
   const isClosed = computed(() => lifecycle.value === 'closed' || lifecycle.value === 'archived');
-  const hasStandings = computed(() => lifecycle.value === 'open' || isClosed.value);
+  const hasStandings = computed(
+    () =>
+      list.value?.participationPaused !== true && (lifecycle.value === 'open' || isClosed.value),
+  );
   /** Members rate while the list is open; once it closes they still see their own scores. */
   const canVote = computed(
     () => lifecycle.value === 'open' && list.value?.viewer.canParticipate === true,
@@ -101,6 +128,7 @@ export const useListPage = (slug: () => string) => {
   const canNominateHere = computed(
     () =>
       list.value?.entryMode === 'nominations' &&
+      list.value.participationPaused !== true &&
       (lifecycle.value === 'open' || lifecycle.value === 'scheduled'),
   );
   const ratedCount = computed(
@@ -157,5 +185,8 @@ export const useListPage = (slug: () => string) => {
     withdraw,
     withdrawing,
     withdrawalError,
+    deleteEntry,
+    deletingEntry,
+    deletionError,
   };
 };

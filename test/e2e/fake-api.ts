@@ -35,6 +35,7 @@ const entry = (id: string, title: string, subtitle: string | null): EntryDto => 
   isMine: id === 'b',
   nominatedAt: '2026-01-01T00:00:00.000Z',
   withdrawalToken: id === 'b' ? 'claim-b' : null,
+  deletionToken: `entry-${id}`,
 });
 
 export const list: ListDetailDto = {

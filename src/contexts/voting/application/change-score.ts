@@ -18,6 +18,7 @@ export interface ChangeScoreDeps {
 }
 
 export interface ChangeScoreInput {
+  readonly revision?: string | null;
   readonly list: string;
   readonly entryId: string;
   /** Null clears the score. */
@@ -33,30 +34,37 @@ export const makeChangeScore =
   async (actor: Actor, input: ChangeScoreInput): Promise<Result<MyBallot, DomainError>> => {
     const allowed = await mayVote(deps.lists, actor, input.list);
     if (!allowed.ok) return allowed;
-    return deps.lists.withWrite(allowed.value.rules.listId, async () => {
-      const fresh = await mayVote(deps.lists, actor, input.list);
-      if (!fresh.ok) return fresh;
-      const { member, rules } = fresh.value;
-      const entryId = input.entryId as BallotEntryId;
-      if (!(await deps.lists.entryExists(rules.listId, entryId)))
-        return err(votingErrors.unknownEntry);
+    if ((input.revision ?? null) !== (allowed.value.rules.writeRevision ?? null)) {
+      return err(votingErrors.listChanged);
+    }
+    return deps.lists.withWrite(
+      allowed.value.rules.listId,
+      async () => {
+        const fresh = await mayVote(deps.lists, actor, input.list);
+        if (!fresh.ok) return fresh;
+        const { member, rules } = fresh.value;
+        const entryId = input.entryId as BallotEntryId;
+        if (!(await deps.lists.entryExists(rules.listId, entryId)))
+          return err(votingErrors.unknownEntry);
 
-      return withConflictRetry(async () => {
-        const current = await deps.ballots.get(rules.listId, member.memberId);
-        const existing = current?.ballot ?? emptyBallot(rules.listId, member.memberId);
-        // Names are kept only where scores are public.
-        const ballot = {
-          ...existing,
-          voterName: rules.namesWithScores ? member.displayName : null,
-        };
-        const changed =
-          input.score === null
-            ? ok(clearScore(ballot, entryId))
-            : setScore(ballot, entryId, input.score, rules.scale);
-        if (!changed.ok) return changed;
-        return (await deps.ballots.save(changed.value, current?.version ?? null))
-          ? ok(toMyBallot(changed.value))
-          : err(votingErrors.conflict);
-      });
-    });
+        return withConflictRetry(async () => {
+          const current = await deps.ballots.get(rules.listId, member.memberId);
+          const existing = current?.ballot ?? emptyBallot(rules.listId, member.memberId);
+          // Names are kept only where scores are public.
+          const ballot = {
+            ...existing,
+            voterName: rules.namesWithScores ? member.displayName : null,
+          };
+          const changed =
+            input.score === null
+              ? ok(clearScore(ballot, entryId))
+              : setScore(ballot, entryId, input.score, rules.scale);
+          if (!changed.ok) return changed;
+          return (await deps.ballots.save(changed.value, current?.version ?? null))
+            ? ok(toMyBallot(changed.value))
+            : err(votingErrors.conflict);
+        });
+      },
+      allowed.value.rules.writeRevision ?? null,
+    );
   };

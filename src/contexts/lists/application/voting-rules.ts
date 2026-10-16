@@ -12,6 +12,7 @@ import type { RoleId } from '../../../shared/kernel/index.ts';
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 
 export interface VotingRules {
+  readonly writeRevision: string | null;
   readonly listId: ListId;
   /** Scores can be set or cleared only while the list is open. */
   readonly isOpen: boolean;
@@ -39,6 +40,7 @@ export const makeRulesForVoting =
     if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
     const list = found.value;
     if (list.deletionRequested === true) return err(listsErrors.deleting);
+    if (list.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
     const lifecycle = lifecycleOf(list, deps.clock.now());
     const publicScores = list.config.scoreVisibility === 'public';
     const resultsVisible =
@@ -47,6 +49,7 @@ export const makeRulesForVoting =
       lifecycle === 'archived';
     return ok({
       listId: list.id,
+      writeRevision: list.entryDeletionRevision ?? null,
       isOpen: lifecycle === 'open',
       scoresPublic: publicScores && resultsVisible,
       namesWithScores: publicScores,

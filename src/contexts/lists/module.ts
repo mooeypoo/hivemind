@@ -7,6 +7,11 @@ import { makeCreateList } from './application/create-list.ts';
 import { makeEditList } from './application/edit-list.ts';
 import { makePrepareListDeletion, makeFinishListDeletion } from './application/delete-list.ts';
 import { makeWithListWrite } from './application/list-write.ts';
+import {
+  makePrepareEntryDeletion,
+  makeWithEntryDeletion,
+  makeFinishEntryDeletion,
+} from './application/delete-entry.ts';
 import { makeGetList, makeGetSharePreview } from './application/get-list.ts';
 import { makeListLists } from './application/list-lists.ts';
 import { makeNominate } from './application/nominate.ts';
@@ -54,6 +59,9 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     editList: makeEditList(shared),
     prepareListDeletion: makePrepareListDeletion(repositories),
     finishListDeletion: makeFinishListDeletion(repositories),
+    prepareEntryDeletion: makePrepareEntryDeletion({ ...repositories, ids: deps.ids }),
+    withEntryDeletion: makeWithEntryDeletion({ ...repositories, ids: deps.ids }),
+    finishEntryDeletion: makeFinishEntryDeletion({ ...repositories, ids: deps.ids }),
     withListWrite: makeWithListWrite({ ...repositories, ids: deps.ids }),
     scheduleList: makeScheduleList({ ...shared, ids: deps.ids }),
     archiveList: makeArchiveList(shared),

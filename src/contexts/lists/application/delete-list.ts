@@ -35,6 +35,7 @@ export const makePrepareListDeletion =
           ? ok(false)
           : err(listsErrors.immutableIdRequired);
       }
+      if (current.value.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
       if (input.confirmation !== current.value.config.slug) {
         return err(listsErrors.confirmationMismatch);
       }

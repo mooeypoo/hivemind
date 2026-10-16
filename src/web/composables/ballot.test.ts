@@ -31,7 +31,7 @@ describe('useBallot', () => {
     expect(calls).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(250);
     await flushPromises();
-    expect(calls.map((call) => call.body)).toEqual([{ entryId: 'a', score: 7 }]);
+    expect(calls.map((call) => call.body)).toEqual([{ entryId: 'a', score: 7, revision: null }]);
     expect(onSaved).toHaveBeenCalledOnce();
     expect(ballot.saving.value).toEqual({});
   });
@@ -46,7 +46,7 @@ describe('useBallot', () => {
     ballot.set('a', 5);
     await vi.advanceTimersByTimeAsync(250);
     await flushPromises();
-    expect(calls.map((call) => call.body)).toEqual([{ entryId: 'a', score: 5 }]);
+    expect(calls.map((call) => call.body)).toEqual([{ entryId: 'a', score: 5, revision: null }]);
   });
 
   test('clearing sends a null score', async () => {
@@ -59,7 +59,7 @@ describe('useBallot', () => {
     expect(ballot.scores.value).toEqual({});
     await vi.advanceTimersByTimeAsync(250);
     await flushPromises();
-    expect(calls[0]?.body).toEqual({ entryId: 'a', score: null });
+    expect(calls[0]?.body).toEqual({ entryId: 'a', score: null, revision: null });
   });
 
   test('a failed save puts the last saved score back and reports why', async () => {
@@ -82,5 +82,61 @@ describe('useBallot', () => {
     ballot.flush();
     await flushPromises();
     expect(calls).toHaveLength(1);
+  });
+
+  test('reloading after deletion cancels settling scores instead of applying them to a new entry', async () => {
+    const calls = stubApi({
+      'PUT /api/lists/list-1/ballot': () => Response.json({ listId: 'list-1', scores: {} }),
+    });
+    const ballot = useBallot(() => 'list-1');
+    ballot.set('deleted', 9);
+    ballot.load({});
+    await vi.advanceTimersByTimeAsync(250);
+    expect(calls).toHaveLength(0);
+    expect(ballot.scores.value).toEqual({});
+  });
+
+  test('a settling score carries the revision when chosen, not the revision when sent', async () => {
+    let revision = 'before';
+    const calls = stubApi({
+      'PUT /api/lists/list-1/ballot': closed,
+    });
+    const ballot = useBallot(() => 'list-1', { revision: () => revision });
+    ballot.set('a', 9);
+    revision = 'after';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(calls[0]?.body).toEqual({ entryId: 'a', score: 9, revision: 'before' });
+  });
+
+  test('an old response after reload cannot restore deleted scores or lose a new queued score', async () => {
+    let resolveOld!: (response: Response) => void;
+    const old = new Promise<Response>((resolve) => {
+      resolveOld = resolve;
+    });
+    const requests: unknown[] = [];
+    vi.stubGlobal('fetch', (_input: string, init: RequestInit) => {
+      requests.push(JSON.parse(init.body as string));
+      return requests.length === 1
+        ? old
+        : Promise.resolve(Response.json({ listId: 'list-1', scores: { a: 5 } }));
+    });
+    let revision: string | null = null;
+    const onSaved = vi.fn();
+    const ballot = useBallot(() => 'list-1', { revision: () => revision, onSaved });
+    ballot.set('a', 9);
+    await vi.advanceTimersByTimeAsync(250);
+    revision = 'after-deletion';
+    ballot.load({});
+    ballot.set('a', 5);
+    await vi.advanceTimersByTimeAsync(250);
+    resolveOld(Response.json({ listId: 'list-1', scores: { a: 9 } }));
+    await flushPromises();
+    expect(requests).toEqual([
+      { entryId: 'a', score: 9, revision: null },
+      { entryId: 'a', score: 5, revision: 'after-deletion' },
+    ]);
+    expect(ballot.scores.value).toEqual({ a: 5 });
+    expect(ballot.saving.value).toEqual({});
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 });

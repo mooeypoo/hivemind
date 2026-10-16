@@ -6,7 +6,7 @@ export type ListsApi = Pick<ListsModule, 'rulesForVoting' | 'entryExists' | 'wit
 
 /** AGENTS.md's cross-context pattern: voting's `ListReader` port over the lists module. */
 export const createListReader = (lists: ListsApi): ListReader => ({
-  withWrite: (listId, work) => lists.withListWrite(listId, work),
+  withWrite: (listId, work, revision) => lists.withListWrite(listId, work, revision),
   rulesFor: (list, viewer) => lists.rulesForVoting(list, viewer),
   entryExists: (listId, entryId) => lists.entryExists(listId, entryId),
 });

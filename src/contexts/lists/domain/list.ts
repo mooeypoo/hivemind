@@ -84,6 +84,14 @@ export interface List {
   /** Changes on entry-write admission, fencing source edits against in-flight nominations. */
   readonly entryWriteToken?: string;
   readonly deletionRequested?: boolean;
+  readonly entryDeletion?: {
+    readonly entryId: string;
+    readonly token: string;
+    readonly title: string;
+    readonly phase: 'cleaning' | 'finishing';
+  } | null;
+  /** Changes when an entry is permanently deleted; old admitted work cannot target its replacement. */
+  readonly entryDeletionRevision?: string;
 }
 
 export const DEFAULT_SCALE: Scale = { min: 1, max: 10 };

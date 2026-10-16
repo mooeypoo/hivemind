@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import type { LeaderboardDto, ListDetailDto } from '../../server/http/contracts.ts';
 import { useToast } from '../composables/toast.ts';
+import { session } from '../state/session.ts';
 import { openTmdbList, stubApi } from '../testing/fixtures.ts';
 import ListPage from './ListPage.vue';
 
@@ -64,9 +65,111 @@ const games = (overrides: Partial<ListDetailDto>) =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  session.me = null;
 });
 
 describe('ListPage rating', () => {
+  test('Admin entry deletion requires typed confirmation and refreshes after success', async () => {
+    session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+    let detail = games({ entries: [{ ...entry('a', 'Root'), deletionToken: 'incarnation' }] });
+    const page = await mountWith(detail, { a: 7 }, undefined, true);
+    const original = globalThis.fetch;
+    const mutations: unknown[] = [];
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) => {
+      if (input === '/api/lists/list-1/entries/delete') {
+        mutations.push(JSON.parse(init.body as string));
+        detail = { ...detail, entries: [] };
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (input === '/api/lists/games') return Promise.resolve(Response.json(detail));
+      return original(input, init);
+    });
+    await page.get('.entry__art').trigger('click');
+    await page.get('button[aria-label="Permanently delete Root"]').trigger('click');
+    const dialog = page.get('dialog[open]');
+    expect(dialog.text()).toContain('all its scores and nomination records will be erased');
+    expect(dialog.get('.button--danger').attributes('disabled')).toBeDefined();
+    await dialog.get('input').setValue('wrong');
+    expect(dialog.get('.button--danger').attributes('disabled')).toBeDefined();
+    expect(mutations).toEqual([]);
+    await dialog.get('input').setValue('Root');
+    await dialog.get('.button--danger').trigger('click');
+    await flushPromises();
+    expect(mutations).toEqual([{ entryId: 'a', token: 'incarnation', confirmation: 'Root' }]);
+    expect(page.find('dialog[open]').exists()).toBe(false);
+    expect(page.findAll('.entry')).toHaveLength(0);
+    expect(useToast().toasts.value.at(-1)?.message).toBe(
+      'Entry and its scores permanently deleted.',
+    );
+    page.unmount();
+  });
+
+  test('pending entry deletion survives reload with retry and explicit errors', async () => {
+    session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+    const page = await mountWith(
+      games({
+        participationPaused: true,
+        entryDeletion: { entryId: 'a', token: 'incarnation', title: 'Root' },
+        viewer: { canParticipate: false, canNominate: false, nominationsUsed: 1 },
+        lifecycle: 'archived',
+      }),
+      {},
+      undefined,
+      true,
+    );
+    const original = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) =>
+      input.endsWith('/entries/delete')
+        ? Promise.resolve(
+            Response.json(
+              {
+                error: {
+                  code: 'lists.deletion-busy',
+                  message: 'Earlier writes must finish.',
+                },
+              },
+              { status: 409 },
+            ),
+          )
+        : original(input, init),
+    );
+    expect(page.find('.score-input').exists()).toBe(false);
+    await page.get('.notice button').trigger('click');
+    const dialog = page.get('dialog[open]');
+    expect(dialog.text()).toContain('Deletion changes its final results');
+    await dialog.get('input').setValue('Root');
+    await dialog.get('.button--danger').trigger('click');
+    await flushPromises();
+    expect(page.get('dialog[open] [role="alert"]').text()).toContain('Earlier writes must finish.');
+    page.unmount();
+  });
+
+  test('Admins can permanently delete a retained withdrawal without showing it in the main list', async () => {
+    session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+    const page = await mountWith(
+      games({
+        entries: [],
+        withdrawnEntries: [{ ...entry('a', 'Root'), deletionToken: 'withdrawn-incarnation' }],
+      }),
+      {},
+      undefined,
+      true,
+    );
+    expect(page.findAll('.entry')).toHaveLength(0);
+    await page.get('button[aria-label="Permanently delete withdrawn Root"]').trigger('click');
+    expect(page.get('dialog[open]').text()).toContain('Permanently delete Root');
+    page.unmount();
+  });
+
+  test('non-Admins have no entry deletion action even if given a token', async () => {
+    session.me = { id: 'member', displayName: 'Member', avatarUrl: '/favicon.svg', isAdmin: false };
+    const page = await mountWith(
+      games({ entries: [{ ...entry('a', 'Root'), deletionToken: 'token' }] }),
+    );
+    await page.get('.entry__art').trigger('click');
+    expect(page.find('button[aria-label="Permanently delete Root"]').exists()).toBe(false);
+    page.unmount();
+  });
   test('the title opens full details and the card shows movie director after the year', async () => {
     const movie = {
       ...entry('a', 'Blade Runner'),
@@ -207,7 +310,7 @@ describe('ListPage rating', () => {
 
   test('choosing a score saves it to your ballot', async () => {
     vi.useFakeTimers();
-    const page = await mountWith(games({}));
+    const page = await mountWith(games({ writeRevision: 'after-deletion' }));
     const calls: unknown[] = [];
     const fetch = globalThis.fetch;
     vi.stubGlobal('fetch', (input: string, init: RequestInit = {}) => {
@@ -221,7 +324,7 @@ describe('ListPage rating', () => {
     expect(page.text()).toContain('1 of 2 rated');
     await vi.advanceTimersByTimeAsync(250);
     await flushPromises();
-    expect(calls).toEqual([{ entryId: 'a', score: 8 }]);
+    expect(calls).toEqual([{ entryId: 'a', score: 8, revision: 'after-deletion' }]);
     vi.useRealTimers();
   });
 

@@ -7,7 +7,7 @@ export type ListsApi = Pick<ListsModule, 'rankingContext' | 'entriesForRanking' 
 export type VotingApi = Pick<VotingModule, 'scoresForList'>;
 
 export const createListSource = (lists: ListsApi): ListSource => ({
-  withWrite: (listId, work) => lists.withListWrite(listId, work),
+  withWrite: (listId, work, revision) => lists.withListWrite(listId, work, revision),
   context: (list, viewer) => lists.rankingContext(list, viewer),
   entries: (listId) => lists.entriesForRanking(listId as ListId),
 });

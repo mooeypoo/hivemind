@@ -722,6 +722,7 @@ describe('services for voting', () => {
       ok: true,
       value: {
         listId: list.id,
+        writeRevision: null,
         isOpen: true,
         scale: { min: 0, max: 5 },
         requiredRoleIds: ['r1'],
@@ -757,6 +758,7 @@ describe('services for ranking', () => {
       ok: true,
       value: {
         listId: list.id,
+        writeRevision: null,
         resultsVisibility: 'after-close',
         votingEnded: false,
         closesAt: at(20),

@@ -1,6 +1,16 @@
 import { domainError, type DomainError } from '../../../shared/kernel/index.ts';
 
 export const listsErrors = {
+  entryDeletionBusy: domainError(
+    'conflict',
+    'lists.entry-deletion-busy',
+    'An entry is being permanently deleted. Nominations, scores and list changes are paused until an Admin finishes deletion.',
+  ),
+  entryConfirmationMismatch: domainError(
+    'invalid',
+    'lists.entry-confirmation-mismatch',
+    'Type the entry title exactly to confirm permanent deletion.',
+  ),
   immutableIdRequired: domainError(
     'invalid',
     'lists.immutable-id-required',

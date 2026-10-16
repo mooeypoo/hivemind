@@ -34,6 +34,7 @@ const { canNominateHere, isClosed, resultsSealed, unrated, ratedCount, next, req
   page;
 const { scores, saving, errors } = ballot;
 const { withdrawing, withdrawalError } = page;
+const { deletingEntry, deletionError } = page;
 usePageTitle(() => list.value?.title ?? null);
 
 // Tabs, kept in the address (?tab=standings) so they can be linked to.
@@ -102,6 +103,36 @@ const confirmWithdrawal = async () => {
     queue.value = [];
     rating.value = false;
     toast.show('Nomination withdrawn.', 'success');
+  }
+};
+
+const deletion = ref<{ entryId: string; token: string; title: string } | null>(null);
+const beginDeletion = (entry: EntryDto) => {
+  if (entry.deletionToken == null) return;
+  deletion.value = { entryId: entry.id, token: entry.deletionToken, title: entry.item.title };
+  deletionError.value = null;
+  selectedId.value = null;
+};
+const cancelDeletion = () => {
+  const entryId = deletion.value?.entryId;
+  selectedId.value = list.value?.entries.some((entry) => entry.id === entryId)
+    ? (entryId ?? null)
+    : null;
+  deletion.value = null;
+};
+const confirmDeletion = async () => {
+  if (deletion.value === null) return;
+  if (
+    await page.deleteEntry({
+      entryId: deletion.value.entryId,
+      token: deletion.value.token,
+      confirmation: deletion.value.title,
+    })
+  ) {
+    deletion.value = null;
+    queue.value = [];
+    rating.value = false;
+    toast.show('Entry and its scores permanently deleted.', 'success');
   }
 };
 
@@ -178,7 +209,21 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
     <p v-if="list.scoreVisibility === 'public'" class="notice public-score-notice">
       Scores on this list are public: other members can see the score you give each entry.
     </p>
-    <p v-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="notice">
+    <div v-if="list.participationPaused" class="notice" role="status">
+      <p>An entry is being permanently deleted. Nominations and scores are temporarily paused.</p>
+      <button
+        v-if="session.me?.isAdmin === true && list.entryDeletion != null"
+        type="button"
+        class="button button--danger"
+        @click="
+          deletion = list.entryDeletion;
+          deletionError = null;
+        "
+      >
+        Retry entry deletion...
+      </button>
+    </div>
+    <p v-else-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="notice">
       This list is open only to members with {{ requiredRolesText }}, so you can’t rate it.
     </p>
 
@@ -258,7 +303,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
           @open="selectedId = entry.id"
         >
           <PublicScoreDisclosure
-            v-if="publicScores.visible"
+            v-if="publicScores.visible && !list.participationPaused"
             :scores="publicScores.entries[entry.id] ?? []"
           />
           <ScoreInput
@@ -268,11 +313,38 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
             :item-title="entry.item.title"
             @change="ballot.set(entry.id, $event)"
           />
-          <p v-else-if="isClosed && scores[entry.id] !== undefined" class="entry__meta">
+          <p
+            v-else-if="isClosed && !list.participationPaused && scores[entry.id] !== undefined"
+            class="entry__meta"
+          >
             Your score: <strong>{{ scores[entry.id] }}</strong>
           </p>
         </EntryCard>
       </ul>
+      <details
+        v-if="session.me?.isAdmin === true && (list.withdrawnEntries?.length ?? 0) > 0"
+        class="stack"
+      >
+        <summary>Withdrawn nominations (Admin)</summary>
+        <p>
+          These are outside the list and ranking. Their earlier scores are retained for
+          re-nomination unless you permanently delete them.
+        </p>
+        <ul class="stack">
+          <li v-for="entry in list.withdrawnEntries" :key="entry.id">
+            <span>{{ entry.item.title }}</span>
+            <button
+              v-if="entry.deletionToken != null && !list.participationPaused"
+              type="button"
+              class="button button--danger"
+              :aria-label="`Permanently delete withdrawn ${entry.item.title}`"
+              @click="beginDeletion(entry)"
+            >
+              Delete entry...
+            </button>
+          </li>
+        </ul>
+      </details>
     </section>
 
     <section
@@ -316,16 +388,44 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
       :scale="list.scale"
       :standing="selected === null ? undefined : standings[selected.id]"
       :public-scores="
-        selected !== null && publicScores.visible
+        selected !== null && publicScores.visible && !list.participationPaused
           ? (publicScores.entries[selected.id] ?? [])
           : undefined
       "
       :score="selected !== null && canVote ? scoreState(selected.id) : null"
-      :final-score="selected !== null && isClosed ? scores[selected.id] : undefined"
+      :final-score="
+        selected !== null && isClosed && !list.participationPaused ? scores[selected.id] : undefined
+      "
+      :can-delete="session.me?.isAdmin === true && !list.participationPaused"
       @close="selectedId = null"
       @change="onDetailsChange"
       @withdraw="beginWithdrawal"
+      @delete="beginDeletion"
     />
+    <ConfirmDialog
+      :open="deletion !== null"
+      :title="`Permanently delete ${deletion?.title ?? 'entry'}?`"
+      confirm-label="Delete entry permanently"
+      :confirm-text="deletion?.title ?? ''"
+      :busy="deletingEntry"
+      danger
+      @cancel="cancelDeletion"
+      @confirm="confirmDeletion"
+    >
+      <p>
+        This cannot be undone. The entry, all its scores and nomination records will be erased. Its
+        nomination allowance will be freed. If nominated again, it starts with no previous scores.
+      </p>
+      <p v-if="isClosed">
+        This list has finished voting. Deletion changes its final results and may change every rank.
+      </p>
+      <p>
+        Ranking will be recalculated. Nominations and score changes pause for this list until
+        cleanup finishes. Once started, deletion must be finished; closing this dialog does not
+        cancel it. Previously downloaded backups are not erased.
+      </p>
+      <ErrorNotice :error="deletionError" />
+    </ConfirmDialog>
     <ConfirmDialog
       :open="withdrawalEntry !== null"
       :title="`Withdraw ${withdrawalEntry?.item.title ?? 'nomination'}?`"

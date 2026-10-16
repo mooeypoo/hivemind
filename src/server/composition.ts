@@ -9,6 +9,7 @@ import { loadConfig, type AppConfig } from './config.ts';
 import { deployContextFrom, isProduction, type DeployContext } from './deploy-context.ts';
 import { netlifyPlatform, type Platform } from './platform.ts';
 import { makeDeleteList } from './delete-list.ts';
+import { makeDeleteEntry } from './delete-entry.ts';
 
 export interface App {
   readonly config: AppConfig;
@@ -19,6 +20,7 @@ export interface App {
   readonly ranking: RankingModule;
   readonly backup: BackupModule;
   readonly deleteList: ReturnType<typeof makeDeleteList>;
+  readonly deleteEntry: ReturnType<typeof makeDeleteEntry>;
   /** Whether backups are configured (`BACKUP_KEY`). */
   readonly backupsEnabled: boolean;
   readonly deployContext: DeployContext;
@@ -100,6 +102,7 @@ export const createApp = (
     ranking,
     backup,
     deleteList: makeDeleteList({ lists, voting, ranking }),
+    deleteEntry: makeDeleteEntry({ lists, voting, ranking }),
     backupsEnabled: backupCrypto !== null,
     deployContext,
     demo,

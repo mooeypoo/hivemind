@@ -24,6 +24,93 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test.use({ colorScheme });
 
     for (const width of widths) {
+      test(`pending entry deletion and withdrawn management at ${String(width)} px fit`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        const withdrawn = list.entries[1];
+        if (withdrawn === undefined) throw new Error('fixture');
+        let pending = false;
+        await page.route('**/api/lists/films', (route) =>
+          route.fulfill({
+            json: {
+              ...list,
+              entries: list.entries.filter((entry) => entry.id !== withdrawn.id),
+              withdrawnEntries: [withdrawn],
+              participationPaused: pending,
+              ...(pending
+                ? {
+                    entryDeletion: {
+                      entryId: withdrawn.id,
+                      token: withdrawn.deletionToken,
+                      title: withdrawn.item.title,
+                    },
+                    viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 },
+                  }
+                : {}),
+            },
+          }),
+        );
+        await page.goto('/lists/films');
+        await page.getByText('Withdrawn nominations (Admin)', { exact: true }).click();
+        await expectNoSidewaysScroll(page);
+        await page.getByRole('button', { name: /^Permanently delete withdrawn Dr/ }).click();
+        await expect(page.getByRole('dialog', { name: /^Permanently delete Dr/ })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+        await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+        pending = true;
+        await page.reload();
+        await expect(page.getByText(/Nominations and scores are temporarily paused/)).toBeVisible();
+        await page.getByRole('button', { name: 'Retry entry deletion...', exact: true }).click();
+        await expect(page.getByRole('dialog', { name: /^Permanently delete Dr/ })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+      });
+
+      test(`entry deletion confirmation at ${String(width)} px fits and requires the title`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        let removed = false;
+        await page.route('**/api/lists/list-1/entries/delete', async (route) => {
+          expect(route.request().postDataJSON()).toEqual({
+            entryId: 'b',
+            token: 'entry-b',
+            confirmation: list.entries[1]?.item.title,
+          });
+          removed = true;
+          await route.fulfill({ status: 204 });
+        });
+        await page.route('**/api/lists/films', (route) =>
+          route.fulfill({
+            json: {
+              ...list,
+              entries: removed ? list.entries.filter((entry) => entry.id !== 'b') : list.entries,
+            },
+          }),
+        );
+        await page.goto('/lists/films');
+        await page.getByRole('button', { name: /^Open full details for Dr/ }).click();
+        await page.getByRole('button', { name: /^Permanently delete Dr/ }).click();
+        const dialog = page.getByRole('dialog', { name: /^Permanently delete Dr/ });
+        await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+        const confirm = dialog.getByRole('button', {
+          name: 'Delete entry permanently',
+          exact: true,
+        });
+        await expect(confirm).toBeDisabled();
+        await dialog.getByRole('textbox').fill('wrong');
+        await expect(confirm).toBeDisabled();
+        await dialog.getByRole('textbox').fill(list.entries[1]?.item.title ?? '');
+        await expectNoSidewaysScroll(page);
+        await confirm.click();
+        await expect(dialog).not.toBeVisible();
+        await expect(page.getByRole('button', { name: /^Open full details for Dr/ })).toHaveCount(
+          0,
+        );
+      });
+
       test(`permanent deletion confirmation at ${String(width)} px fits and requires the slug`, async ({
         page,
       }) => {

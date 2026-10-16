@@ -48,6 +48,7 @@ export const makeGetList =
     if (!member.ok) return member;
     const found = await findList(deps, member.value, input.list, {
       allowDeleting: member.value.isAdmin,
+      allowEntryDeletion: true,
     });
     if (!found.ok) return found;
     const list = found.value.value;
@@ -66,12 +67,19 @@ export const makeGetList =
       itemSourceEditable:
         member.value.isAdmin &&
         list.deletionRequested !== true &&
+        list.entryDeletion == null &&
         !writingEntries &&
         entries.length === 0 &&
         (list.phase === 'draft' ||
           (list.config.entryMode === 'nominations' &&
             ['scheduled', 'open'].includes(lifecycleOf(list, deps.clock.now())))),
       snapshotsExpireAt: expiry(list, deps.catalog),
+      entryDeletion: member.value.isAdmin ? (list.entryDeletion ?? null) : null,
+      withdrawnEntries: member.value.isAdmin
+        ? entries
+            .filter((entry) => !isActiveEntry(entry))
+            .map((entry) => toEntryView(entry, list, member.value, deps.clock.now()))
+        : [],
       entries: entries
         .filter(isActiveEntry)
         .sort(

@@ -137,13 +137,16 @@ export const makeExportForBackup =
   > => {
     let lists: List[];
     if (ref === null) {
-      lists = (await deps.lists.all()).filter((list) => list.deletionRequested !== true);
+      lists = (await deps.lists.all()).filter(
+        (list) => list.deletionRequested !== true && list.entryDeletion == null,
+      );
     } else {
       const byId = await deps.lists.get(ref as ListId);
       const id = byId === null ? await deps.slugs.lookup(ref) : null;
       const found = byId ?? (id === null ? null : await deps.lists.get(id));
       if (found === null) return err(notFound);
       if (found.value.deletionRequested === true) return err(listsErrors.deleting);
+      if (found.value.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
       lists = [found.value];
     }
     lists.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());

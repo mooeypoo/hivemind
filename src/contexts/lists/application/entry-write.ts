@@ -26,6 +26,10 @@ export const withEntryWrite = async <T>(
       const current = await lists.get(expected.id);
       if (current === null) return err(listsErrors.notFound);
       if (current.value.deletionRequested === true) return err(listsErrors.deleting);
+      if (current.value.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
+      if (current.value.entryDeletionRevision !== expected.entryDeletionRevision) {
+        return err(listsErrors.conflict);
+      }
       if (
         JSON.stringify(current.value.config.itemSource) !==
           JSON.stringify(expected.config.itemSource) ||
@@ -38,7 +42,9 @@ export const withEntryWrite = async <T>(
       }
       const saved = await lists.get(expected.id);
       if (saved === null) return err(listsErrors.notFound);
-      return saved.value.deletionRequested === true ? err(listsErrors.deleting) : ok(saved);
+      if (saved.value.deletionRequested === true) return err(listsErrors.deleting);
+      if (saved.value.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
+      return ok(saved);
     });
     const result = admitted.ok ? await work(admitted.value) : admitted;
     completed = true;

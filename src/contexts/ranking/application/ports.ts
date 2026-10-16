@@ -2,6 +2,7 @@ import type { DomainError, Result } from '../../../shared/kernel/index.ts';
 import type { ItemSnapshot, Leaderboard } from '../domain/leaderboard.ts';
 
 export interface RankingContext {
+  readonly writeRevision?: string | null;
   readonly listId: string;
   readonly resultsVisibility: 'live' | 'after-close';
   /** Voting has ended (closed or archived): final results may be shown. */
@@ -19,6 +20,7 @@ export interface ListSource {
   withWrite<T>(
     listId: string,
     work: () => Promise<Result<T, DomainError>>,
+    revision?: string | null,
   ): Promise<Result<T, DomainError>>;
   /** By id or slug. Not found for drafts. */
   /** Not found for drafts and hidden lists, unless the viewer is an Admin. */

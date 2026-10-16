@@ -126,6 +126,8 @@ A list's `entryMode` is `nominations` (members nominate) or `seeded` (every item
 - **Close voting now** (Admins, open lists only) sets `closesAt` to now: scores become final and results waiting for the close are revealed.
 - **Archive** (Admins) works on any published list, at any time: voting and nominations end, the list becomes read-only with its final results. It can't be undone.
 - **Permanently delete a list** (Admins) works in every lifecycle. The request addresses the immutable list ID and confirms its current slug. Persist deletion intent first; the list becomes unavailable to members and blocks every normal edit. Wait for admitted nominations, publication/imports, ballot writes and leaderboard cache writes to finish, then remove ballots, cached ranking, all entries (including withdrawn) and nomination ledgers. Release the slug only after cleanup, using an owner-checked conditional write, then replace the list record with a non-personal ID fence. Retrying partial cleanup is safe; a stale deletion request cannot delete a replacement list or release its slug. Admins can resume pending deletion from the editor, including after reload. Previously downloaded backups are not erased.
+- **Permanently delete an entry** (Admins) works in every lifecycle, including seeded and withdrawn entries. Confirm its title and incarnation token against an immutable list ID. Persist entry-deletion intent, pause list writes, drain admitted writers, erase that entry's scores and all ledger references, invalidate the full leaderboard and remove the entry. Cleanup workers are fenced too: close their admission and drain them before reopening participation. A later nomination gets a fresh token and no previous scores; stale confirmations, votes, cache writes or cleanup retries cannot affect it. Partial cleanup stays paused and exposes an Admin retry action. Deleting from finished lists changes final results. Backups exclude paused lists; downloaded files are unaffected.
+- Score changes send the list detail's `writeRevision` as `revision`. Missing/null means the original list snapshot and is rejected after any permanent entry deletion. This prevents old tabs from rating a later re-nomination. Web ballot reloads cancel queued changes and ignore responses from the prior loaded snapshot.
 - **Visibility** is `public` (all signed-in members) or `hidden` (only Admins; members get not-found everywhere, including voting and ranking). Admins change it at any time, even on archived lists; nothing is lost while hidden.
 - Scheduling publishes a draft.
 - Nominations are allowed while the list is open and before `nominationsCloseAt`, and never on a seeded list. A given item (`source` and `externalId`) can be nominated only once per list: the entry id derives from them and entries are created with `onlyIfNew`. Each member has a nomination cap, enforced by their nomination ledger; a duplicate gives the nomination back.
@@ -169,39 +171,40 @@ Each context has its own store. A context never reads another context's store.
 
 Each route is one file in `netlify/functions` (`export default handle(endpoint)` plus `config.path` and `config.method`). Its endpoint lives in `src/server/http/endpoints/` and does three things: parse, call one use case, map the result. Wire types live in `contracts.ts`. API responses send `Cache-Control: no-store`.
 
-| Route                               | Method | Notes                                                                                             |
-| ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
-| `/api/auth/login`                   | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord                        |
-| `/api/auth/callback`                | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure              |
-| `/api/auth/logout`                  | POST   | Clears the session cookie                                                                         |
-| `/api/auth/demo`                    | POST   | Demo mode only: `{ persona }` signs in as a pretend account and creates the sample lists          |
-| `/api/me`                           | GET    | `MeDto`; 401 when signed out                                                                      |
-| `/api/me/export`                    | GET    | `MyDataExportDto` as a download                                                                   |
-| `/api/me`                           | DELETE | Erases the member's data in every context and clears the session cookie                           |
-| `/api/catalog/sources`              | GET    | Admin: the item sources this site offers                                                          |
-| `/api/catalog/presets`              | POST   | Admin: import a CSV preset; errors by row                                                         |
-| `/api/lists`                        | GET    | Lists the caller may see                                                                          |
-| `/api/lists`                        | POST   | Admin: create a draft                                                                             |
-| `/api/lists/:list`                  | GET    | Detail with entries. `:list` is an id or a slug                                                   |
-| `/api/lists/:list`                  | PUT    | Admin: edit, within the lifecycle rules                                                           |
-| `/api/lists/:list`                  | DELETE | Admin: permanently delete by immutable ID; `{ confirmation: currentSlug }`; retry partial cleanup |
-| `/api/lists/:list/schedule`         | POST   | Admin: set the schedule and publish (seeds a seeded list)                                         |
-| `/api/lists/:list/archive`          | POST   | Admin: archive a published list, at any time                                                      |
-| `/api/lists/:list/close`            | POST   | Admin: close voting now on an open list                                                           |
-| `/api/lists/:list/visibility`       | PUT    | Admin: `{ visibility: 'public' \| 'hidden' }`, at any time                                        |
-| `/api/lists/:list/score-visibility` | PUT    | Admin: `{ scoreVisibility }`; choose either in draft, only public → private after publishing      |
-| `/api/lists/:list/search?q=`        | GET    | Search the list's item source while nominations are open                                          |
-| `/api/lists/:list/entries`          | POST   | Nominate `{ externalId }`, or `{ title }` for free text                                           |
-| `/api/lists/:list/entries/withdraw` | POST   | Withdraw the caller's nomination with `{ entryId, token }`; 204 on success                        |
-| `/api/lists/:list/ballot`           | GET    | The caller's own scores                                                                           |
-| `/api/lists/:list/ballot`           | PUT    | `{ entryId, score }` sets a score; `score: null` clears it                                        |
-| `/api/lists/:list/scores`           | GET    | `{ visible: false }` or public names and scores, when results are visible                         |
-| `/api/lists/:list/leaderboard`      | GET    | The leaderboard, or `{ hidden: true, revealsAt }` until an after-close list closes                |
-| `/api/site`                         | GET    | Public: the community (name, icon, invite) and whether movie data is offered                      |
-| `/api/roles`                        | GET    | Role names, for members                                                                           |
-| `/api/roles`                        | PUT    | Admin: replace the role names; `{ labels, version }`, a stale version is refused                  |
-| `/api/admin/backup`                 | GET    | Admin: download a backup of every list, or `?list=<id or slug>` for one                           |
-| `/api/admin/backup`                 | POST   | Admin: import a backup file (up to 5 MB); returns what was restored                               |
+| Route                               | Method | Notes                                                                                                              |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ |
+| `/api/auth/login`                   | GET    | Sets the `__Host-login_state` cookie (10 minutes) and redirects to Discord                                         |
+| `/api/auth/callback`                | GET    | Redirects to `/` with the `__Host-session` cookie, or to `/?login=<code>` on failure                               |
+| `/api/auth/logout`                  | POST   | Clears the session cookie                                                                                          |
+| `/api/auth/demo`                    | POST   | Demo mode only: `{ persona }` signs in as a pretend account and creates the sample lists                           |
+| `/api/me`                           | GET    | `MeDto`; 401 when signed out                                                                                       |
+| `/api/me/export`                    | GET    | `MyDataExportDto` as a download                                                                                    |
+| `/api/me`                           | DELETE | Erases the member's data in every context and clears the session cookie                                            |
+| `/api/catalog/sources`              | GET    | Admin: the item sources this site offers                                                                           |
+| `/api/catalog/presets`              | POST   | Admin: import a CSV preset; errors by row                                                                          |
+| `/api/lists`                        | GET    | Lists the caller may see                                                                                           |
+| `/api/lists`                        | POST   | Admin: create a draft                                                                                              |
+| `/api/lists/:list`                  | GET    | Detail with entries. `:list` is an id or a slug                                                                    |
+| `/api/lists/:list`                  | PUT    | Admin: edit, within the lifecycle rules                                                                            |
+| `/api/lists/:list`                  | DELETE | Admin: permanently delete by immutable ID; `{ confirmation: currentSlug }`; retry partial cleanup                  |
+| `/api/lists/:list/schedule`         | POST   | Admin: set the schedule and publish (seeds a seeded list)                                                          |
+| `/api/lists/:list/archive`          | POST   | Admin: archive a published list, at any time                                                                       |
+| `/api/lists/:list/close`            | POST   | Admin: close voting now on an open list                                                                            |
+| `/api/lists/:list/visibility`       | PUT    | Admin: `{ visibility: 'public' \| 'hidden' }`, at any time                                                         |
+| `/api/lists/:list/score-visibility` | PUT    | Admin: `{ scoreVisibility }`; choose either in draft, only public → private after publishing                       |
+| `/api/lists/:list/search?q=`        | GET    | Search the list's item source while nominations are open                                                           |
+| `/api/lists/:list/entries`          | POST   | Nominate `{ externalId }`, or `{ title }` for free text                                                            |
+| `/api/lists/:list/entries/withdraw` | POST   | Withdraw the caller's nomination with `{ entryId, token }`; 204 on success                                         |
+| `/api/lists/:list/entries/delete`   | POST   | Admin: permanent entry deletion by immutable list ID; `{ entryId, token, confirmation: title }`; 204 after cleanup |
+| `/api/lists/:list/ballot`           | GET    | The caller's own scores                                                                                            |
+| `/api/lists/:list/ballot`           | PUT    | `{ entryId, score }` sets a score; `score: null` clears it                                                         |
+| `/api/lists/:list/scores`           | GET    | `{ visible: false }` or public names and scores, when results are visible                                          |
+| `/api/lists/:list/leaderboard`      | GET    | The leaderboard, or `{ hidden: true, revealsAt }` until an after-close list closes                                 |
+| `/api/site`                         | GET    | Public: the community (name, icon, invite) and whether movie data is offered                                       |
+| `/api/roles`                        | GET    | Role names, for members                                                                                            |
+| `/api/roles`                        | PUT    | Admin: replace the role names; `{ labels, version }`, a stale version is refused                                   |
+| `/api/admin/backup`                 | GET    | Admin: download a backup of every list, or `?list=<id or slug>` for one                                            |
+| `/api/admin/backup`                 | POST   | Admin: import a backup file (up to 5 MB); returns what was restored                                                |
 
 The member-only `GET /api/lists/:list/item?externalId=...` returns full details for one selected item while nominations are open. It uses the search rate limit.
 

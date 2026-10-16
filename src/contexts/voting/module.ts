@@ -1,6 +1,7 @@
 import type { Store } from '@netlify/blobs';
 import { makeChangeScore } from './application/change-score.ts';
 import { makeDeleteListData } from './application/delete-list-data.ts';
+import { makeDeleteEntryScores } from './application/delete-entry-scores.ts';
 import { makeGetMyBallot } from './application/get-my-ballot.ts';
 import { makeGetPublicScores } from './application/get-public-scores.ts';
 import { makeVotingPersonalData } from './application/personal-data.ts';
@@ -29,6 +30,7 @@ export const createVotingModule = (deps: VotingModuleDeps) => {
   return {
     changeScore: makeChangeScore({ lists, ballots }),
     deleteListData: makeDeleteListData({ ballots }),
+    deleteEntryScores: makeDeleteEntryScores({ ballots }),
     getMyBallot: makeGetMyBallot({ lists, ballots }),
     getPublicScores: makeGetPublicScores({ lists, ballots }),
     personalData: makeVotingPersonalData({ ballots }),

@@ -16,6 +16,7 @@ const entry = (id: string, title: string, imageUrl: string | null = null) => ({
   isMine: id === 'a',
   nominatedAt: '2026-01-01T00:00:00.000Z',
   withdrawalToken: id === 'a' ? 'claim-a' : null,
+  deletionToken: `entry-${id}`,
 });
 const list = (overrides: Partial<ListDetailDto> = {}): ListDetailDto =>
   openTmdbList({
@@ -54,6 +55,7 @@ const renderAt = async (
   mediaSource: 'tvdb-series' | 'igdb-game' | null = null,
   unusedList = false,
   deletingList = false,
+  entryState: 'deleting' | 'withdrawn' | null = null,
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -94,6 +96,19 @@ const renderAt = async (
           maxNominationsPerMember: unlimitedCap ? null : 3,
           ...(unusedList ? { entries: [], itemSourceEditable: true } : {}),
           ...(deletingList ? { deleting: true, itemSourceEditable: false } : {}),
+          ...(entryState === 'deleting'
+            ? {
+                participationPaused: true,
+                entryDeletion: { entryId: 'a', token: 'entry-a', title: 'Blade Runner' },
+                viewer: { canParticipate: false, canNominate: false, nominationsUsed: 1 },
+              }
+            : {}),
+          ...(entryState === 'withdrawn'
+            ? {
+                entries: [],
+                withdrawnEntries: [entry('a', 'Blade Runner')],
+              }
+            : {}),
         }),
       ),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
@@ -197,6 +212,26 @@ describe('every page passes automated accessibility checks', () => {
     await wrapper.get('input[value=preset]').setValue(true);
     await flushPromises();
     expect(wrapper.get('input[value=seeded]').attributes('disabled')).toBeDefined();
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
+  test('retained withdrawal management and deletion pass accessibility checks', async () => {
+    const wrapper = await renderAt(
+      '/lists/best-sci-fi',
+      true,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      'withdrawn',
+    );
+    await wrapper
+      .get('button[aria-label="Permanently delete withdrawn Blade Runner"]')
+      .trigger('click');
+    await flushPromises();
     await expectAccessible(document.body);
     wrapper.unmount();
   });
@@ -419,6 +454,33 @@ describe('list page dialogs', () => {
 });
 
 describe('archiving', () => {
+  test('entry deletion confirmation passes accessibility checks', async () => {
+    const wrapper = await renderAt('/lists/best-sci-fi', true);
+    await wrapper.get('.entry__art').trigger('click');
+    await wrapper.get('button[aria-label="Permanently delete Blade Runner"]').trigger('click');
+    await flushPromises();
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('all its scores');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
+  test('pending entry deletion retry passes accessibility checks', async () => {
+    const wrapper = await renderAt(
+      '/lists/best-sci-fi',
+      true,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      'deleting',
+    );
+    await wrapper.get('.notice button').trigger('click');
+    await flushPromises();
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
   test('explains plainly that it is permanent, and asks for the address to be typed', async () => {
     const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
     const dialogs = [...document.querySelectorAll('dialog')].map((d) => d.textContent);
@@ -559,6 +621,7 @@ describe('site-wide content', () => {
       'What we never store',
       'Withdrawing a nomination',
       'When an Admin deletes a list',
+      'When an Admin deletes an entry',
       'Shared links',
       'Cookies and browser storage',
       'Download my data',
