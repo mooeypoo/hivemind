@@ -207,7 +207,7 @@ describe('Blobs lists repositories', () => {
     };
     expect(await entries.create(entry)).toBe(true);
     expect(await entries.create(entry)).toBe(false);
-    expect(await entries.forList(listId)).toEqual([entry]);
+    expect(await entries.forList(listId)).toEqual([{ ...entry, setAsideReason: null }]);
     expect(await entries.idsForList(listId)).toEqual([entry.id]);
 
     const stored = await entries.get(listId, entry.id);
@@ -220,7 +220,24 @@ describe('Blobs lists repositories', () => {
       nominatedBy: null,
       nominatedAt: '2026-03-12T00:00:00.000Z',
       snapshotPurgedAt: null,
+      setAsideReason: null,
     });
+    const latest = await entries.get(listId, entry.id);
+    expect(
+      await entries.save(
+        { ...entry, setAsideReason: 'Outside the criteria' },
+        latest?.version ?? '',
+      ),
+    ).toBe(true);
+    expect((await entries.get(listId, entry.id))?.value.setAsideReason).toBe(
+      'Outside the criteria',
+    );
+    await store.setJSON(`entry/l1/${entry.id}`, {
+      v: 1,
+      ...entry,
+      nominatedAt: entry.nominatedAt.toISOString(),
+    });
+    expect((await entries.get(listId, entry.id))?.value.setAsideReason).toBeNull();
   });
 
   test('ledgers are found by member across lists, and deleted', async () => {

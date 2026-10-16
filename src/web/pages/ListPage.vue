@@ -9,6 +9,7 @@ import { usePageTitle } from '../lib/page-title.ts';
 import { session } from '../state/session.ts';
 import EntryCard from '../components/EntryCard.vue';
 import EntryDetails from '../components/EntryDetails.vue';
+import EntrySetAsideDialog from '../components/EntrySetAsideDialog.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import EventCountdown from '../components/EventCountdown.vue';
@@ -66,6 +67,23 @@ const panelProps = (id: string) =>
 
 // Entry details and rating one by one
 const selectedId = ref<string | null>(null);
+const settingAside = ref<EntryDto | null>(null);
+const beginSetAside = (entry: EntryDto) => {
+  selectedId.value = null;
+  settingAside.value = entry;
+};
+const savedSetAside = async (entry: EntryDto) => {
+  settingAside.value = null;
+  queue.value = [];
+  rating.value = false;
+  await page.load();
+  toast.show(
+    entry.setAsideReason == null
+      ? 'Entry returned to the main ranking.'
+      : 'Set-aside explanation saved.',
+    'success',
+  );
+};
 const selected = computed(
   () => list.value?.entries.find((entry) => entry.id === selectedId.value) ?? null,
 );
@@ -397,10 +415,20 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
         selected !== null && isClosed && !list.participationPaused ? scores[selected.id] : undefined
       "
       :can-delete="session.me?.isAdmin === true && !list.participationPaused"
+      :can-set-aside="
+        session.me?.isAdmin === true && list.lifecycle !== 'archived' && !list.participationPaused
+      "
       @close="selectedId = null"
       @change="onDetailsChange"
       @withdraw="beginWithdrawal"
       @delete="beginDeletion"
+      @set-aside="beginSetAside"
+    />
+    <EntrySetAsideDialog
+      :entry="settingAside"
+      :list="list"
+      @close="settingAside = null"
+      @saved="savedSetAside"
     />
     <ConfirmDialog
       :open="deletion !== null"

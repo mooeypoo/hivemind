@@ -4,6 +4,7 @@ import type { EntryDto } from '../../server/http/contracts.ts';
 import AppDialog from './ui/AppDialog.vue';
 import ItemArt from './ui/ItemArt.vue';
 import ScoreInput from './ui/ScoreInput.vue';
+import SetAsideNotice from './SetAsideNotice.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -47,6 +48,7 @@ const next = () => {
       />
       <div class="one-by-one__body">
         <h3 class="one-by-one__title">{{ entry.item.title }}</h3>
+        <SetAsideNotice :reason="entry.setAsideReason" />
         <p v-if="entry.item.subtitle !== null" class="meta">{{ entry.item.subtitle }}</p>
         <div
           v-if="['tmdb-movie', 'tvdb-series', 'igdb-game'].includes(entry.item.source)"

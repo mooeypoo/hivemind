@@ -26,10 +26,25 @@ import {
   scoreVisibilityBody,
   visibilityBody,
   withdrawNominationBody,
+  setEntryAsideBody,
 } from '../schemas.ts';
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
   result.ok ? json(map(result.value), status) : domainErrorResponse(result.error);
+
+export const setEntryAside = async (request: Request, app: App): Promise<Response> => {
+  const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
+  if (rejected !== null) return rejected;
+  const body = await readJson(request, setEntryAsideBody);
+  if (!body.ok) return body.response;
+  return respond(
+    await app.lists.setEntryAside(await actorOf(request, app), {
+      list: listParam(request),
+      ...body.data,
+    }),
+    entryDto,
+  );
+};
 
 /** `POST /api/lists/:list/entries/delete` — immutable list ID and entry incarnation. */
 export const deleteEntry = async (request: Request, app: App): Promise<Response> => {

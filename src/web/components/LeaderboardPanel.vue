@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type {
   LeaderboardDto,
   ListDetailDto,
@@ -43,7 +43,7 @@ const load = async () => {
     error.value = result.error;
   }
 };
-onMounted(load);
+watch(() => props.list, load, { immediate: true });
 defineExpose({ refresh: load });
 
 const updated = computed(() => {

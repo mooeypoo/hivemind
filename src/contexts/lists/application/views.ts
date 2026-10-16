@@ -30,6 +30,7 @@ export interface ListView extends ListConfig {
 }
 
 export interface EntryView {
+  readonly setAsideReason: string | null;
   readonly id: EntryId;
   readonly item: ItemSnapshot;
   /** Only when the list shows nominators. */
@@ -83,6 +84,7 @@ export const toEntryView = (
   actor: MemberActor,
   now: Date,
 ): EntryView => ({
+  setAsideReason: entry.setAsideReason ?? null,
   id: entry.id,
   item: entry.item,
   nominatedBy: list.config.showNominators ? (entry.nominatedBy?.displayName ?? null) : null,

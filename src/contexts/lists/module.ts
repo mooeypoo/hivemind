@@ -16,6 +16,7 @@ import { makeGetList, makeGetSharePreview } from './application/get-list.ts';
 import { makeListLists } from './application/list-lists.ts';
 import { makeNominate } from './application/nominate.ts';
 import { makeWithdrawNomination } from './application/withdraw-nomination.ts';
+import { makeSetEntryAside } from './application/set-entry-aside.ts';
 import { makeRefreshMovieDetails } from './application/refresh-movie-details.ts';
 import { makeListsPersonalData } from './application/personal-data.ts';
 import { makeScheduleList } from './application/schedule-list.ts';
@@ -75,6 +76,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     resolveItemForList: makeResolveItemForList(shared),
     nominate: makeNominate({ ...shared, ids: deps.ids }),
     withdrawNomination: makeWithdrawNomination(shared),
+    setEntryAside: makeSetEntryAside({ ...shared, ids: deps.ids }),
     refreshMovieDetails: makeRefreshMovieDetails(shared),
     personalData: makeListsPersonalData(repositories),
     // Services for downstream contexts (voting, ranking).

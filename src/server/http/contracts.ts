@@ -148,6 +148,7 @@ export interface DeleteEntryRequest {
 }
 
 export interface EntryDto {
+  readonly setAsideReason?: string | null;
   readonly id: string;
   readonly item: CatalogItemDto;
   /** Only when the list shows nominators. */
@@ -158,6 +159,13 @@ export interface EntryDto {
   readonly withdrawalToken?: string | null;
   /** Admin-only confirmation token, specific to this nomination/seeded entry. */
   readonly deletionToken?: string | null;
+}
+
+export interface SetEntryAsideRequest {
+  readonly entryId: string;
+  readonly token: string;
+  readonly expectedReason: string | null;
+  readonly reason: string | null;
 }
 
 /** `GET /api/lists` */
@@ -269,6 +277,11 @@ export type LeaderboardDto =
       readonly computedAt: string;
       readonly minVotes: number;
       readonly rows: readonly LeaderboardRowDto[];
+      /** Independently calculated groups. `rows` is always the combined ranking. */
+      readonly groups?: {
+        readonly main: readonly LeaderboardRowDto[];
+        readonly setAside: readonly LeaderboardRowDto[];
+      };
     };
 
 // ---- Site and roles ----

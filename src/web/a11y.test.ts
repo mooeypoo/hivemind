@@ -44,6 +44,26 @@ const me = {
   avatarUrl: 'https://cdn.discordapp.com/embed/avatars/0.png',
   isAdmin: true,
 };
+const rankingRows = [
+  {
+    rank: 1,
+    entryId: 'a',
+    item: entry('a', 'Blade Runner').item,
+    score: 8.2,
+    votes: 4,
+    provisional: false,
+    votesNeeded: 0,
+  },
+  {
+    rank: null,
+    entryId: 'b',
+    item: entry('b', 'Alien').item,
+    score: null,
+    votes: 0,
+    provisional: true,
+    votesNeeded: 3,
+  },
+];
 
 /** Mounts the whole app (header, page, footer) at `path`, as a signed-in Admin or signed out. */
 const renderAt = async (
@@ -55,7 +75,7 @@ const renderAt = async (
   mediaSource: 'tvdb-series' | 'igdb-game' | null = null,
   unusedList = false,
   deletingList = false,
-  entryState: 'deleting' | 'withdrawn' | null = null,
+  entryState: 'deleting' | 'withdrawn' | 'set-aside' | null = null,
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -109,6 +129,14 @@ const renderAt = async (
                 withdrawnEntries: [entry('a', 'Blade Runner')],
               }
             : {}),
+          ...(entryState === 'set-aside'
+            ? {
+                entries: [
+                  entry('a', 'Blade Runner'),
+                  { ...entry('b', 'Alien'), setAsideReason: 'Outside this list’s criteria' },
+                ],
+              }
+            : {}),
         }),
       ),
     'GET /api/lists/closed': () => Response.json(list({ lifecycle: 'closed', slug: 'closed' })),
@@ -125,26 +153,12 @@ const renderAt = async (
         hidden: false,
         computedAt: new Date().toISOString(),
         minVotes: 3,
-        rows: [
-          {
-            rank: 1,
-            entryId: 'a',
-            item: entry('a', 'Blade Runner').item,
-            score: 8.2,
-            votes: 4,
-            provisional: false,
-            votesNeeded: 0,
-          },
-          {
-            rank: null,
-            entryId: 'b',
-            item: entry('b', 'Alien').item,
-            score: null,
-            votes: 0,
-            provisional: true,
-            votesNeeded: 3,
-          },
-        ],
+        rows: rankingRows,
+        ...(entryState === 'set-aside'
+          ? {
+              groups: { main: rankingRows.slice(0, 1), setAside: rankingRows.slice(1) },
+            }
+          : {}),
       }),
     'GET /api/lists/closed/leaderboard': () =>
       Response.json({ hidden: true, revealsAt: '2026-01-10T00:00:00.000Z' }),
@@ -175,6 +189,50 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test.each(['/lists/best-sci-fi?tab=standings', '/lists/best-sci-fi/results'])(
+    'separate and combined standings at %s are accessible',
+    async (path) => {
+      const wrapper = await renderAt(
+        path,
+        true,
+        false,
+        false,
+        false,
+        null,
+        false,
+        false,
+        'set-aside',
+      );
+      expect(wrapper.get('.set-aside-ranking').text()).toContain('Outside this list’s criteria');
+      await expectAccessible(document.body);
+      await wrapper.get('input[value=combined]').setValue(true);
+      await flushPromises();
+      expect(wrapper.find('.set-aside-ranking').exists()).toBe(false);
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
+
+  test.each(['/lists/best-sci-fi', '/lists/closed'])(
+    'the set-aside editor at %s is accessible',
+    async (path) => {
+      const wrapper = await renderAt(path, true);
+      await wrapper.get('.entry__art').trigger('click');
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Set aside...')
+        ?.trigger('click');
+      await flushPromises();
+      expect(document.querySelector('dialog[open] textarea')).not.toBeNull();
+      if (path === '/lists/closed')
+        expect(document.querySelector('dialog[open]')?.textContent).toContain(
+          'changes the final standings',
+        );
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
+
   test.each([false, true])(
     'the permanent deletion dialog is accessible (pending: %s)',
     async (pending) => {
@@ -619,6 +677,7 @@ describe('site-wide content', () => {
     expect(headings).toEqual([
       'What we store about you',
       'What we never store',
+      'Setting entries aside',
       'Withdrawing a nomination',
       'When an Admin deletes a list',
       'When an Admin deletes an entry',

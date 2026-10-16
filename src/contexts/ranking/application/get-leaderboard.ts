@@ -51,7 +51,10 @@ export const makeGetLeaderboard =
     }
 
     const cached = await deps.cache.get(context.value.listId);
-    if (cached !== null && isFresh(cached, context.value.entryIds, now)) {
+    if (
+      cached !== null &&
+      isFresh(cached, context.value.entryIds, now, context.value.setAsideEntryIds)
+    ) {
       return ok({ hidden: false, minVotes, board: cached });
     }
     const built = await build(deps, context.value, now);
@@ -78,18 +81,30 @@ const build = async (
     deps.scores.scoresForList(context.listId),
   ]);
   const items = new Map(entries.map((entry) => [entry.id, entry.item]));
-  const rows = rank({
-    entries: entries.map((entry) => ({ id: entry.id, title: entry.item.title })),
-    ballots,
-    minVotes: context.minVotes,
-  }).flatMap((row) => {
-    const item = items.get(row.entryId);
-    return item === undefined ? [] : [{ ...row, item }];
-  });
+  const rankEntries = (group: typeof entries) =>
+    rank({
+      entries: group.map((entry) => ({ id: entry.id, title: entry.item.title })),
+      ballots,
+      minVotes: context.minVotes,
+    }).flatMap((row) => {
+      const item = items.get(row.entryId);
+      return item === undefined ? [] : [{ ...row, item }];
+    });
+  const setAside = new Set(context.setAsideEntryIds ?? []);
+  const rows = rankEntries(entries);
   return ok({
     listId: context.listId,
     computedAt: now,
     entryIds: entries.map((entry) => entry.id).sort(),
     rows,
+    setAsideEntryIds: [...setAside].sort(),
+    ...(setAside.size === 0
+      ? {}
+      : {
+          groups: {
+            main: rankEntries(entries.filter((entry) => !setAside.has(entry.id))),
+            setAside: rankEntries(entries.filter((entry) => setAside.has(entry.id))),
+          },
+        }),
   });
 };

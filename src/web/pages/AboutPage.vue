@@ -25,6 +25,13 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
       gets a place; until then it waits below the ranking, however high its score.
     </p>
     <p>
+      Admins can set entries aside as outside a list's criteria, with an explanation. You can still
+      rate them: they appear in a separate ranking below the main one. Choose Combined to rank all
+      entries together instead. Scores are calculated within each group, so scores and places can
+      differ between views. Admins can correct this classification after voting closes, but not
+      after the list is archived.
+    </p>
+    <p>
       Scores are private unless a list says they are public. Public lists explain this before you
       vote, and show who gave each score when results are visible. Admins can make public scores
       private later, but can’t make a published private list public.

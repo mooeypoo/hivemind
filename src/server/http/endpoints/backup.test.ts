@@ -26,6 +26,7 @@ import {
   scheduleList,
   setVisibility,
   withdrawNomination,
+  setEntryAside,
 } from './lists.ts';
 import { deleteMyData } from './me.ts';
 import { changeScore, getMyBallot } from './voting.ts';
@@ -91,6 +92,39 @@ afterEach(async () => {
 });
 
 describe('backups', () => {
+  test('set-aside explanations survive the HTTP backup schema and import', async () => {
+    const detail = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', admin);
+    const root = detail.body.entries.find((entry) => entry.item.title === 'Root');
+    if (root === undefined) throw new Error('fixture');
+    expect(
+      (
+        await call(setEntryAside, 'PUT', '/api/lists/games/entries/set-aside', admin, {
+          entryId: root.id,
+          token: root.deletionToken,
+          expectedReason: null,
+          reason: 'Outside the criteria',
+        })
+      ).status,
+    ).toBe(200);
+    const file = (await call<unknown>(exportBackup, 'GET', '/api/admin/backup?list=games', admin))
+      .body;
+    expect((await call(importBackup, 'POST', '/api/admin/backup', admin, file)).status).toBe(200);
+    const copy = await call<ListDetailDto>(getList, 'GET', '/api/lists/games-2', admin);
+    expect(copy.body.entries.find((entry) => entry.id === root.id)?.setAsideReason).toBe(
+      'Outside the criteria',
+    );
+    expect(
+      (
+        await call(setVisibility, 'PUT', '/api/lists/games-2/visibility', admin, {
+          visibility: 'public',
+        })
+      ).status,
+    ).toBe(200);
+    const ballot = await call<BallotDto>(getMyBallot, 'GET', '/api/lists/games-2/ballot', ada);
+    expect(ballot.status).toBe(200);
+    expect(ballot.body.scores[root.id]).toBe(9);
+  });
+
   test('withdrawn items stay withdrawn after import and their sealed votes return on re-nomination', async () => {
     const detail = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', ada);
     const root = detail.body.entries.find((entry) => entry.item.title === 'Root');

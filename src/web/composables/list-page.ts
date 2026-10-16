@@ -100,7 +100,11 @@ export const useListPage = (slug: () => string) => {
     leaderboard.value = board;
   };
   const rows = computed((): readonly LeaderboardRowDto[] | null =>
-    leaderboard.value === null || leaderboard.value.hidden ? null : leaderboard.value.rows,
+    leaderboard.value === null || leaderboard.value.hidden
+      ? null
+      : leaderboard.value.groups === undefined
+        ? leaderboard.value.rows
+        : [...leaderboard.value.groups.main, ...leaderboard.value.groups.setAside],
   );
   const standings = computed((): Readonly<Record<string, LeaderboardRowDto>> =>
     Object.fromEntries((rows.value ?? []).map((row) => [row.entryId, row])),

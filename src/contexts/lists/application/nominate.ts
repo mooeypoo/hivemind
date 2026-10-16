@@ -93,14 +93,19 @@ export const makeNominate =
         const current = await deps.entries.get(list.id, entry.id);
         if (current !== null && isActiveEntry(current.value))
           return err(listsErrors.alreadyNominated);
+        const nominatedEntry =
+          current === null
+            ? entry
+            : {
+                ...entry,
+                setAsideReason: current.value.setAsideReason ?? null,
+                withdrawnNominationIds: current.value.withdrawnNominationIds ?? [],
+              };
         const saved =
           current === null
-            ? await deps.entries.create(entry)
-            : await deps.entries.save(
-                { ...entry, withdrawnNominationIds: current.value.withdrawnNominationIds ?? [] },
-                current.version,
-              );
-        return saved ? ok(undefined) : err(listsErrors.conflict);
+            ? await deps.entries.create(nominatedEntry)
+            : await deps.entries.save(nominatedEntry, current.version);
+        return saved ? ok(nominatedEntry) : err(listsErrors.conflict);
       });
       if (!created.ok) {
         await withConflictRetry(() =>
@@ -110,7 +115,7 @@ export const makeNominate =
         );
         return created;
       }
-      return ok(toEntryView(entry, list, member.value, now));
+      return ok(toEntryView(created.value, list, member.value, now));
     });
   };
 

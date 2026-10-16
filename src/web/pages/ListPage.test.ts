@@ -69,6 +69,32 @@ afterEach(() => {
 });
 
 describe('ListPage rating', () => {
+  test.each(['open', 'archived'] as const)(
+    'Admin classification management on an %s list',
+    async (lifecycle) => {
+      session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
+      const page = await mountWith(
+        games({
+          lifecycle,
+          entries: [{ ...entry('a', 'Root'), deletionToken: 'incarnation' }],
+        }),
+        {},
+        undefined,
+        true,
+      );
+      await page.get('.entry__art').trigger('click');
+      const action = page.findAll('button').find((button) => button.text() === 'Set aside...');
+      expect(action !== undefined).toBe(lifecycle !== 'archived');
+      if (action !== undefined) {
+        await action.trigger('click');
+        const dialog = page.get('dialog[open]');
+        expect(dialog.text()).toContain('Reason shown to members');
+        expect(dialog.text()).toContain('Existing ratings are kept');
+      }
+      page.unmount();
+    },
+  );
+
   test('Admin entry deletion requires typed confirmation and refreshes after success', async () => {
     session.me = { id: 'admin', displayName: 'Admin', avatarUrl: '/favicon.svg', isAdmin: true };
     let detail = games({ entries: [{ ...entry('a', 'Root'), deletionToken: 'incarnation' }] });

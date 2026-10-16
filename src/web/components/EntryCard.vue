@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { EntryDto, LeaderboardRowDto } from '../../server/http/contracts.ts';
 import ItemArt from './ui/ItemArt.vue';
+import SetAsideNotice from './SetAsideNotice.vue';
 
 defineProps<{ entry: EntryDto; standing?: LeaderboardRowDto | undefined; rated?: boolean }>();
 const emit = defineEmits<{ open: [] }>();
@@ -38,6 +39,7 @@ const emit = defineEmits<{ open: [] }>();
           <span class="entry__info-icon" aria-hidden="true">i</span>
         </button>
       </h3>
+      <SetAsideNotice :reason="entry.setAsideReason" />
       <p
         v-if="
           entry.item.subtitle !== null ||
@@ -82,7 +84,10 @@ const emit = defineEmits<{ open: [] }>();
             {{ standing.votesNeeded === 1 ? 'vote' : 'votes' }} for a place</span
           >
         </template>
-        <template v-else>Rank {{ standing.rank }}</template>
+        <template v-else
+          >{{ entry.setAsideReason != null ? 'Set-aside rank' : 'Rank' }}
+          {{ standing.rank }}</template
+        >
       </p>
     </div>
     <div class="entry__rate"><slot /></div>

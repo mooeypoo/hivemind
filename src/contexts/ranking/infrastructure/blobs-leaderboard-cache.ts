@@ -8,6 +8,8 @@ import type { Leaderboard, LeaderboardRow } from '../domain/leaderboard.ts';
  */
 
 interface LeaderboardRecordV1 {
+  readonly setAsideEntryIds?: readonly string[];
+  readonly groups?: Leaderboard['groups'];
   readonly v: 1;
   readonly listId: string;
   readonly computedAt: string;
@@ -28,6 +30,10 @@ export const createBlobsLeaderboardCache = (store: Store): LeaderboardCache => (
       computedAt: new Date(record.computedAt),
       entryIds: record.entryIds ?? [],
       rows: record.rows,
+      ...(record.setAsideEntryIds === undefined
+        ? {}
+        : { setAsideEntryIds: record.setAsideEntryIds }),
+      ...(record.groups === undefined ? {} : { groups: record.groups }),
     };
   },
 
@@ -38,6 +44,8 @@ export const createBlobsLeaderboardCache = (store: Store): LeaderboardCache => (
       computedAt: board.computedAt.toISOString(),
       entryIds: board.entryIds,
       rows: board.rows,
+      ...(board.setAsideEntryIds === undefined ? {} : { setAsideEntryIds: board.setAsideEntryIds }),
+      ...(board.groups === undefined ? {} : { groups: board.groups }),
     };
     await store.setJSON(`leaderboard/${board.listId}`, record);
   },
