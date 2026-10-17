@@ -8,6 +8,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     for (const width of [320, 375, 1280]) {
       test(`new list controls and next step stay clear at ${String(width)}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 850 });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
         await fakeApi(page, admin);
         await page.goto('/admin/lists/new');
         const radios = page.locator('input[name="source"]');
@@ -17,6 +18,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
         expect(freeText).not.toBeNull();
         expect(freeText?.width).toBe(first?.width);
         expect(freeText?.width).toBeGreaterThanOrEqual(20);
+        const choices = page.locator('.source-choice');
+        let previousBottom: number | null = null;
+        for (const choice of await choices.all()) {
+          const box = await choice.boundingBox();
+          expect(box).not.toBeNull();
+          if (box === null) throw new Error('Item choice is not visible');
+          if (previousBottom !== null) expect(box.y - previousBottom).toBeGreaterThanOrEqual(12);
+          previousBottom = box.y + box.height;
+          const radio = await choice.locator('input').boundingBox();
+          expect(radio?.y).toBeGreaterThan(box.y);
+          expect((radio?.y ?? 0) + (radio?.height ?? 0)).toBeLessThan(box.y + box.height);
+        }
+        await choices.filter({ has: page.locator('input[value="freeform"]') }).click();
+        await expect(page.locator('input[value="freeform"]')).toBeChecked();
         await expect(page.getByLabel('Unlimited', { exact: true })).toBeChecked();
         await expect(page.locator('.editor-next-step')).toBeVisible();
         expect(

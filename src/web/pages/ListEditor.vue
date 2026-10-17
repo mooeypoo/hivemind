@@ -954,8 +954,8 @@ const importCsv = async () => {
           seeded lists also keep their source. An unfinished entry write temporarily locks the
           source.
         </p>
-        <div class="choices" role="radiogroup" aria-label="Item source">
-          <label v-for="kind in sources" :key="kind" class="choice">
+        <div class="source-choices" role="radiogroup" aria-label="Item source">
+          <label v-for="kind in sources" :key="kind" class="choice source-choice">
             <input v-model="form.sourceKind" type="radio" name="source" :value="kind" />
             <span>
               <strong>{{ sourceLabel[kind] }}</strong>
