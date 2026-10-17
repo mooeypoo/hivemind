@@ -33,6 +33,10 @@ Unsaved edits remain only in your browser tab.
 Only integrations enabled by the site operator appear. If one is missing, ask the
 operator; changing a list title does not enable an integration.
 
+**Free text has no automatic content filter.** Members can submit any words or free
+text, so moderation may be needed. Use **Admin tools** on an entry to set it aside
+or delete it when necessary.
+
 For a collection, upload a CSV spreadsheet with `title` or `title,subtitle` as its
 first row and up to 200 items. For example:
 

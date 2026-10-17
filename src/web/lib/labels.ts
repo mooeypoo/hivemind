@@ -21,7 +21,8 @@ export const sourceExplanation: Record<ItemSourceKind, string> = {
     'Members search for movies and select a result, with posters and details from TMDB.',
   'tvdb-series': 'Members search for TV series, not individual episodes, using TheTVDB.',
   'igdb-game': 'Members search for video games, with covers and details from IGDB.',
-  freeform: 'Members type their own titles. There are no automatic posters or catalog details.',
+  freeform:
+    'Members type their own titles. There are no automatic posters or catalog details. No automatic content filter: any words or free text can be submitted, so moderation may be needed.',
   preset:
     'Upload your own collection as a CSV spreadsheet. Include every item or let members choose nominations.',
 };

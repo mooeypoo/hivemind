@@ -37,6 +37,27 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test('free text warns admins about unfiltered submissions when choosing and reviewing', async () => {
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    const choice = editor.get('input[value=freeform]').element.closest('label');
+    expect(choice?.textContent).toContain(
+      'No automatic content filter: any words or free text can be submitted, so moderation may be needed.',
+    );
+    await editor.get('input[value=freeform]').setValue(true);
+    await editor.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(editor.get('dialog[open]').text()).toContain(
+      'No automatic content filter: any words or free text can be submitted, so moderation may be needed.',
+    );
+    editor.unmount();
+  });
+
   test('the form cannot accept input before its saved settings arrive', async () => {
     stubApi({ 'GET /api/catalog/sources': sources, 'GET /api/roles': roles });
     const fetch = globalThis.fetch;
