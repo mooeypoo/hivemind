@@ -189,6 +189,25 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test('stale editor settings comparison is accessible', async () => {
+    sessionStorage.setItem(
+      'draft:editor:draft',
+      JSON.stringify({
+        form: { description: 'My unsaved description' },
+        settingsVersion: -1,
+        lifecycle: 'draft',
+      }),
+    );
+    try {
+      const wrapper = await renderAt('/admin/lists/draft', true);
+      expect(wrapper.get('#settings-conflict-heading').text()).toBe('Compare before continuing');
+      expect(wrapper.get('.settings-conflict').text()).toContain('My unsaved description');
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    } finally {
+      sessionStorage.removeItem('draft:editor:draft');
+    }
+  });
   test.each([false, true])('publishing review is accessible (named scores: %s)', async (named) => {
     const wrapper = await renderAt('/admin/lists/draft', true);
     if (named) await wrapper.get('input[name=score-visibility][value=public]').setValue(true);

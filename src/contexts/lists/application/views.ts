@@ -15,6 +15,7 @@ import {
 } from '../domain/list.ts';
 
 export interface ListView extends ListConfig {
+  readonly settingsVersion?: number;
   readonly writeRevision: string | null;
   readonly participationPaused: boolean;
   readonly deleting: boolean;
@@ -64,6 +65,7 @@ export const toListView = (
     mayParticipate(list, actor.roleIds);
   return {
     ...list.config,
+    ...(actor.isAdmin ? { settingsVersion: list.settingsVersion ?? 0 } : {}),
     writeRevision: list.entryDeletionRevision ?? null,
     deleting: list.deletionRequested === true,
     participationPaused: list.entryDeletion != null,

@@ -37,6 +37,175 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test('the form cannot accept input before its saved settings arrive', async () => {
+    stubApi({ 'GET /api/catalog/sources': sources, 'GET /api/roles': roles });
+    const fetch = globalThis.fetch;
+    let respond: ((response: Response) => void) | undefined;
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) =>
+      input === '/api/lists/best-sci-fi'
+        ? new Promise<Response>((resolve) => {
+            respond = resolve;
+          })
+        : fetch(input, init),
+    );
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.find('form').exists()).toBe(false);
+    expect(editor.text()).toContain('Loading list settings');
+    if (respond === undefined) throw new Error('Missing list request');
+    respond(Response.json(openTmdbList({ description: 'Saved description' })));
+    await flushPromises();
+    expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'Saved description',
+    );
+    editor.unmount();
+  });
+  test('a draft published by another admin keeps restored input for comparison but cannot rebase locked settings', async () => {
+    sessionStorage.setItem(
+      'draft:editor:best-sci-fi',
+      JSON.stringify({
+        form: { title: 'My unsaved title', description: 'My description' },
+        settingsVersion: 0,
+        lifecycle: 'draft',
+      }),
+    );
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList({ settingsVersion: 1 })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect((editor.get('#title').element as HTMLInputElement).value).toBe('My unsaved title');
+    expect(editor.get('.settings-conflict').text()).toContain('My unsaved title');
+    expect(editor.get('.settings-conflict').text()).toContain('list’s status has changed');
+    expect(
+      editor
+        .findAll('button')
+        .find((button) => button.text() === 'Keep my input after comparison')
+        ?.attributes('disabled'),
+    ).toBeDefined();
+    editor.unmount();
+  });
+  test('a stale save keeps input and requires an explicit comparison before saving against the latest version', async () => {
+    let version = 0;
+    const draft = (description: string) =>
+      openTmdbList({ lifecycle: 'draft', schedule: null, settingsVersion: version, description });
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(draft(version === 0 ? '' : 'Other admin')),
+      'GET /api/lists/list-1': () => Response.json(draft('Other admin')),
+      'PUT /api/lists/list-1': (call) => {
+        const body = call.body as { expectedSettingsVersion: number; description: string };
+        if (body.expectedSettingsVersion !== version)
+          return Response.json(
+            { error: { code: 'lists.settings-changed', message: 'Settings changed' } },
+            { status: 409 },
+          );
+        version += 1;
+        return Response.json(draft(body.description));
+      },
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('#description').setValue('My unsaved description');
+    version = 1;
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(editor.text()).toContain('Compare before continuing');
+    expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'My unsaved description',
+    );
+    await editor.get('form').trigger('submit');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+    await editor
+      .findAll('button')
+      .find((button) => button.text() === 'Compare latest settings')
+      ?.trigger('click');
+    await flushPromises();
+    expect(editor.text()).toContain('Other admin');
+    expect(editor.text()).toContain('My unsaved description');
+    await editor
+      .findAll('button')
+      .find((button) => button.text() === 'Keep my input after comparison')
+      ?.trigger('click');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.filter((call) => call.method === 'PUT').at(-1)?.body).toMatchObject({
+      expectedSettingsVersion: 1,
+      description: 'My unsaved description',
+    });
+    editor.unmount();
+  });
+
+  test('restored input keeps its original version instead of silently rebasing onto another admin’s changes', async () => {
+    let version = 0;
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(
+          openTmdbList({
+            lifecycle: 'draft',
+            schedule: null,
+            settingsVersion: version,
+            description: version === 0 ? '' : 'Other admin',
+          }),
+        ),
+    });
+    const first = await mountAt('/admin/lists/best-sci-fi');
+    await first.get('#description').setValue('Keep across reload');
+    first.unmount();
+    version = 1;
+    const restored = await mountAt('/admin/lists/best-sci-fi');
+    expect((restored.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'Keep across reload',
+    );
+    expect(restored.text()).toContain('Compare before continuing');
+    expect(restored.text()).toContain('Other admin');
+    await restored.get('form').trigger('submit');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    await restored
+      .findAll('button')
+      .find((button) => button.text() === 'Replace my input with latest settings')
+      ?.trigger('click');
+    expect((restored.get('#description').element as HTMLTextAreaElement).value).toBe('Other admin');
+    restored.unmount();
+  });
+
+  test('publishing uses the saved version and a conflict closes review without losing the form', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null, settingsVersion: 3 })),
+      'PUT /api/lists/list-1': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null, settingsVersion: 4 })),
+      'POST /api/lists/list-1/schedule': () =>
+        Response.json(
+          { error: { code: 'lists.settings-changed', message: 'Changed during publication' } },
+          { status: 409 },
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('#description').setValue('Reviewed description');
+    await editor.get('[data-review-publish]').trigger('click');
+    await editor.get('#publish-locks').setValue(true);
+    await editor.get('[data-confirm-publish]').trigger('click');
+    await flushPromises();
+    expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+      expectedSettingsVersion: 3,
+    });
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      expectedSettingsVersion: 4,
+    });
+    expect(editor.find('dialog[open]').exists()).toBe(false);
+    expect(editor.text()).toContain('Compare before continuing');
+    expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'Reviewed description',
+    );
+    editor.unmount();
+  });
+
   test('new lists require an item choice and keep names visible with private individual scores', async () => {
     const calls = stubApi({
       'GET /api/catalog/sources': sources,
@@ -573,7 +742,7 @@ describe('ListEditor', () => {
     const editor = await mountAt('/admin/lists/best-sci-fi');
     await editor.get('input[name=visibility][value=hidden]').setValue(true);
     await flushPromises();
-    expect(calls.find((call) => call.url.endsWith('/visibility'))?.body).toEqual({
+    expect(calls.find((call) => call.url.endsWith('/visibility'))?.body).toMatchObject({
       visibility: 'hidden',
     });
     expect(editor.text()).toContain('Hidden: only Admins can see it now.');

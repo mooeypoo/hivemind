@@ -158,8 +158,17 @@ replacement list.
 ## Working with other admins
 
 Drafts, including their saved dates, are shared, but unsaved input is local to your browser tab.
-Coordinate before editing the same list; the editor does not merge changes from
-different admins. Reload before starting work on a list someone else has just edited.
+The editor checks whether the saved settings changed since you opened the list.
+If another admin saves first, your save, publication or status action is stopped rather
+than overwriting their work. Votes and background updates do not trigger this warning.
+Your unsaved input stays in the form, including after reloading in the same tab.
+
+Choose **Compare latest settings** to see the differences. You can replace your input
+with the latest saved settings, or explicitly keep your input after comparing. Keeping
+input does **not** save or publish: review it and save again. If the list has since been
+published, closed or archived, load the latest settings to see what is still editable.
+The site does not automatically merge changes. Coordinate with your fellow admins
+before replacing their choices.
 
 There is currently **no stored admin creator attribution or activity history**.
 You cannot tell from the site who published, changed settings or set an entry aside.

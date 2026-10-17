@@ -35,6 +35,7 @@ type ConfigRecord = Omit<ListConfig, 'requiredRoleIds' | 'scoreVisibility'> & {
 /** v2: several required roles and an optional nomination cap. */
 interface ListRecordV2 {
   readonly v: 2;
+  readonly settingsVersion?: number;
   readonly id: string;
   readonly config: ConfigRecord;
   readonly schedule: ScheduleRecord | null;
@@ -112,6 +113,7 @@ const scheduleFromRecord = (record: ScheduleRecord | null): Schedule | null =>
 
 const listToRecord = (list: List): ListRecordV2 => ({
   v: 2,
+  settingsVersion: list.settingsVersion ?? 0,
   id: list.id,
   config: list.config,
   schedule: scheduleToRecord(list.schedule),
@@ -152,6 +154,7 @@ const listFromRecord = (data: unknown): List => {
   const record = upgradeList(data);
   return {
     id: record.id as ListId,
+    settingsVersion: record.settingsVersion ?? 0,
     config: {
       ...record.config,
       requiredRoleIds: record.config.requiredRoleIds as RoleId[],

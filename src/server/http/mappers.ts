@@ -11,6 +11,7 @@ const scheduleDto = (schedule: Schedule | null): ScheduleDto | null =>
       };
 
 export const listDto = (view: ListView): ListDto => ({
+  ...(view.settingsVersion === undefined ? {} : { settingsVersion: view.settingsVersion }),
   deleting: view.deleting,
   writeRevision: view.writeRevision,
   participationPaused: view.participationPaused,

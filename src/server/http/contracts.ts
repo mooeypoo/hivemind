@@ -124,6 +124,8 @@ export type DraftScheduleDto = Omit<ScheduleDto, 'opensAt'> & { readonly opensAt
 export type Visibility = 'public' | 'hidden';
 
 export interface ListDto extends ListConfigDto {
+  /** Admin-only settings revision, independent of votes and technical write markers. */
+  readonly settingsVersion?: number;
   /** Send with score changes; a permanent entry deletion invalidates older list snapshots. */
   readonly writeRevision?: string | null;
   readonly participationPaused?: boolean;
@@ -200,6 +202,7 @@ export type CreateListRequest = Pick<ListConfigDto, 'title' | 'slug' | 'itemSour
 
 /** `PUT /api/lists/:list` body. Published lists may remove, but never restore, a nomination cap. */
 export type EditListRequest = Partial<ListConfigDto> & {
+  readonly expectedSettingsVersion?: number;
   readonly draftSchedule?: DraftScheduleDto | null;
   /** A later end, an end for an open-ended list, or null to remove the end. */
   readonly closesAt?: string | null;
@@ -208,10 +211,11 @@ export type EditListRequest = Partial<ListConfigDto> & {
 /** `PUT /api/lists/:list/visibility` body. */
 export interface SetVisibilityRequest {
   readonly visibility: Visibility;
+  readonly expectedSettingsVersion?: number;
 }
 
 /** `POST /api/lists/:list/schedule` body. */
-export type ScheduleListRequest = ScheduleDto;
+export type ScheduleListRequest = ScheduleDto & { readonly expectedSettingsVersion?: number };
 
 /** `GET /api/lists/:list/search?q=` */
 export interface SearchResultsDto {

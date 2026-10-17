@@ -103,6 +103,89 @@ const openList = async (body: Record<string, unknown>): Promise<ListDto> => {
 };
 
 describe('shared draft schedules', () => {
+  test('two admins cannot overwrite saved plans or publish settings reviewed before another edit', async () => {
+    const second = await signInAs(h, {
+      id: '900000000000000012',
+      username: 'moderator',
+      roles: [ADMIN_ROLE_ID],
+    });
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Shared list',
+      slug: 'shared',
+      itemSource: { kind: 'freeform' },
+    });
+    expect(created.body.settingsVersion).toBe(0);
+    const path = `/api/lists/${created.body.id}`;
+    const plan = { opensAt: null, nominationsCloseAt: NOMINATIONS_CLOSE, closesAt: CLOSES };
+    const saved = await call<ListDto>(editList, 'PUT', path, second, {
+      description: 'Second admin',
+      draftSchedule: plan,
+      expectedSettingsVersion: 0,
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.settingsVersion).toBe(1);
+    const stale = await call<ErrorDto>(editList, 'PUT', path, admin, {
+      description: 'Old editor',
+      draftSchedule: null,
+      expectedSettingsVersion: 0,
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('lists.settings-changed');
+    expect((await call<ListDto>(getList, 'GET', path, admin)).body).toMatchObject({
+      description: 'Second admin',
+      draftSchedule: plan,
+    });
+    const stalePublication = await call<ErrorDto>(scheduleList, 'POST', `${path}/schedule`, admin, {
+      opensAt: OPENS,
+      nominationsCloseAt: null,
+      closesAt: null,
+      expectedSettingsVersion: 0,
+    });
+    expect(stalePublication.status).toBe(409);
+    const published = await call<ListDto>(scheduleList, 'POST', `${path}/schedule`, second, {
+      opensAt: OPENS,
+      nominationsCloseAt: null,
+      closesAt: null,
+      expectedSettingsVersion: 1,
+    });
+    expect(published.status).toBe(200);
+    expect(published.body.settingsVersion).toBe(2);
+    expect((await call<ListDto>(getList, 'GET', path, ada)).body.settingsVersion).toBeUndefined();
+    for (const [endpoint, method, suffix, body] of [
+      [editList, 'PUT', '', { description: 'Stale' }],
+      [setVisibility, 'PUT', '/visibility', { visibility: 'hidden' }],
+      [setScoreVisibility, 'PUT', '/score-visibility', { scoreVisibility: 'private' }],
+      [closeVoting, 'POST', '/close', {}],
+      [archiveList, 'POST', '/archive', {}],
+    ] as const) {
+      const conflict = await call<ErrorDto>(endpoint, method, `${path}${suffix}`, admin, {
+        ...body,
+        expectedSettingsVersion: 1,
+      });
+      expect(conflict.status).toBe(409);
+      expect(conflict.body.error.code).toBe('lists.settings-changed');
+    }
+  });
+
+  test.each([-1, 1.5, '0', Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid settings version %s',
+    async (expectedSettingsVersion) => {
+      const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+        title: 'Versioned list',
+        slug: 'versioned',
+        itemSource: { kind: 'freeform' },
+      });
+      expect(
+        (
+          await call(editList, 'PUT', `/api/lists/${created.body.id}`, admin, {
+            description: 'No change',
+            expectedSettingsVersion,
+          })
+        ).status,
+      ).toBe(422);
+    },
+  );
+
   test('a second admin sees saved dates without publication; members cannot see or edit them', async () => {
     const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
       title: 'Planned list',

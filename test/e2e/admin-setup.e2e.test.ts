@@ -6,6 +6,78 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`admin publishing in ${colorScheme} mode`, () => {
     test.use({ colorScheme });
     for (const width of [320, 375, 1280]) {
+      test(`stale editor comparison retains input and fits at ${String(width)}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 850 });
+        await fakeApi(page, admin);
+        let shared: ListDetailDto = {
+          ...list,
+          lifecycle: 'draft',
+          schedule: null,
+          settingsVersion: 0,
+          entries: [],
+          itemSourceEditable: true,
+          scoreVisibility: 'private',
+        };
+        let saves = 0;
+        await page.route('**/api/lists/films', (route) => route.fulfill({ json: shared }));
+        await page.route('**/api/lists/list-1', async (route) => {
+          if (route.request().method() === 'GET') {
+            await route.fulfill({ json: shared });
+            return;
+          }
+          saves += 1;
+          const body = route.request().postDataJSON() as EditListRequest;
+          if (body.expectedSettingsVersion !== shared.settingsVersion) {
+            await route.fulfill({
+              status: 409,
+              json: {
+                error: {
+                  code: 'lists.settings-changed',
+                  message: 'Settings changed since you opened the list.',
+                },
+              },
+            });
+            return;
+          }
+          shared = {
+            ...shared,
+            description: body.description ?? shared.description,
+            settingsVersion: (shared.settingsVersion ?? 0) + 1,
+          };
+          await route.fulfill({ json: shared });
+        });
+        await page.goto('/admin/lists/films');
+        await page.getByLabel('Description', { exact: true }).fill('My unsaved description');
+        shared = { ...shared, settingsVersion: 1, description: `Other admin: ${'x'.repeat(180)}` };
+        await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+        await expect(
+          page.getByRole('heading', { name: 'Compare before continuing' }),
+        ).toBeFocused();
+        await expect(page.getByLabel('Description', { exact: true })).toHaveValue(
+          'My unsaved description',
+        );
+        await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+        await page.getByRole('button', { name: 'Compare latest settings', exact: true }).click();
+        const comparison = page.getByRole('region', { name: 'Compare before continuing' });
+        await expect(comparison).toContainText('Other admin:');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await page.reload();
+        await expect(comparison).toContainText('My unsaved description');
+        await expect(page.getByLabel('Description', { exact: true })).toHaveValue(
+          'My unsaved description',
+        );
+        await page.getByRole('button', { name: 'Keep my input after comparison' }).click();
+        expect(saves).toBe(1);
+        await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+        await expect(page.getByText('Saved.', { exact: true }).last()).toBeVisible();
+        expect(shared.description).toBe('My unsaved description');
+        expect(shared.settingsVersion).toBe(2);
+      });
+
       test(`saved draft dates survive a fresh editor at ${String(width)}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 850 });
         await fakeApi(page, admin);

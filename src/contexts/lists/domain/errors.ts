@@ -1,6 +1,11 @@
 import { domainError, type DomainError } from '../../../shared/kernel/index.ts';
 
 export const listsErrors = {
+  settingsChanged: domainError(
+    'conflict',
+    'lists.settings-changed',
+    'This list’s settings changed since you opened it. Your changes have not been applied. Compare the latest settings before saving or publishing again.',
+  ),
   entryDeletionBusy: domainError(
     'conflict',
     'lists.entry-deletion-busy',

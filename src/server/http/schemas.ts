@@ -9,6 +9,8 @@ export const loginCallbackQuery = z.object({
 });
 
 const isoDate = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
+const settingsVersion = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional();
+export const listActionBody = z.strictObject({ expectedSettingsVersion: settingsVersion });
 const roleId = z
   .string()
   .regex(/^\d{5,25}$/, 'must be a Discord role ID')
@@ -58,6 +60,7 @@ export const editListBody = z
   .strictObject(listConfigFields)
   .partial()
   .extend({
+    expectedSettingsVersion: settingsVersion,
     closesAt: isoDate.nullable().optional(),
     draftSchedule: z
       .strictObject({
@@ -71,12 +74,16 @@ export const editListBody = z
 
 /** `closesAt: null`: open-ended, until an Admin closes voting. */
 export const scheduleBody = z.strictObject({
+  expectedSettingsVersion: settingsVersion,
   opensAt: isoDate,
   nominationsCloseAt: isoDate.nullable(),
   closesAt: isoDate.nullable(),
 });
 
-export const visibilityBody = z.strictObject({ visibility: z.enum(['public', 'hidden']) });
+export const visibilityBody = z.strictObject({
+  visibility: z.enum(['public', 'hidden']),
+  expectedSettingsVersion: settingsVersion,
+});
 export const deleteListBody = z.strictObject({ confirmation: z.string().min(1).max(60) });
 export const deleteEntryBody = z.strictObject({
   entryId: z.string().min(1).max(1000),
@@ -85,6 +92,7 @@ export const deleteEntryBody = z.strictObject({
 });
 
 export const scoreVisibilityBody = z.strictObject({
+  expectedSettingsVersion: settingsVersion,
   scoreVisibility: z.enum(['private', 'public']),
 });
 

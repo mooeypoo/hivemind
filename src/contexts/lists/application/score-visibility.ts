@@ -13,16 +13,25 @@ import { changeScoreVisibility, type ScoreVisibility } from '../domain/list.ts';
 import { findList } from './find-list.ts';
 import type { ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
+import { checkSettingsVersion, type SettingsExpectation } from './settings-version.ts';
 
 /** Admins choose public or private scores: either way in a draft, only to private after. */
 export const makeSetScoreVisibility =
   (deps: { readonly lists: ListRepository; readonly slugs: SlugIndex; readonly clock: Clock }) =>
-  (actor: Actor, input: { readonly list: string; readonly scoreVisibility: ScoreVisibility }) =>
+  (
+    actor: Actor,
+    input: {
+      readonly list: string;
+      readonly scoreVisibility: ScoreVisibility;
+    } & SettingsExpectation,
+  ) =>
     withConflictRetry(async (): Promise<Result<ListView, DomainError>> => {
       const admin = requireAdmin(actor);
       if (!admin.ok) return admin;
       const found = await findList(deps, admin.value, input.list);
       if (!found.ok) return found;
+      const expected = checkSettingsVersion(found.value.value, input);
+      if (!expected.ok) return expected;
       const now = deps.clock.now();
       const changed = changeScoreVisibility(found.value.value, input.scoreVisibility, now);
       if (!changed.ok) return changed;

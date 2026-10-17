@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type {
   CreateListRequest,
@@ -26,6 +26,7 @@ import { slugify } from '../lib/slugify.ts';
 import { usePageTitle } from '../lib/page-title.ts';
 import { site } from '../state/site.ts';
 import { adminGuideUrl } from '../lib/navigation.ts';
+import { compareListSettings } from '../lib/list-settings.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -92,6 +93,12 @@ const form = reactive<Form>({
 });
 
 const existing = ref<ListDto | null>(null);
+const ready = ref(false);
+const baseSettingsVersion = ref<number | undefined>();
+const baseLifecycle = ref<ListDto['lifecycle'] | undefined>();
+const settingsConflict = ref(false);
+const latestSettings = ref<ListDetailDto | null>(null);
+const conflictHeading = ref<HTMLHeadingElement | null>(null);
 const sourcePermission = ref(false);
 const itemSourceEditable = computed(
   () =>
@@ -174,7 +181,9 @@ const fillFrom = (list: ListDto) => {
 };
 
 const load = async () => {
+  ready.value = false;
   error.value = null;
+  let loaded: ListDetailDto | null = null;
   const [sourcesResult, rolesResult] = await Promise.all([
     api.get<SourcesDto>('/api/catalog/sources'),
     api.get<RoleLabelsDto>('/api/roles'),
@@ -199,6 +208,11 @@ const load = async () => {
       return;
     }
     existing.value = result.data;
+    loaded = result.data;
+    baseSettingsVersion.value = result.data.settingsVersion;
+    baseLifecycle.value = result.data.lifecycle;
+    settingsConflict.value = false;
+    latestSettings.value = null;
     sourcePermission.value = result.data.itemSourceEditable;
     snapshotsExpireAt.value = result.data.snapshotsExpireAt;
     fillFrom(result.data);
@@ -207,8 +221,31 @@ const load = async () => {
     sourcePermission.value = false;
   }
 
-  const draft = loadDraft(draftKey.value);
-  if (draft !== null && typeof draft === 'object' && !locked.value) Object.assign(form, draft);
+  const cached = loadDraft(draftKey.value);
+  const envelope =
+    cached !== null && typeof cached === 'object' && 'form' in cached ? cached : null;
+  const draft = envelope === null ? cached : envelope.form;
+  const savedLifecycle = envelope !== null && 'lifecycle' in envelope ? envelope.lifecycle : null;
+  if (
+    savedLifecycle === 'draft' ||
+    savedLifecycle === 'scheduled' ||
+    savedLifecycle === 'open' ||
+    savedLifecycle === 'closed' ||
+    savedLifecycle === 'archived'
+  ) {
+    baseLifecycle.value = savedLifecycle;
+  }
+  fillingForm = true;
+  if (draft !== null && typeof draft === 'object' && (!locked.value || savedLifecycle === 'draft'))
+    Object.assign(form, draft);
+  if (draft !== null && typeof draft === 'object' && locked.value) {
+    for (const field of ['description', 'endMode', 'closesAt', 'unlimitedNominations'] as const) {
+      const value: unknown = Reflect.get(draft, field);
+      if (typeof value === typeof form[field]) {
+        Object.assign(form, { [field]: value });
+      }
+    }
+  }
   if (
     draft !== null &&
     typeof draft === 'object' &&
@@ -222,14 +259,36 @@ const load = async () => {
       form.presetId = draft.presetId;
     }
   }
+  fillingForm = false;
+  if (draft !== null && typeof draft === 'object' && existing.value !== null) {
+    const cachedVersion =
+      envelope !== null &&
+      'settingsVersion' in envelope &&
+      typeof envelope.settingsVersion === 'number'
+        ? envelope.settingsVersion
+        : undefined;
+    baseSettingsVersion.value = cachedVersion;
+    if (cachedVersion === undefined || cachedVersion !== existing.value.settingsVersion) {
+      settingsConflict.value = true;
+      latestSettings.value = loaded;
+    }
+  }
+  ready.value = true;
 };
 onMounted(load);
 watch(routeSlug, load);
 
+const cacheForm = (value: Form = { ...form }) => {
+  saveDraft(draftKey.value, {
+    form: value,
+    settingsVersion: baseSettingsVersion.value,
+    lifecycle: baseLifecycle.value,
+  });
+};
 watch(
   () => ({ ...form }),
   (value) => {
-    if (!fillingForm) saveDraft(draftKey.value, value);
+    if (!fillingForm) cacheForm(value);
   },
   { flush: 'sync' },
 );
@@ -323,6 +382,7 @@ const run = async <T,>(
   busy.value = false;
   if (!result.ok) {
     error.value = result.error;
+    noteSettingsConflict(result.error);
     return null;
   }
   status.value = done;
@@ -332,6 +392,10 @@ const run = async <T,>(
 const afterSave = async (list: ListDto) => {
   clearDraft(draftKey.value);
   existing.value = list;
+  baseSettingsVersion.value = list.settingsVersion;
+  baseLifecycle.value = list.lifecycle;
+  settingsConflict.value = false;
+  latestSettings.value = null;
   if (list.slug !== routeSlug.value) {
     await router.replace({ name: 'edit-list', params: { slug: list.slug } });
   } else {
@@ -399,8 +463,85 @@ const participationSummary = computed(() =>
         .join(', ')}`,
 );
 
+const expectation = () =>
+  baseSettingsVersion.value === undefined
+    ? {}
+    : { expectedSettingsVersion: baseSettingsVersion.value };
+const noteSettingsConflict = (failure: ApiError) => {
+  if (failure.code !== 'lists.settings-changed') return;
+  settingsConflict.value = true;
+  latestSettings.value = null;
+  reviewing.value = false;
+  confirming.value = null;
+  void nextTick(() => conflictHeading.value?.focus());
+};
+const compareLatest = async () => {
+  if (existing.value === null || busy.value) return;
+  busy.value = true;
+  const result = await api.get<ListDetailDto>(
+    `/api/lists/${encodeURIComponent(existing.value.id)}`,
+  );
+  busy.value = false;
+  if (!result.ok) {
+    error.value = result.error;
+    return;
+  }
+  latestSettings.value = result.data;
+  error.value = null;
+};
+const comparison = computed(() => {
+  if (latestSettings.value === null || existing.value === null || form.sourceKind === null)
+    return [];
+  const mine: ListDto = {
+    ...existing.value,
+    lifecycle: baseLifecycle.value ?? existing.value.lifecycle,
+    ...config(form.sourceKind),
+    ...(baseLifecycle.value === 'draft'
+      ? { draftSchedule: draftSchedule() }
+      : {
+          schedule:
+            existing.value.schedule === null
+              ? null
+              : { ...existing.value.schedule, ...endChange() },
+        }),
+  };
+  return compareListSettings(latestSettings.value, mine, roleLabels.value);
+});
+const resolveSettingsConflict = (keepInput: boolean) => {
+  const latest = latestSettings.value;
+  if (latest === null) return;
+  existing.value = latest;
+  baseSettingsVersion.value = latest.settingsVersion;
+  baseLifecycle.value = latest.lifecycle;
+  sourcePermission.value = latest.itemSourceEditable;
+  snapshotsExpireAt.value = latest.snapshotsExpireAt;
+  if (!keepInput) fillFrom(latest);
+  else if (latest.lifecycle !== 'draft') {
+    const editable = {
+      description: form.description,
+      endMode: form.endMode,
+      closesAt: form.closesAt,
+      unlimitedNominations: form.unlimitedNominations,
+      ...(latest.itemSourceEditable
+        ? { sourceKind: form.sourceKind, presetId: form.presetId, presetCount: form.presetCount }
+        : {}),
+    };
+    fillFrom(latest);
+    Object.assign(form, editable);
+  }
+  settingsConflict.value = false;
+  latestSettings.value = null;
+  error.value = null;
+  locksAccepted.value = false;
+  namedScoresAccepted.value = false;
+  cacheForm();
+  status.value = keepInput
+    ? 'Your edits are kept. Review them, then save or review publication again. Nothing has been saved yet.'
+    : 'Latest saved settings loaded. Your previous unsaved input has been replaced.';
+};
+
 const reviewPublish = () => {
-  if (busy.value || validatedConfig() === null) return;
+  if (busy.value || settingsConflict.value || validatedConfig() === null) return;
   setupError.value = scheduleProblem() ?? '';
   if (setupError.value !== '') return;
   locksAccepted.value = false;
@@ -411,7 +552,7 @@ const reviewPublish = () => {
 };
 
 const save = async () => {
-  if (existing.value === null || busy.value) return;
+  if (existing.value === null || busy.value || settingsConflict.value) return;
   if (
     locked.value &&
     existing.value.maxNominationsPerMember !== null &&
@@ -440,7 +581,7 @@ const save = async () => {
       }
     : { ...input, draftSchedule: draftSchedule() };
   const list = await run(
-    () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
+    () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, { ...body, ...expectation() }),
     'Saved.',
   );
   if (list !== null) {
@@ -453,6 +594,7 @@ const schedule = async () => {
   if (
     existing.value === null ||
     busy.value ||
+    settingsConflict.value ||
     !reviewing.value ||
     !locksAccepted.value ||
     (form.scoreVisibility === 'public' && !namedScoresAccepted.value)
@@ -471,13 +613,18 @@ const schedule = async () => {
     const saved = await api.put<ListDto>(`/api/lists/${id}`, {
       ...input,
       draftSchedule: draftSchedule(),
+      ...expectation(),
     });
     if (!saved.ok) {
       error.value = saved.error;
+      noteSettingsConflict(saved.error);
       return;
     }
     draftSavedForPublish.value = true;
+    baseSettingsVersion.value = saved.data.settingsVersion;
+    cacheForm();
     const result = await api.post<ListDto>(`/api/lists/${id}/schedule`, {
+      ...expectation(),
       opensAt: form.opensMode === 'now' ? new Date().toISOString() : fromLocalInput(form.opensAt),
       nominationsCloseAt:
         form.entryMode === 'nominations' ? fromLocalInput(form.nominationsCloseAt) : null,
@@ -485,6 +632,7 @@ const schedule = async () => {
     });
     if (!result.ok) {
       error.value = result.error;
+      noteSettingsConflict(result.error);
       return;
     }
     reviewing.value = false;
@@ -522,48 +670,57 @@ const deleteList = async () => {
 };
 
 const archive = async () => {
-  if (existing.value === null) return;
+  if (existing.value === null || busy.value || settingsConflict.value) return;
   const id = existing.value.id;
   confirming.value = null;
-  const list = await run(() => api.post<ListDto>(`/api/lists/${id}/archive`), 'Archived.');
+  const list = await run(
+    () => api.post<ListDto>(`/api/lists/${id}/archive`, expectation()),
+    'Archived.',
+  );
   if (list !== null) await afterSave(list);
 };
 
 const closeVotingNow = async () => {
-  if (existing.value === null) return;
+  if (existing.value === null || busy.value || settingsConflict.value) return;
   const id = existing.value.id;
   confirming.value = null;
   const list = await run(
-    () => api.post<ListDto>(`/api/lists/${id}/close`),
+    () => api.post<ListDto>(`/api/lists/${id}/close`, expectation()),
     'Voting closed. Scores are final and the results are shown.',
   );
   if (list !== null) await afterSave(list);
 };
 
 const changeVisibility = async (visibility: 'public' | 'hidden') => {
-  if (existing.value === null) return;
+  if (existing.value === null || busy.value || settingsConflict.value) return;
   const id = existing.value.id;
   const list = await run(
-    () => api.put<ListDto>(`/api/lists/${id}/visibility`, { visibility }),
+    () => api.put<ListDto>(`/api/lists/${id}/visibility`, { visibility, ...expectation() }),
     visibility === 'hidden'
       ? 'Hidden: only Admins can see it now.'
       : 'Public: all members can see it.',
   );
-  if (list !== null) existing.value = list;
+  if (list !== null) {
+    existing.value = list;
+    baseSettingsVersion.value = list.settingsVersion;
+    cacheForm();
+  }
 };
 
 const makeScoresPrivate = async () => {
-  if (existing.value === null) return;
+  if (existing.value === null || busy.value || settingsConflict.value) return;
   const list = await run(
     () =>
       api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}/score-visibility`, {
         scoreVisibility: 'private',
+        ...expectation(),
       }),
     'Scores are private now.',
   );
   confirming.value = null;
   if (list !== null) {
     existing.value = list;
+    baseSettingsVersion.value = list.settingsVersion;
     form.scoreVisibility = 'private';
   }
 };
@@ -635,10 +792,62 @@ const importCsv = async () => {
       />
     </header>
 
+    <p v-if="!ready && error === null" role="status">Loading list settings…</p>
+    <ErrorNotice v-if="!ready" :error="error" />
     <p class="meta">
       Save a draft, review the member experience, then publish.
       <a :href="adminGuideUrl">Admin guide and FAQ</a>
     </p>
+    <section
+      v-if="settingsConflict"
+      class="card stack settings-conflict"
+      aria-labelledby="settings-conflict-heading"
+    >
+      <h2 id="settings-conflict-heading" ref="conflictHeading" tabindex="-1">
+        Compare before continuing
+      </h2>
+      <p role="alert">
+        This list may have changed since you started editing. Your input is still in the form; it
+        has not overwritten the saved settings. Compare the latest version before continuing.
+      </p>
+      <button type="button" :disabled="busy" @click="compareLatest">Compare latest settings</button>
+      <template v-if="latestSettings !== null">
+        <p>
+          Differences between the latest saved settings and your form (times in {{ timeZone }}):
+        </p>
+        <div v-for="row in comparison" :key="row.label" class="stack">
+          <h3>{{ row.label }}</h3>
+          <dl class="review-summary">
+            <dt>Latest saved</dt>
+            <dd>{{ row.latest }}</dd>
+            <dt>Your form</dt>
+            <dd>{{ row.yours }}</dd>
+          </dl>
+        </div>
+        <p v-if="comparison.length === 0">
+          The settings shown in your form match the latest saved settings.
+        </p>
+        <p v-if="latestSettings.lifecycle !== baseLifecycle">
+          The list’s status has changed. Load the latest settings to see what can still be edited.
+        </p>
+        <div class="actions">
+          <button type="button" :disabled="busy" @click="resolveSettingsConflict(false)">
+            Replace my input with latest settings
+          </button>
+          <button
+            type="button"
+            :disabled="busy || latestSettings.lifecycle !== baseLifecycle"
+            @click="resolveSettingsConflict(true)"
+          >
+            Keep my input after comparison
+          </button>
+        </div>
+        <p class="meta">
+          Keeping your input does not save or publish it. Save again only after reviewing these
+          differences.
+        </p>
+      </template>
+    </section>
     <p v-if="!locked" class="notice">
       Publishing fixes most settings immediately, even if participation opens later. You will review
       the choices before publishing.
@@ -670,7 +879,7 @@ const importCsv = async () => {
       >, as TMDB’s terms require. Titles become “details removed”; scores and ranks stay.
     </p>
 
-    <nav v-if="!deleting" class="editor-index" aria-label="List settings">
+    <nav v-if="ready && !deleting" class="editor-index" aria-label="List settings">
       <a href="#editor-basics">Basics</a>
       <a href="#editor-items">Items</a>
       <a href="#editor-rating">Rating</a>
@@ -684,7 +893,7 @@ const importCsv = async () => {
     </nav>
 
     <form
-      v-if="!deleting"
+      v-if="ready && !deleting"
       ref="editorForm"
       class="stack"
       @submit.prevent="existing === null ? create() : save()"
@@ -1081,14 +1290,14 @@ const importCsv = async () => {
           Create draft
         </button>
         <template v-else-if="!finished">
-          <button type="submit" class="button" :disabled="busy">
+          <button type="submit" class="button" :disabled="busy || settingsConflict">
             {{ locked ? 'Save changes' : 'Save draft' }}
           </button>
           <button
             v-if="!locked"
             type="button"
             class="button button--primary"
-            :disabled="busy || publishBlocker !== null"
+            :disabled="busy || settingsConflict || publishBlocker !== null"
             data-review-publish
             @click="reviewPublish"
           >
@@ -1106,7 +1315,7 @@ const importCsv = async () => {
     </form>
 
     <section
-      v-if="existing !== null && existing.lifecycle !== 'draft' && !deleting"
+      v-if="ready && existing !== null && existing.lifecycle !== 'draft' && !deleting"
       class="card stack status-section"
       aria-labelledby="status-heading"
     >
@@ -1116,7 +1325,7 @@ const importCsv = async () => {
         <button
           type="button"
           class="button"
-          :disabled="busy"
+          :disabled="busy || settingsConflict"
           @click="confirming = 'private-scores'"
         >
           Make scores private
@@ -1155,7 +1364,7 @@ const importCsv = async () => {
           }}
         </button>
       </div>
-      <fieldset class="stack">
+      <fieldset class="stack" :disabled="busy || settingsConflict">
         <legend class="legend--small">Who can see this list</legend>
         <div class="choices">
           <label class="choice">
@@ -1197,7 +1406,7 @@ const importCsv = async () => {
           v-if="existing.lifecycle === 'open'"
           type="button"
           class="button"
-          :disabled="busy"
+          :disabled="busy || settingsConflict"
           @click="confirming = 'close'"
         >
           Close voting now
@@ -1206,7 +1415,7 @@ const importCsv = async () => {
           v-if="existing.lifecycle !== 'archived'"
           type="button"
           class="button button--danger"
-          :disabled="busy"
+          :disabled="busy || settingsConflict"
           @click="confirming = 'archive'"
         >
           Archive
@@ -1371,7 +1580,7 @@ const importCsv = async () => {
       <p v-if="setupError !== ''" class="notice notice--error" role="alert">{{ setupError }}</p>
     </ConfirmDialog>
 
-    <section v-if="existing !== null" class="card stack" aria-labelledby="danger-heading">
+    <section v-if="ready && existing !== null" class="card stack" aria-labelledby="danger-heading">
       <h2 id="danger-heading" class="danger-text">Danger zone</h2>
       <p>
         Permanently delete this list and all its entries and scores. Unlike archiving, deletion

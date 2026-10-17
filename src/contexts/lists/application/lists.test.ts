@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { anonymous, type Actor, type MemberId, type RoleId } from '../../../shared/kernel/index.ts';
 import { FixedClock, SequentialIds } from '../../../shared/kernel/testing/index.ts';
 import { nominationToken, type EntryId } from '../domain/entry.ts';
@@ -128,6 +128,131 @@ describe('Admin-only use cases', () => {
 });
 
 describe('creating and editing', () => {
+  test('stale settings edits conflict instead of overwriting another admin, including on retry', async () => {
+    const created = await create();
+    if (!created.ok) throw new Error('fixture');
+    const version = created.value.settingsVersion;
+    expect(version).toBe(0);
+    const input = { list: created.value.id, expectedSettingsVersion: 0 };
+    const changed = await makeEditList(deps)(admin, {
+      ...input,
+      edit: { description: 'First admin' },
+    });
+    expect(changed.ok && changed.value.settingsVersion).toBe(1);
+    const stale = await makeEditList(deps)(admin, {
+      ...input,
+      edit: { description: 'Second admin' },
+    });
+    expect(!stale.ok && stale.error.code).toBe('lists.settings-changed');
+    const loaded = await makeGetList(deps)(admin, { list: input.list });
+    expect(loaded.ok && loaded.value.description).toBe('First admin');
+
+    const save = deps.lists.save.bind(deps.lists);
+    let raced = false;
+    const spy = vi.spyOn(deps.lists, 'save').mockImplementation(async (list, expected) => {
+      if (!raced) {
+        raced = true;
+        await save(
+          { ...list, config: { ...list.config, description: 'Concurrent winner' } },
+          expected,
+        );
+        return false;
+      }
+      return save(list, expected);
+    });
+    const racedResult = await makeEditList(deps)(admin, {
+      list: input.list,
+      expectedSettingsVersion: 1,
+      edit: { description: 'Would overwrite winner' },
+    });
+    expect(!racedResult.ok && racedResult.error.code).toBe('lists.settings-changed');
+    spy.mockRestore();
+    expect((await deps.lists.get(input.list))?.value.config.description).toBe('Concurrent winner');
+  });
+
+  test('publication rejects stale review settings but housekeeping writes do not stale the editor', async () => {
+    const created = await create();
+    if (!created.ok) throw new Error('fixture');
+    const id = created.value.id;
+    const stored = await deps.lists.get(id);
+    if (stored === null) throw new Error('fixture');
+    await deps.lists.save({ ...stored.value, entryWriteToken: 'housekeeping' }, stored.version);
+    const edited = await makeEditList(deps)(admin, {
+      list: id,
+      expectedSettingsVersion: 0,
+      edit: { description: 'Latest' },
+    });
+    expect(edited.ok).toBe(true);
+    const stale = await makeScheduleList(deps)(admin, {
+      list: id,
+      schedule,
+      expectedSettingsVersion: 0,
+    });
+    expect(!stale.ok && stale.error.code).toBe('lists.settings-changed');
+    const published = await makeScheduleList(deps)(admin, {
+      list: id,
+      schedule,
+      expectedSettingsVersion: 1,
+    });
+    expect(published.ok && published.value.settingsVersion).toBe(2);
+  });
+
+  test('publication checks again after entry-write admission when settings changed in the gap', async () => {
+    const created = await create();
+    if (!created.ok) throw new Error('fixture');
+    const begin = deps.lists.beginEntryWrite.bind(deps.lists);
+    const spy = vi.spyOn(deps.lists, 'beginEntryWrite').mockImplementation(async (id, token) => {
+      await begin(id, token);
+      const changed = await makeEditList(deps)(admin, {
+        list: id,
+        edit: { description: 'Changed after review' },
+      });
+      expect(changed.ok).toBe(true);
+    });
+    try {
+      const result = await makeScheduleList(deps)(admin, {
+        list: created.value.id,
+        schedule,
+        expectedSettingsVersion: 0,
+      });
+      expect(!result.ok && result.error.code).toBe('lists.settings-changed');
+      const stored = await deps.lists.get(created.value.id);
+      expect(stored?.value.phase).toBe('draft');
+      expect(stored?.value.config.description).toBe('Changed after review');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('all editor controls reject stale settings and members never receive the revision', async () => {
+    await openList();
+    const view = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
+    if (!view.ok) throw new Error('fixture');
+    expect(view.value.settingsVersion).toBe(1);
+    expect(
+      (
+        await makeSetVisibility(deps)(admin, {
+          list: view.value.id,
+          visibility: 'hidden',
+          expectedSettingsVersion: 1,
+        })
+      ).ok,
+    ).toBe(true);
+    const stale = { list: view.value.id, expectedSettingsVersion: 1 };
+    const results = await Promise.all([
+      makeCloseVoting(deps)(admin, stale),
+      makeArchiveList(deps)(admin, stale),
+      makeSetVisibility(deps)(admin, { ...stale, visibility: 'public' }),
+      makeSetScoreVisibility(deps)(admin, { ...stale, scoreVisibility: 'private' }),
+    ]);
+    expect(results.map((result) => !result.ok && result.error.code)).toEqual(
+      Array(4).fill('lists.settings-changed'),
+    );
+    await makeSetVisibility(deps)(admin, { list: stale.list, visibility: 'public' });
+    const memberView = await makeGetList(deps)(ada, { list: stale.list });
+    expect(memberView.ok && memberView.value.settingsVersion).toBeUndefined();
+  });
+
   test.each([1, 12])('changes an unused published list source on day %s', async (day) => {
     const list = await openList();
     clock.set(at(day));

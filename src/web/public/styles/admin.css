@@ -27,6 +27,12 @@
   background: var(--surface-2);
 }
 
+.settings-conflict dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 /* Section links, sticky under the header like the list tabs. */
 .editor-index {
   position: sticky;

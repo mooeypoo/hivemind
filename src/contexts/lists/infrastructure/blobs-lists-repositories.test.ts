@@ -42,6 +42,19 @@ const draft = newList(
 );
 
 describe('Blobs lists repositories', () => {
+  test('settings revisions round-trip and legacy records start at zero', async () => {
+    const store = blobs.store('settings-revisions');
+    const repo = createBlobsListRepository(store);
+    expect(await repo.save({ ...draft, settingsVersion: 7 }, null)).toBe(true);
+    expect((await repo.get(listId))?.value.settingsVersion).toBe(7);
+    const record: unknown = await store.get(`list/${listId}`, { type: 'json' });
+    if (typeof record !== 'object' || record === null || !('settingsVersion' in record))
+      throw new Error('fixture');
+    const { settingsVersion, ...legacy } = record;
+    expect(settingsVersion).toBe(7);
+    await store.setJSON(`list/${listId}`, legacy);
+    expect((await repo.get(listId))?.value.settingsVersion).toBe(0);
+  });
   test('draft schedules round-trip with nullable opening and older records have no plan', async () => {
     const store = blobs.store('draft-schedules');
     const repo = createBlobsListRepository(store);

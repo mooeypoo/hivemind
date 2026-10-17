@@ -77,6 +77,8 @@ export type Lifecycle = 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
 
 export interface List {
   readonly id: ListId;
+  /** Admin settings only; participation and technical write fencing do not advance this. */
+  readonly settingsVersion?: number;
   readonly config: ListConfig;
   readonly schedule: Schedule | null;
   readonly draftSchedule?: DraftSchedule | null;
@@ -188,6 +190,7 @@ export const validateDraftSchedule = (plan: DraftSchedule): Result<DraftSchedule
 
 export const newList = (id: ListId, config: ListConfig, now: Date): List => ({
   id,
+  settingsVersion: 0,
   config,
   schedule: null,
   draftSchedule: null,
@@ -210,7 +213,13 @@ export const publish = (list: List, schedule: Schedule, now: Date): Result<List,
   if (list.phase !== 'draft') return err(listsErrors.notADraft);
   const valid = validateSchedule(schedule, now);
   return valid.ok
-    ? ok({ ...list, schedule: valid.value, draftSchedule: null, phase: 'published' })
+    ? ok({
+        ...list,
+        settingsVersion: (list.settingsVersion ?? 0) + 1,
+        schedule: valid.value,
+        draftSchedule: null,
+        phase: 'published',
+      })
     : valid;
 };
 
@@ -220,7 +229,12 @@ export const publish = (list: List, schedule: Schedule, now: Date): Result<List,
  */
 export const archive = (list: List, now: Date): Result<List, DomainError> =>
   list.phase === 'published'
-    ? ok({ ...list, phase: 'archived', archivedAt: now })
+    ? ok({
+        ...list,
+        settingsVersion: (list.settingsVersion ?? 0) + 1,
+        phase: 'archived',
+        archivedAt: now,
+      })
     : err(listsErrors.notPublished);
 
 /**
@@ -229,7 +243,11 @@ export const archive = (list: List, now: Date): Result<List, DomainError> =>
  */
 export const closeVoting = (list: List, now: Date): Result<List, DomainError> =>
   lifecycleOf(list, now) === 'open' && list.schedule !== null
-    ? ok({ ...list, schedule: { ...list.schedule, closesAt: now } })
+    ? ok({
+        ...list,
+        settingsVersion: (list.settingsVersion ?? 0) + 1,
+        schedule: { ...list.schedule, closesAt: now },
+      })
     : err(listsErrors.notOpen);
 
 /** A change to a list. `closesAt` moves the end; a live cap can only be removed, never restored. */
@@ -298,6 +316,7 @@ export const editList = (
   return config.ok
     ? ok({
         ...list,
+        settingsVersion: (list.settingsVersion ?? 0) + 1,
         config: config.value,
         schedule,
         ...(draftSchedule === undefined ? {} : { draftSchedule }),
@@ -331,11 +350,16 @@ export const changeScoreVisibility = (
 ): Result<List, DomainError> =>
   scoreVisibility === 'public' && lifecycleOf(list, now) !== 'draft'
     ? err(listsErrors.scoresPrivateOnly)
-    : ok({ ...list, config: { ...list.config, scoreVisibility } });
+    : ok({
+        ...list,
+        settingsVersion: (list.settingsVersion ?? 0) + 1,
+        config: { ...list.config, scoreVisibility },
+      });
 
 /** Hidden lists exist only for Admins. */
 export const setVisibility = (list: List, visibility: Visibility): List => ({
   ...list,
+  settingsVersion: (list.settingsVersion ?? 0) + 1,
   visibility,
 });
 

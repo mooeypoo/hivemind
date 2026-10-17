@@ -13,6 +13,7 @@ import { editList, type ListEdit } from '../domain/list.ts';
 import { findList } from './find-list.ts';
 import type { Catalog, EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
+import { checkSettingsVersion, type SettingsExpectation } from './settings-version.ts';
 
 export interface EditListDeps {
   readonly lists: ListRepository;
@@ -24,13 +25,15 @@ export interface EditListDeps {
 
 export const makeEditList =
   (deps: EditListDeps) =>
-  (actor: Actor, input: { readonly list: string; readonly edit: ListEdit }) =>
+  (actor: Actor, input: { readonly list: string; readonly edit: ListEdit } & SettingsExpectation) =>
     withConflictRetry(async (): Promise<Result<ListView, DomainError>> => {
       const admin = requireAdmin(actor);
       if (!admin.ok) return admin;
       const found = await findList(deps, admin.value, input.list);
       if (!found.ok) return found;
       const before = found.value.value;
+      const expected = checkSettingsVersion(before, input);
+      if (!expected.ok) return expected;
       const now = deps.clock.now();
 
       const changesSource =

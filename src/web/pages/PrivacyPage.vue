@@ -58,6 +58,10 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       member identity or scores. Active write markers are normally removed after completion; an
       interrupted write may leave its marker for an operator to check.
     </p>
+    <p>
+      Each list also keeps a settings version number so one admin’s old editor cannot silently
+      overwrite newer changes. This number identifies no admin and records no edit history.
+    </p>
 
     <h2>What we never store</h2>
     <ul>
