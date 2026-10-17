@@ -19,6 +19,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ListActivity from '../components/ListActivity.vue';
 import AppDialog from '../components/ui/AppDialog.vue';
 import ExternalLink from '../components/ui/ExternalLink.vue';
+import FixedSettings from '../components/ui/FixedSettings.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { formatDateTime, fromLocalInput, toLocalInput } from '../lib/datetime.ts';
@@ -967,7 +968,11 @@ const importCsv = async () => {
       >, as TMDB’s terms require. Titles become “details removed”; scores and ranks stay.
     </p>
 
-    <nav v-if="ready && !deleting && showingSetup" class="editor-index" aria-label="List settings">
+    <nav
+      v-if="ready && !deleting && showingSetup && !locked"
+      class="editor-index"
+      aria-label="List settings"
+    >
       <a href="#editor-basics">Basics</a>
       <a href="#editor-items">Items</a>
       <a href="#editor-rating">Rating</a>
@@ -1043,299 +1048,323 @@ const importCsv = async () => {
       <div class="stack editor-setup" :class="{ 'editor-setup--collapsed': !showingSetup }">
         <fieldset id="editor-basics" class="card stack" :disabled="finished">
           <legend>Basics</legend>
-          <p class="meta"><span class="pill">Fixed when published</span> Title and address.</p>
-          <label for="title">Title</label>
-          <input
-            id="title"
-            v-model="form.title"
-            type="text"
-            maxlength="120"
-            required
-            :disabled="locked"
-          />
-
-          <label for="slug">Address</label>
-          <div class="input-prefix">
-            <span aria-hidden="true">/lists/</span>
+          <FixedSettings :fixed="locked" label="Title and address">
+            <p class="meta"><span class="pill">Fixed when published</span> Title and address.</p>
+            <label for="title">Title</label>
             <input
-              id="slug"
-              v-model="form.slug"
+              id="title"
+              v-model="form.title"
               type="text"
-              maxlength="60"
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
+              maxlength="120"
               required
-              aria-describedby="slug-hint"
               :disabled="locked"
-              @input="form.slugEdited = true"
             />
-          </div>
-          <p id="slug-hint" class="meta">Lowercase letters, digits and hyphens.</p>
 
-          <label for="description">Description</label>
-          <p class="meta">
-            <span class="pill">Editable until voting closes</span> Description only.
-          </p>
-          <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
-        </fieldset>
-
-        <fieldset id="editor-items" class="card stack" :disabled="sourceLocked">
-          <legend>Items</legend>
-          <p class="meta">Where do the things in this list come from?</p>
-          <p class="meta">
-            <span class="pill">{{ sourceLocked ? 'Locked' : 'Editable while unused' }}</span>
-            Item type locks when the first entry is added, even if later withdrawn. A collection
-            included in full locks when published. Finished lists cannot change item type.
-          </p>
-          <p v-if="locked && itemSourceEditable" class="meta">
-            This list is unused. You can change its item source until the first entry is added.
-            Published lists keep their nomination mode.
-          </p>
-          <p v-else-if="sourceLocked && !finished" class="meta">
-            The source is locked once entries have been added, including withdrawn entries.
-            Published seeded lists also keep their source. An unfinished entry write temporarily
-            locks the source.
-          </p>
-          <div class="source-choices" role="radiogroup" aria-label="Item source">
-            <label v-for="kind in sources" :key="kind" class="choice source-choice">
-              <input v-model="form.sourceKind" type="radio" name="source" :value="kind" />
-              <span>
-                <strong>{{ sourceLabel[kind] }}</strong>
-                <span class="source-explanation">{{ sourceExplanation[kind] }}</span>
-              </span>
-            </label>
-          </div>
-
-          <template v-if="form.sourceKind === 'preset'">
-            <p v-if="form.presetId !== null" class="notice">
-              Using an imported CSV<template v-if="form.presetCount !== null">
-                with {{ form.presetCount }} items</template
-              >. Import another below to replace it.
-            </p>
-            <label for="csv">CSV</label>
-            <textarea
-              id="csv"
-              v-model="csv"
-              rows="6"
-              aria-describedby="csv-hint"
-              placeholder="title,subtitle&#10;OK Computer,Radiohead"
-            />
-            <p id="csv-hint" class="meta">
-              First row: <code>title</code> or <code>title,subtitle</code>. Up to 200 rows.
-            </p>
-            <label for="csv-file">Or choose a file</label>
-            <input id="csv-file" type="file" accept=".csv,text/csv" @change="readCsvFile" />
-            <div class="actions">
-              <button type="button" class="button" :disabled="csv.trim() === ''" @click="importCsv">
-                Import CSV
-              </button>
-            </div>
-            <ErrorNotice :error="csvError" />
-
-            <p class="meta">How should members use these items?</p>
-            <p class="meta">
-              <span class="pill">Fixed when published</span> How items enter the list.
-            </p>
-            <div class="choices" role="radiogroup" aria-label="Entry mode">
-              <label class="choice">
-                <input
-                  v-model="form.entryMode"
-                  type="radio"
-                  name="mode"
-                  value="seeded"
-                  :disabled="locked"
-                />
-                Rate them all: every item is in the list from the start
-              </label>
-              <label class="choice">
-                <input
-                  v-model="form.entryMode"
-                  type="radio"
-                  name="mode"
-                  value="nominations"
-                  :disabled="locked"
-                />
-                Nominate from them: members pick which items go in
-              </label>
-            </div>
-          </template>
-        </fieldset>
-
-        <fieldset id="editor-rating" class="card stack" :disabled="locked">
-          <legend>Rating</legend>
-          <p class="meta">
-            <span class="pill">Fixed when published</span>
-            Score range, votes needed for a rank, standings timing and nomination names.
-          </p>
-          <div class="row">
-            <div class="stack">
-              <label for="scale-min">Lowest score</label>
+            <label for="slug">Address</label>
+            <div class="input-prefix">
+              <span aria-hidden="true">/lists/</span>
               <input
-                id="scale-min"
-                v-model.number="form.scaleMin"
-                type="number"
-                min="0"
-                max="99"
+                id="slug"
+                v-model="form.slug"
+                type="text"
+                maxlength="60"
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
                 required
+                aria-describedby="slug-hint"
+                :disabled="locked"
+                @input="form.slugEdited = true"
               />
             </div>
-            <div class="stack">
-              <label for="scale-max">Highest score</label>
+            <p id="slug-hint" class="meta">Lowercase letters, digits and hyphens.</p>
+          </FixedSettings>
+
+          <FixedSettings :fixed="finished" label="Description">
+            <label for="description">Description</label>
+            <p class="meta">
+              <span class="pill">Editable until voting closes</span> Description only.
+            </p>
+            <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
+          </FixedSettings>
+        </fieldset>
+
+        <FixedSettings :fixed="sourceLocked" label="Items">
+          <fieldset id="editor-items" class="card stack" :disabled="sourceLocked">
+            <legend>Items</legend>
+            <p class="meta">Where do the things in this list come from?</p>
+            <p class="meta">
+              <span class="pill">{{ sourceLocked ? 'Locked' : 'Editable while unused' }}</span>
+              Item type locks when the first entry is added, even if later withdrawn. A collection
+              included in full locks when published. Finished lists cannot change item type.
+            </p>
+            <p v-if="locked && itemSourceEditable" class="meta">
+              This list is unused. You can change its item source until the first entry is added.
+              Published lists keep their nomination mode.
+            </p>
+            <p v-else-if="sourceLocked && !finished" class="meta">
+              The source is locked once entries have been added, including withdrawn entries.
+              Published seeded lists also keep their source. An unfinished entry write temporarily
+              locks the source.
+            </p>
+            <div class="source-choices" role="radiogroup" aria-label="Item source">
+              <label v-for="kind in sources" :key="kind" class="choice source-choice">
+                <input v-model="form.sourceKind" type="radio" name="source" :value="kind" />
+                <span>
+                  <strong>{{ sourceLabel[kind] }}</strong>
+                  <span class="source-explanation">{{ sourceExplanation[kind] }}</span>
+                </span>
+              </label>
+            </div>
+
+            <template v-if="form.sourceKind === 'preset'">
+              <p v-if="form.presetId !== null" class="notice">
+                Using an imported CSV<template v-if="form.presetCount !== null">
+                  with {{ form.presetCount }} items</template
+                >. Import another below to replace it.
+              </p>
+              <label for="csv">CSV</label>
+              <textarea
+                id="csv"
+                v-model="csv"
+                rows="6"
+                aria-describedby="csv-hint"
+                placeholder="title,subtitle&#10;OK Computer,Radiohead"
+              />
+              <p id="csv-hint" class="meta">
+                First row: <code>title</code> or <code>title,subtitle</code>. Up to 200 rows.
+              </p>
+              <label for="csv-file">Or choose a file</label>
+              <input id="csv-file" type="file" accept=".csv,text/csv" @change="readCsvFile" />
+              <div class="actions">
+                <button
+                  type="button"
+                  class="button"
+                  :disabled="csv.trim() === ''"
+                  @click="importCsv"
+                >
+                  Import CSV
+                </button>
+              </div>
+              <ErrorNotice :error="csvError" />
+
+              <p class="meta">How should members use these items?</p>
+              <p class="meta">
+                <span class="pill">Fixed when published</span> How items enter the list.
+              </p>
+              <div class="choices" role="radiogroup" aria-label="Entry mode">
+                <label class="choice">
+                  <input
+                    v-model="form.entryMode"
+                    type="radio"
+                    name="mode"
+                    value="seeded"
+                    :disabled="locked"
+                  />
+                  Rate them all: every item is in the list from the start
+                </label>
+                <label class="choice">
+                  <input
+                    v-model="form.entryMode"
+                    type="radio"
+                    name="mode"
+                    value="nominations"
+                    :disabled="locked"
+                  />
+                  Nominate from them: members pick which items go in
+                </label>
+              </div>
+            </template>
+          </fieldset>
+        </FixedSettings>
+        <FixedSettings :fixed="locked" label="Rating">
+          <fieldset id="editor-rating" class="card stack" :disabled="locked">
+            <legend>Rating</legend>
+            <p class="meta">
+              <span class="pill">Fixed when published</span>
+              Score range, votes needed for a rank, standings timing and nomination names.
+            </p>
+            <div class="row">
+              <div class="stack">
+                <label for="scale-min">Lowest score</label>
+                <input
+                  id="scale-min"
+                  v-model.number="form.scaleMin"
+                  type="number"
+                  min="0"
+                  max="99"
+                  required
+                />
+              </div>
+              <div class="stack">
+                <label for="scale-max">Highest score</label>
+                <input
+                  id="scale-max"
+                  v-model.number="form.scaleMax"
+                  type="number"
+                  min="1"
+                  max="100"
+                  required
+                />
+              </div>
+            </div>
+
+            <label for="min-votes">Votes before a rank is confirmed</label>
+            <input
+              id="min-votes"
+              v-model.number="form.minVotes"
+              type="number"
+              min="0"
+              max="1000"
+              required
+              aria-describedby="min-votes-hint"
+            />
+            <p id="min-votes-hint" class="meta">
+              Members can vote the whole time the list is open. Entries with fewer votes than this
+              don’t get a place yet: they wait below the ranking, so a few early 10s can’t top the
+              list.
+            </p>
+
+            <p class="field-label">When can members see the results?</p>
+            <div class="choices" role="radiogroup" aria-label="Results visibility">
+              <label class="choice">
+                <input
+                  v-model="form.resultsVisibility"
+                  type="radio"
+                  name="visibility"
+                  value="live"
+                />
+                While voting is open
+              </label>
+              <label class="choice">
+                <input
+                  v-model="form.resultsVisibility"
+                  type="radio"
+                  name="visibility"
+                  value="after-close"
+                />
+                Only after voting closes
+              </label>
+            </div>
+
+            <label class="choice">
+              <input v-model="form.showNominators" type="checkbox" />
+              Show who nominated each entry
+            </label>
+            <p class="meta">
+              Hiding nomination names does not hide individual scores. These are separate choices.
+            </p>
+          </fieldset>
+        </FixedSettings>
+        <FixedSettings :fixed="locked" label="Individual score visibility">
+          <fieldset id="editor-scores" class="card stack" :disabled="locked">
+            <legend>Scores</legend>
+            <p class="meta">
+              <span class="pill">One-way change after publishing</span>
+              Named scores can become private, but private scores can never become named.
+            </p>
+            <div class="choices" role="radiogroup" aria-label="Score visibility">
+              <label class="choice">
+                <input
+                  v-model="form.scoreVisibility"
+                  type="radio"
+                  name="score-visibility"
+                  value="private"
+                />
+                Private: each member sees only their own score
+              </label>
+              <label class="choice">
+                <input
+                  v-model="form.scoreVisibility"
+                  type="radio"
+                  name="score-visibility"
+                  value="public"
+                />
+                Named: community members can see who gave what score
+              </label>
+            </div>
+            <p class="meta">
+              Private scores still count toward standings. Named scores appear only when standings
+              are visible. Admins cannot inspect other members' private scores.
+            </p>
+          </fieldset>
+        </FixedSettings>
+        <FixedSettings :fixed="locked" label="Who can take part">
+          <fieldset id="editor-roles" class="card stack" :disabled="locked">
+            <legend>Who can take part</legend>
+            <p class="meta"><span class="pill">Fixed when published</span> Participation roles.</p>
+            <p id="roles-hint" class="meta">
+              Leave every role unticked to let all members take part. Otherwise, members need at
+              least one of the ticked roles.
+            </p>
+            <p class="meta">
+              Roles restrict nominating and rating, not viewing. Other signed-in community members
+              can still see a published list unless it is hidden.
+            </p>
+            <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
+              <label v-for="role in roleChoices" :key="role.roleId" class="choice">
+                <input v-model="form.requiredRoleIds" type="checkbox" :value="role.roleId" />
+                {{ role.name }}
+              </label>
+            </div>
+            <p class="meta">
+              Role not listed?
+              <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
+              back.
+            </p>
+          </fieldset>
+        </FixedSettings>
+        <FixedSettings
+          v-if="form.entryMode === 'nominations'"
+          :fixed="locked && (finished || existing?.maxNominationsPerMember === null)"
+          label="Nomination limit"
+        >
+          <fieldset
+            v-if="form.entryMode === 'nominations'"
+            id="editor-nominations"
+            class="card stack"
+            :disabled="finished"
+          >
+            <legend>Nominations</legend>
+            <p class="meta">
+              <span class="pill">Remove-only after publishing</span>
+              A limit can become unlimited, but cannot be lowered, increased to another finite
+              limit, added or restored.
+            </p>
+            <template v-if="locked">
+              <p v-if="existing?.maxNominationsPerMember !== null" class="meta">
+                You can remove this limit to allow unlimited nominations. After saving, the limit
+                cannot be restored; existing nominations stay as they are.
+              </p>
+              <p v-else class="meta">
+                Nominations are already unlimited; a cap cannot be added after publishing.
+              </p>
+              <label class="choice" for="unlimited">
+                <input
+                  id="unlimited"
+                  v-model="form.unlimitedNominations"
+                  type="checkbox"
+                  :disabled="existing?.maxNominationsPerMember === null"
+                />
+                Unlimited
+              </label>
+            </template>
+            <template v-else>
+              <label for="cap">Nominations per member</label>
               <input
-                id="scale-max"
-                v-model.number="form.scaleMax"
+                id="cap"
+                v-model.number="form.maxNominationsPerMember"
                 type="number"
                 min="1"
-                max="100"
-                required
+                max="50"
+                :required="!form.unlimitedNominations"
+                :disabled="form.unlimitedNominations"
               />
-            </div>
-          </div>
-
-          <label for="min-votes">Votes before a rank is confirmed</label>
-          <input
-            id="min-votes"
-            v-model.number="form.minVotes"
-            type="number"
-            min="0"
-            max="1000"
-            required
-            aria-describedby="min-votes-hint"
-          />
-          <p id="min-votes-hint" class="meta">
-            Members can vote the whole time the list is open. Entries with fewer votes than this
-            don’t get a place yet: they wait below the ranking, so a few early 10s can’t top the
-            list.
-          </p>
-
-          <p class="field-label">When can members see the results?</p>
-          <div class="choices" role="radiogroup" aria-label="Results visibility">
-            <label class="choice">
-              <input v-model="form.resultsVisibility" type="radio" name="visibility" value="live" />
-              While voting is open
-            </label>
-            <label class="choice">
-              <input
-                v-model="form.resultsVisibility"
-                type="radio"
-                name="visibility"
-                value="after-close"
-              />
-              Only after voting closes
-            </label>
-          </div>
-
-          <label class="choice">
-            <input v-model="form.showNominators" type="checkbox" />
-            Show who nominated each entry
-          </label>
-          <p class="meta">
-            Hiding nomination names does not hide individual scores. These are separate choices.
-          </p>
-        </fieldset>
-
-        <fieldset id="editor-scores" class="card stack" :disabled="locked">
-          <legend>Scores</legend>
-          <p class="meta">
-            <span class="pill">One-way change after publishing</span>
-            Named scores can become private, but private scores can never become named.
-          </p>
-          <div class="choices" role="radiogroup" aria-label="Score visibility">
-            <label class="choice">
-              <input
-                v-model="form.scoreVisibility"
-                type="radio"
-                name="score-visibility"
-                value="private"
-              />
-              Private: each member sees only their own score
-            </label>
-            <label class="choice">
-              <input
-                v-model="form.scoreVisibility"
-                type="radio"
-                name="score-visibility"
-                value="public"
-              />
-              Named: community members can see who gave what score
-            </label>
-          </div>
-          <p class="meta">
-            Private scores still count toward standings. Named scores appear only when standings are
-            visible. Admins cannot inspect other members' private scores.
-          </p>
-        </fieldset>
-
-        <fieldset id="editor-roles" class="card stack" :disabled="locked">
-          <legend>Who can take part</legend>
-          <p class="meta"><span class="pill">Fixed when published</span> Participation roles.</p>
-          <p id="roles-hint" class="meta">
-            Leave every role unticked to let all members take part. Otherwise, members need at least
-            one of the ticked roles.
-          </p>
-          <p class="meta">
-            Roles restrict nominating and rating, not viewing. Other signed-in community members can
-            still see a published list unless it is hidden.
-          </p>
-          <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
-            <label v-for="role in roleChoices" :key="role.roleId" class="choice">
-              <input v-model="form.requiredRoleIds" type="checkbox" :value="role.roleId" />
-              {{ role.name }}
-            </label>
-          </div>
-          <p class="meta">
-            Role not listed?
-            <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
-            back.
-          </p>
-        </fieldset>
-
-        <fieldset
-          v-if="form.entryMode === 'nominations'"
-          id="editor-nominations"
-          class="card stack"
-          :disabled="finished"
-        >
-          <legend>Nominations</legend>
-          <p class="meta">
-            <span class="pill">Remove-only after publishing</span>
-            A limit can become unlimited, but cannot be lowered, increased to another finite limit,
-            added or restored.
-          </p>
-          <template v-if="locked">
-            <p v-if="existing?.maxNominationsPerMember !== null" class="meta">
-              You can remove this limit to allow unlimited nominations. After saving, the limit
-              cannot be restored; existing nominations stay as they are.
-            </p>
-            <p v-else class="meta">
-              Nominations are already unlimited; a cap cannot be added after publishing.
-            </p>
-            <label class="choice" for="unlimited">
-              <input
-                id="unlimited"
-                v-model="form.unlimitedNominations"
-                type="checkbox"
-                :disabled="existing?.maxNominationsPerMember === null"
-              />
-              Unlimited
-            </label>
-          </template>
-          <template v-else>
-            <label for="cap">Nominations per member</label>
-            <input
-              id="cap"
-              v-model.number="form.maxNominationsPerMember"
-              type="number"
-              min="1"
-              max="50"
-              :required="!form.unlimitedNominations"
-              :disabled="form.unlimitedNominations"
-            />
-            <label class="choice" for="unlimited">
-              <input id="unlimited" v-model="form.unlimitedNominations" type="checkbox" />
-              Unlimited
-            </label>
-          </template>
-        </fieldset>
+              <label class="choice" for="unlimited">
+                <input id="unlimited" v-model="form.unlimitedNominations" type="checkbox" />
+                Unlimited
+              </label>
+            </template>
+          </fieldset>
+        </FixedSettings>
       </div>
 
       <fieldset
@@ -1352,71 +1381,76 @@ const importCsv = async () => {
           participation. Dates stay editable in draft and are checked again before publishing.
         </p>
 
-        <fieldset class="stack" :disabled="locked">
-          <legend class="legend--small">Opens</legend>
-          <p class="meta"><span class="pill">Fixed when published</span> Participation opening.</p>
-          <p class="meta">
-            From this moment eligible members can nominate and rate. A published list is visible to
-            signed-in members before opening, unless hidden.
-          </p>
-          <div class="choices">
-            <label class="choice">
-              <input v-model="form.opensMode" type="radio" name="opens" value="now" />
-              Right away when published
-            </label>
-            <label class="choice">
-              <input v-model="form.opensMode" type="radio" name="opens" value="at" />
-              At a set time
-            </label>
-          </div>
-          <template v-if="form.opensMode === 'at'">
-            <label for="opens">Opens at</label>
-            <input id="opens" v-model="form.opensAt" type="datetime-local" />
-          </template>
-        </fieldset>
+        <FixedSettings :fixed="locked" label="Opening and nomination deadline">
+          <fieldset class="stack" :disabled="locked">
+            <legend class="legend--small">Opens</legend>
+            <p class="meta">
+              <span class="pill">Fixed when published</span> Participation opening.
+            </p>
+            <p class="meta">
+              From this moment eligible members can nominate and rate. A published list is visible
+              to signed-in members before opening, unless hidden.
+            </p>
+            <div class="choices">
+              <label class="choice">
+                <input v-model="form.opensMode" type="radio" name="opens" value="now" />
+                Right away when published
+              </label>
+              <label class="choice">
+                <input v-model="form.opensMode" type="radio" name="opens" value="at" />
+                At a set time
+              </label>
+            </div>
+            <template v-if="form.opensMode === 'at'">
+              <label for="opens">Opens at</label>
+              <input id="opens" v-model="form.opensAt" type="datetime-local" />
+            </template>
+          </fieldset>
 
-        <template v-if="form.entryMode === 'nominations'">
-          <label for="nominations-close">Nominations close (optional)</label>
-          <p class="meta"><span class="pill">Fixed when published</span> Nomination deadline.</p>
-          <input
-            id="nominations-close"
-            v-model="form.nominationsCloseAt"
-            type="datetime-local"
-            aria-describedby="nominations-close-hint"
-            :disabled="locked"
-          />
-          <p id="nominations-close-hint" class="meta">
-            After this, no new nominations; members can still rate. Leave blank to accept
-            nominations until voting closes.
-          </p>
-        </template>
-
-        <fieldset class="stack">
-          <legend class="legend--small">Voting</legend>
-          <p class="meta">
-            <span class="pill">Extend-only while active</span>
-            Move a deadline later, remove it, or give open-ended voting a future deadline. To end
-            voting immediately, use Close voting now. Closed voting cannot be reopened.
-          </p>
-          <p class="meta">
-            When voting closes, scores are final and the results are shown. The list stays visible;
-            archive it to file it away.
-          </p>
-          <div class="choices">
-            <label class="choice">
-              <input v-model="form.endMode" type="radio" name="end" value="open-ended" />
-              Stays open until an Admin closes it
-            </label>
-            <label class="choice">
-              <input v-model="form.endMode" type="radio" name="end" value="at" />
-              Closes at a set time
-            </label>
-          </div>
-          <template v-if="form.endMode === 'at'">
-            <label for="closes">Voting closes at</label>
-            <input id="closes" v-model="form.closesAt" type="datetime-local" />
+          <template v-if="form.entryMode === 'nominations'">
+            <label for="nominations-close">Nominations close (optional)</label>
+            <p class="meta"><span class="pill">Fixed when published</span> Nomination deadline.</p>
+            <input
+              id="nominations-close"
+              v-model="form.nominationsCloseAt"
+              type="datetime-local"
+              aria-describedby="nominations-close-hint"
+              :disabled="locked"
+            />
+            <p id="nominations-close-hint" class="meta">
+              After this, no new nominations; members can still rate. Leave blank to accept
+              nominations until voting closes.
+            </p>
           </template>
-        </fieldset>
+        </FixedSettings>
+        <FixedSettings :fixed="finished" label="Voting schedule">
+          <fieldset class="stack">
+            <legend class="legend--small">Voting</legend>
+            <p class="meta">
+              <span class="pill">Extend-only while active</span>
+              Move a deadline later, remove it, or give open-ended voting a future deadline. To end
+              voting immediately, use Close voting now. Closed voting cannot be reopened.
+            </p>
+            <p class="meta">
+              When voting closes, scores are final and the results are shown. The list stays
+              visible; archive it to file it away.
+            </p>
+            <div class="choices">
+              <label class="choice">
+                <input v-model="form.endMode" type="radio" name="end" value="open-ended" />
+                Stays open until an Admin closes it
+              </label>
+              <label class="choice">
+                <input v-model="form.endMode" type="radio" name="end" value="at" />
+                Closes at a set time
+              </label>
+            </div>
+            <template v-if="form.endMode === 'at'">
+              <label for="closes">Voting closes at</label>
+              <input id="closes" v-model="form.closesAt" type="datetime-local" />
+            </template>
+          </fieldset>
+        </FixedSettings>
       </fieldset>
 
       <ErrorNotice :error="error" />

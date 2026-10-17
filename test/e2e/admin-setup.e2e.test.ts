@@ -6,6 +6,31 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`admin publishing in ${colorScheme} mode`, () => {
     test.use({ colorScheme });
     for (const width of [320, 375, 1280]) {
+      test(`published settings separate fixed and editable controls at ${String(width)}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 850 });
+        await fakeApi(page, admin);
+        await page.goto('/admin/lists/films');
+        await expect(page.getByLabel('Description', { exact: true })).toBeVisible();
+        await expect(page.getByLabel('Description', { exact: true })).toBeEditable();
+        await expect(page.locator('#min-votes')).not.toBeVisible();
+        const rating = page
+          .locator('.fixed-settings')
+          .filter({ has: page.locator('#editor-rating') });
+        await rating.locator('summary').click();
+        await expect(page.locator('#min-votes')).toBeVisible();
+        await expect(page.locator('#min-votes')).toBeDisabled();
+        await rating.locator('summary').click();
+        await expect(page.locator('#min-votes')).not.toBeVisible();
+        await expect(
+          page.getByRole('radio', { name: 'Closes at a set time', exact: true }),
+        ).toBeEnabled();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+      });
+
       test(`new list controls and next step stay clear at ${String(width)}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 850 });
         await page.emulateMedia({ reducedMotion: 'reduce' });

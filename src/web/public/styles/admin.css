@@ -270,12 +270,12 @@
 
 /* Each section is a card; its legend reads as the card's title. */
 .editor form > fieldset.card,
-.editor-setup > fieldset.card {
+.editor-setup fieldset.card {
   padding: 1.25rem clamp(1rem, 3vw, 1.5rem) 1.5rem;
 }
 
 .editor form > fieldset.card > legend,
-.editor-setup > fieldset.card > legend {
+.editor-setup fieldset.card > legend {
   float: left;
   width: 100%;
   margin-bottom: 0.75rem;
@@ -286,7 +286,7 @@
 }
 
 .editor form > fieldset.card > legend + *,
-.editor-setup > fieldset.card > legend + * {
+.editor-setup fieldset.card > legend + * {
   clear: both;
 }
 

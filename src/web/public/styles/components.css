@@ -2,6 +2,39 @@
 
 /* Dialog */
 
+.fixed-settings {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.fixed-settings > summary {
+  min-height: 44px;
+  padding: 0.85rem 1rem;
+  color: var(--muted);
+  font-weight: 650;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.fixed-settings > summary .pill {
+  margin-inline-start: 0.5rem;
+}
+
+.fixed-settings[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.fixed-settings__body {
+  padding: 1rem;
+}
+
+.fixed-settings__body > fieldset.card {
+  border: 0;
+  background: transparent;
+}
+
 .dialog {
   width: min(30rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);

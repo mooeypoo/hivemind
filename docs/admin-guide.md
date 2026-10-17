@@ -72,6 +72,13 @@ published. The editor also temporarily locks source changes during an unfinished
 
 ## Who sees what?
 
+When editing a published list, settings you cannot change are collapsed under
+**Fixed · view settings**. Open them to inspect the saved choices; opening a panel
+does not unlock its controls. Editable descriptions, voting deadlines and removable
+nomination limits stay visible. An unused list's item source stays visible when it
+can still be changed. One-way actions such as making named scores private remain
+in **Admin controls**. Closed and archived lists keep their settings read-only.
+
 These are independent settings:
 
 - **List visibility:** community members must sign in to view lists. Hidden lists are

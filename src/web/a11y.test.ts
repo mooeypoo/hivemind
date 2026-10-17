@@ -668,6 +668,16 @@ describe('archiving', () => {
 });
 
 describe('score visibility editor', () => {
+  test('published fixed settings can be expanded for accessible read-only inspection', async () => {
+    const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
+    const panels = [...document.querySelectorAll<HTMLDetailsElement>('.fixed-settings')];
+    expect(panels.length).toBeGreaterThan(0);
+    expect(panels.every((panel) => !panel.open)).toBe(true);
+    for (const panel of panels) panel.open = true;
+    await expectAccessible(document.body);
+    expect(document.querySelector<HTMLFieldSetElement>('#editor-rating')?.disabled).toBe(true);
+    wrapper.unmount();
+  });
   test('drafts offer the choice and published lists lock it', async () => {
     const draft = await renderAt('/admin/lists/new', true);
     const privateChoice = document.querySelector<HTMLInputElement>(
