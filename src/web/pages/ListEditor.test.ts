@@ -726,8 +726,14 @@ describe('ListEditor', () => {
     await flushPromises();
     expect(calls.some((call) => call.url.endsWith('/schedule'))).toBe(false);
     const dialog = editor.get('dialog[open]');
-    expect(dialog.text()).toContain('Nominator names: shown');
-    expect(dialog.text()).toContain('Individual scores: private');
+    const fact = (label: string) =>
+      dialog
+        .findAll('dl > div')
+        .find((row) => row.find('dt').text() === label)
+        ?.get('dd')
+        .text();
+    expect(fact('Nominator names')).toBe('Shown');
+    expect(fact('Individual scores')).toBe('Private');
     await dialog.get('#publish-locks').setValue(true);
     await dialog.get('[data-confirm-publish]').trigger('click');
     await flushPromises();

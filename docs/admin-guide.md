@@ -27,6 +27,11 @@ when you move between steps. From the publication review, **Back to timing** let
 you check dates or return to setup again. Moving between steps never saves or publishes.
 Use **Save draft** when you want to save your work and finish later.
 
+The publication review groups your choices into **What members will experience** and
+**Timing & access**, followed by the settings that become fixed. Check any moderation
+or score-privacy notices and the acknowledgments before publishing. On larger screens,
+the summaries sit side by side; the back and publish buttons stay visible while you read.
+
 New lists allow **unlimited nominations per member** by default. Uncheck **Unlimited**
 and choose a limit if your community needs one. Existing lists keep their saved limits.
 

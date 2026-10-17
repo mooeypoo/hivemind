@@ -1578,80 +1578,129 @@ const importCsv = async () => {
 
     <AppDialog
       :open="reviewing"
+      class="publish-review"
       title="Review before publishing"
       @close="!busy && (reviewing = false)"
     >
       <div class="stack">
         <p class="eyebrow">Step 3: Review &amp; publish</p>
-        <h3>{{ form.title }}</h3>
-        <p><strong>Member address:</strong> /lists/{{ form.slug }}</p>
-        <h3>What members will experience</h3>
-        <ul>
-          <li>
-            Item type: {{ form.sourceKind === null ? 'Not chosen' : sourceLabel[form.sourceKind] }}.
-          </li>
-          <li>{{ form.sourceKind === null ? '' : sourceExplanation[form.sourceKind] }}</li>
-          <li v-if="form.entryMode === 'seeded'">
-            Every item in the imported collection is included. Members do not nominate.
-          </li>
-          <li v-else>
-            Nominations per member:
-            {{ form.unlimitedNominations ? 'unlimited' : form.maxNominationsPerMember }}.
-          </li>
-          <li>
-            Scores: {{ form.scaleMin }} to {{ form.scaleMax }}; {{ form.minVotes }} votes needed for
-            a confirmed rank.
-          </li>
-          <li>
-            Standings:
-            {{
-              form.resultsVisibility === 'live'
-                ? 'visible during voting'
-                : 'hidden until voting ends'
-            }}.
-          </li>
-          <li>
-            Individual scores:
-            {{
-              form.scoreVisibility === 'private'
-                ? 'private'
-                : 'named, visible to community members when standings are visible'
-            }}.
-          </li>
-          <li v-if="form.entryMode === 'nominations'">
-            Nominator names: {{ form.showNominators ? 'shown' : 'hidden' }}.
-          </li>
-          <li>Who can take part: {{ participationSummary }}.</li>
-        </ul>
-        <h3>Timing · {{ timeZone }}</h3>
-        <ul>
-          <li>
-            Participation opens:
-            {{ form.opensMode === 'now' ? 'immediately on publishing' : reviewDate(form.opensAt) }}.
-          </li>
-          <li v-if="form.entryMode === 'nominations'">
-            Nominations close:
-            {{
-              form.nominationsCloseAt === ''
-                ? 'when voting closes'
-                : reviewDate(form.nominationsCloseAt)
-            }}.
-          </li>
-          <li>
-            Voting closes:
-            {{
-              form.endMode === 'open-ended'
-                ? 'No automatic end; an admin must close voting'
-                : reviewDate(form.closesAt)
-            }}.
-          </li>
-        </ul>
-        <p>
-          {{
-            existing?.visibility === 'hidden'
-              ? 'Only admins can see this hidden list.'
-              : 'Signed-in community members can see this list as soon as it is published, even before participation opens.'
-          }}
+        <header class="publish-review__identity">
+          <h3>{{ form.title }}</h3>
+          <p class="meta">Member address: /lists/{{ form.slug }}</p>
+        </header>
+        <div class="publish-review__columns">
+          <section class="publish-review__section" aria-labelledby="review-experience-heading">
+            <h3 id="review-experience-heading">What members will experience</h3>
+            <p v-if="form.sourceKind !== null && form.sourceKind !== 'freeform'" class="meta">
+              {{ sourceExplanation[form.sourceKind] }}
+            </p>
+            <dl class="publish-review__facts">
+              <div>
+                <dt>Item type</dt>
+                <dd>
+                  {{ form.sourceKind === null ? 'Not chosen' : sourceLabel[form.sourceKind] }}
+                </dd>
+              </div>
+              <div>
+                <dt>Nominations</dt>
+                <dd>
+                  {{
+                    form.entryMode === 'seeded'
+                      ? 'Every collection item included; no nominations'
+                      : form.unlimitedNominations
+                        ? 'Unlimited per member'
+                        : `${form.maxNominationsPerMember} per member`
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Score range</dt>
+                <dd>{{ form.scaleMin }} to {{ form.scaleMax }}</dd>
+              </div>
+              <div>
+                <dt>Confirmed rank</dt>
+                <dd>After {{ form.minVotes }} votes</dd>
+              </div>
+              <div>
+                <dt>Standings</dt>
+                <dd>
+                  {{
+                    form.resultsVisibility === 'live'
+                      ? 'Visible during voting'
+                      : 'Hidden until voting ends'
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Individual scores</dt>
+                <dd>
+                  {{
+                    form.scoreVisibility === 'private'
+                      ? 'Private'
+                      : 'Named, visible when standings are visible'
+                  }}
+                </dd>
+              </div>
+              <div v-if="form.entryMode === 'nominations'">
+                <dt>Nominator names</dt>
+                <dd>{{ form.showNominators ? 'Shown' : 'Hidden' }}</dd>
+              </div>
+            </dl>
+          </section>
+          <section class="publish-review__section" aria-labelledby="review-timing-heading">
+            <h3 id="review-timing-heading">Timing &amp; access</h3>
+            <p class="meta">Times in {{ timeZone }}</p>
+            <dl class="publish-review__facts">
+              <div>
+                <dt>Participation opens</dt>
+                <dd>
+                  {{
+                    form.opensMode === 'now'
+                      ? 'Immediately on publishing'
+                      : reviewDate(form.opensAt)
+                  }}
+                </dd>
+              </div>
+              <div v-if="form.entryMode === 'nominations'">
+                <dt>Nominations close</dt>
+                <dd>
+                  {{
+                    form.nominationsCloseAt === ''
+                      ? 'When voting closes'
+                      : reviewDate(form.nominationsCloseAt)
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Voting closes</dt>
+                <dd>
+                  {{
+                    form.endMode === 'open-ended'
+                      ? 'No automatic end; an admin must close voting'
+                      : reviewDate(form.closesAt)
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Who can view</dt>
+                <dd>
+                  {{
+                    existing?.visibility === 'hidden'
+                      ? 'Only admins (hidden list)'
+                      : 'Signed-in community members, from publication—even before participation opens'
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Who can take part</dt>
+                <dd>{{ participationSummary }}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+        <p v-if="form.sourceKind === 'freeform'" class="notice">
+          <strong>Free text may need moderation.</strong> No automatic content filter: any words or
+          free text can be submitted, so moderation may be needed.
         </p>
         <p v-if="form.resultsVisibility === 'after-close'" class="notice">
           Standings stay hidden from everyone, including admins, until voting ends.
@@ -1661,23 +1710,41 @@ const importCsv = async () => {
         </p>
         <section class="notice stack" aria-labelledby="publish-lock-heading">
           <h3 id="publish-lock-heading">What becomes fixed</h3>
-          <p>
-            Publishing locks the title, address, nomination mode, rating rules, standings timing,
-            nominator-name setting, participation roles, opening time and nomination deadline
-            immediately, not when voting starts.
-          </p>
-          <p>
-            Item type locks once an entry has been added, including withdrawn entries. Including a
-            whole imported collection locks its source when publishing. While active, the
-            description remains editable, voting can be extended and a nomination limit can only be
-            removed. List visibility can change any time.
-          </p>
-          <label class="choice" for="publish-locks">
-            <input id="publish-locks" v-model="locksAccepted" type="checkbox" :disabled="busy" />
-            I have reviewed the settings that become fixed.
-          </label>
+          <dl class="publish-review__rules">
+            <div>
+              <dt>Fixed on publishing—not when voting starts</dt>
+              <dd>
+                Title, address, nomination mode, rating rules, standings timing, nominator names,
+                participation roles, opening time and nomination deadline.
+              </dd>
+            </div>
+            <div>
+              <dt>Item-type exception</dt>
+              <dd>
+                Item type locks after the first entry, even if withdrawn. Including a whole
+                collection locks its source on publishing.
+              </dd>
+            </div>
+            <div>
+              <dt>Still changeable</dt>
+              <dd>
+                While active: edit the description, extend voting, remove its end date or give
+                open-ended voting a future deadline, and remove a nomination limit (never restore
+                it). Make named scores private, but never the reverse. Change list visibility any
+                time.
+              </dd>
+            </div>
+          </dl>
         </section>
-        <label v-if="form.scoreVisibility === 'public'" class="choice" for="publish-named-scores">
+        <label class="choice publish-review__acknowledgment" for="publish-locks">
+          <input id="publish-locks" v-model="locksAccepted" type="checkbox" :disabled="busy" />
+          I have reviewed the settings that become fixed.
+        </label>
+        <label
+          v-if="form.scoreVisibility === 'public'"
+          class="choice publish-review__acknowledgment"
+          for="publish-named-scores"
+        >
           <input
             id="publish-named-scores"
             v-model="namedScoresAccepted"

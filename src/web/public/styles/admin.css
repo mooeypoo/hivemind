@@ -1,5 +1,116 @@
 /* Admin pages: the list editor, Roles and Backups. */
 
+.publish-review {
+  width: min(58rem, calc(100vw - 2rem));
+  overflow: hidden;
+}
+
+.publish-review .dialog__content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem - 2px);
+  padding: 0;
+}
+
+.publish-review .dialog__title {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.publish-review .dialog__body {
+  min-height: 0;
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.publish-review .dialog__actions {
+  flex-shrink: 0;
+  justify-content: space-between;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.publish-review__identity {
+  overflow-wrap: anywhere;
+}
+
+.publish-review__identity h3 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+}
+
+.publish-review__columns {
+  display: grid;
+  gap: 1rem;
+  margin-block: 0.5rem;
+}
+
+.publish-review__section {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.publish-review__facts,
+.publish-review__rules {
+  margin: 0;
+}
+
+.publish-review__facts > div {
+  display: grid;
+  gap: 0.15rem;
+  padding-block: 0.65rem;
+}
+
+.publish-review__facts > div + div {
+  border-top: 1px solid var(--border);
+}
+
+.publish-review dt {
+  font-weight: 650;
+}
+
+.publish-review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.publish-review__rules {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.publish-review__rules dd {
+  margin-top: 0.25rem;
+}
+
+.publish-review__acknowledgment {
+  align-items: flex-start;
+  padding-block: 0.5rem;
+}
+
+.publish-review__acknowledgment input {
+  margin-top: 0.2rem;
+}
+
+@media (min-width: 50rem) {
+  .publish-review__columns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .publish-review__facts > div {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 0.75rem;
+  }
+}
+
 .editor,
 .admin-page {
   max-width: 54rem;

@@ -293,6 +293,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       test(`review and privacy acknowledgments work at ${String(width)}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 850 });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
         await fakeApi(page, admin);
         const draft = {
           ...list,
@@ -338,6 +339,27 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(review).toBeVisible();
         await expect(review.getByRole('button', { name: 'Back to timing' })).toBeFocused();
         await expect(review).toContainText('What becomes fixed');
+        const experience = await review.locator('.publish-review__section').first().boundingBox();
+        const timing = await review.locator('.publish-review__section').last().boundingBox();
+        expect(experience).not.toBeNull();
+        expect(timing).not.toBeNull();
+        if (width === 1280) {
+          const panel = await review.boundingBox();
+          expect(panel?.width).toBeGreaterThanOrEqual(850);
+          expect(experience?.y).toBe(timing?.y);
+          expect(timing?.x).toBeGreaterThan(experience?.x ?? 0);
+        } else {
+          expect(timing?.y).toBeGreaterThan((experience?.y ?? 0) + (experience?.height ?? 0));
+        }
+        const actions = review.locator('.dialog__actions');
+        const initialActions = await actions.boundingBox();
+        await review.locator('.dialog__body').evaluate((el) => {
+          el.scrollTop = el.scrollHeight;
+        });
+        const scrolledActions = await actions.boundingBox();
+        expect(scrolledActions?.y).toBe(initialActions?.y);
+        expect((scrolledActions?.y ?? 0) + (scrolledActions?.height ?? 0)).toBeLessThanOrEqual(850);
+        expect(await review.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
         await fits();
         expect(saved).toBe(false);
         await review.getByRole('button', { name: 'Back to timing' }).click();
