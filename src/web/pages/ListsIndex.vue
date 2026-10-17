@@ -10,6 +10,7 @@ import { isLoginOutcome, loginMessage } from '../lib/labels.ts';
 import { session } from '../state/session.ts';
 import { site } from '../state/site.ts';
 import CommunityBadge from '../components/CommunityBadge.vue';
+import ExternalLink from '../components/ui/ExternalLink.vue';
 import { usePageTitle } from '../lib/page-title.ts';
 
 const siteName = import.meta.env.VITE_SITE_NAME;
@@ -71,14 +72,13 @@ onMounted(async () => {
         <a class="button button--primary button--large" :href="loginUrl('/')"
           >Sign in with Discord</a
         >
-        <a
+        <ExternalLink
           v-if="site.info?.community?.inviteUrl != null"
           class="button button--large"
           :href="site.info.community.inviteUrl"
-          rel="noopener"
         >
           Join the server
-        </a>
+        </ExternalLink>
       </div>
       <p class="meta">
         Lists are only for members of

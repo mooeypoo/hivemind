@@ -36,9 +36,10 @@ and choose a limit if your community needs one. Existing lists keep their saved 
 Only integrations enabled by the site operator appear. If one is missing, ask the
 operator; changing a list title does not enable an integration.
 
-**Free text has no automatic content filter.** Members can submit any words or free
-text, so moderation may be needed. Use **Admin tools** on an entry to set it aside
-or delete it when necessary.
+**Free text has no automatic content filter. Members can submit any words or free
+text, including inappropriate or off-topic content, so moderation may be needed.**
+There are no automatic posters or catalog details. Explain what belongs in your list,
+and use **Admin tools** on an entry to set it aside or delete it when necessary.
 
 For a collection, upload a CSV spreadsheet with `title` or `title,subtitle` as its
 first row and up to 200 items. For example:

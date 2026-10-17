@@ -72,6 +72,20 @@
 
 /* Buttons */
 
+.external-link-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.85em;
+  height: 0.85em;
+  margin-inline-start: 0.25em;
+  vertical-align: baseline;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .button {
   display: inline-flex;
   align-items: center;

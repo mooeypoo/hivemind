@@ -11,6 +11,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await fakeApi(page, admin);
         await page.goto('/admin/lists/new');
+        const guide = page
+          .getByRole('link', { name: 'Admin guide and FAQ (opens in a new tab)', exact: true })
+          .first();
+        await expect(guide).toHaveAttribute('target', '_blank');
+        await expect(guide).toHaveAttribute('rel', 'noopener noreferrer');
+        await expect(guide.locator('.external-link-icon')).toBeVisible();
         const radios = page.locator('input[name="source"]');
         const first = await radios.first().boundingBox();
         const freeText = await page.locator('input[value="freeform"]').boundingBox();

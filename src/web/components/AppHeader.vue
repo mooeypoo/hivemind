@@ -9,6 +9,7 @@ import CommunityBadge from './CommunityBadge.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 import AppDialog from './ui/AppDialog.vue';
+import ExternalLink from './ui/ExternalLink.vue';
 
 const siteName = import.meta.env.VITE_SITE_NAME;
 const theme = useTheme();
@@ -115,7 +116,9 @@ const deleteMyData = async () => {
             </RouterLink>
           </li>
           <li>
-            <a class="menu__item" :href="adminGuideUrl" @click="closeMenu">Admin guide and FAQ</a>
+            <ExternalLink class="menu__item" :href="adminGuideUrl" @click="closeMenu"
+              >Admin guide and FAQ</ExternalLink
+            >
           </li>
         </ul>
       </template>

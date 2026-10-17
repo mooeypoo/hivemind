@@ -502,13 +502,17 @@ describe('the menu', () => {
       'New list',
       'Roles',
       'Backups',
-      'Admin guide and FAQ',
+      'Admin guide and FAQ (opens in a new tab)',
       'Privacy',
       'Download my data',
       'Delete my data',
     ]);
     expect(menuDialog()?.textContent).toContain('Appearance');
     expect(menuDialog()?.textContent).toContain('Sign out');
+    const guide = menuDialog()?.querySelector('a[target="_blank"]');
+    expect(guide?.textContent).toContain('Admin guide and FAQ');
+    expect(guide?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(guide?.querySelector('.external-link-icon')).not.toBeNull();
     wrapper.unmount();
   });
 
@@ -723,7 +727,7 @@ describe('site-wide content', () => {
     expect(footer?.querySelector('a[href="https://moriel.tech"]')).not.toBeNull();
     expect(
       footer?.querySelector('a[href="https://github.com/mooeypoo/hivemind"]')?.textContent,
-    ).toBe('Source code');
+    ).toBe('Source code (opens in a new tab)');
     expect(footer?.textContent).toContain('GPL-3.0-or-later');
     expect(footer?.textContent).toContain('Movie data from TMDB');
     wrapper.unmount();
@@ -754,9 +758,12 @@ describe('site-wide content', () => {
       'Lists are only for members of the Film Club Discord server.',
     );
     expect(document.querySelector('.site-footer')?.textContent).not.toContain('signed-in members');
-    expect(document.querySelector('a[href="https://discord.gg/x"]')?.textContent.trim()).toBe(
-      'Join the server',
-    );
+    expect(
+      document
+        .querySelector('a[href="https://discord.gg/x"]')
+        ?.textContent.replace(/\s+/g, ' ')
+        .trim(),
+    ).toBe('Join the server (opens in a new tab)');
     wrapper.unmount();
   });
 

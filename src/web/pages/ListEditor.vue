@@ -18,6 +18,7 @@ import { api, type ApiError } from '../services/api.ts';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ListActivity from '../components/ListActivity.vue';
 import AppDialog from '../components/ui/AppDialog.vue';
+import ExternalLink from '../components/ui/ExternalLink.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { formatDateTime, fromLocalInput, toLocalInput } from '../lib/datetime.ts';
@@ -797,7 +798,7 @@ const importCsv = async () => {
     <ErrorNotice v-if="!ready" :error="error" />
     <p class="meta">
       Save a draft, review the member experience, then publish.
-      <a :href="adminGuideUrl">Admin guide and FAQ</a>
+      <ExternalLink :href="adminGuideUrl">Admin guide and FAQ</ExternalLink>
     </p>
     <p v-if="existing?.createdBy != null" class="meta">
       Created or imported by {{ existing.createdBy }}

@@ -2,6 +2,7 @@
 import { session } from '../state/session.ts';
 import { site } from '../state/site.ts';
 import CommunityBadge from './CommunityBadge.vue';
+import ExternalLink from './ui/ExternalLink.vue';
 
 const sourceUrl = import.meta.env.VITE_SOURCE_URL;
 </script>
@@ -20,23 +21,23 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
       <nav class="site-footer__links" aria-label="Footer">
         <RouterLink :to="{ name: 'about' }">About</RouterLink>
         <RouterLink :to="{ name: 'privacy' }">Privacy</RouterLink>
-        <a :href="sourceUrl" rel="noopener">Source code</a>
+        <ExternalLink :href="sourceUrl">Source code</ExternalLink>
       </nav>
     </div>
     <p class="site-footer__fine">
-      Made by <a href="https://moriel.tech" rel="noopener">Moriel Schottlender</a>. Code licensed
-      under the GPL-3.0-or-later. Lists, nominations and scores belong to the community.
+      Made by <ExternalLink href="https://moriel.tech">Moriel Schottlender</ExternalLink>. Code
+      licensed under the GPL-3.0-or-later. Lists, nominations and scores belong to the community.
       <template v-if="site.info?.offersMovieData === true">
-        Movie data from <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a>, used under
-        TMDB’s terms.
+        Movie data from <ExternalLink href="https://www.themoviedb.org/">TMDB</ExternalLink>, used
+        under TMDB’s terms.
       </template>
       <template v-if="site.info?.offersTvData === true">
-        TV series data from <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>, used under
-        its API terms.
+        TV series data from <ExternalLink href="https://thetvdb.com/">TheTVDB</ExternalLink>, used
+        under its API terms.
       </template>
       <template v-if="site.info?.offersGameData === true">
-        Game data and artwork from <a href="https://www.igdb.com/" rel="noopener">IGDB</a>, used
-        under Twitch's developer terms.
+        Game data and artwork from <ExternalLink href="https://www.igdb.com/">IGDB</ExternalLink>,
+        used under Twitch's developer terms.
       </template>
     </p>
   </footer>

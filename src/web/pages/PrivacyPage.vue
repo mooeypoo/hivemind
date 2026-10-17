@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { usePageTitle } from '../lib/page-title.ts';
 import { site } from '../state/site.ts';
+import ExternalLink from '../components/ui/ExternalLink.vue';
 
 usePageTitle(() => 'Privacy');
 const siteName = import.meta.env.VITE_SITE_NAME;
@@ -226,21 +227,21 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       </li>
       <li>The software is open source under the GNU GPL, version 3 or later.</li>
       <li v-if="site.info?.offersMovieData !== false">
-        Movie data comes from <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a> and is
-        used under
-        <a href="https://www.themoviedb.org/api-terms-of-use" rel="noopener">TMDB’s terms</a>. This
-        product uses the TMDB API but is not endorsed or certified by TMDB.
+        Movie data comes from
+        <ExternalLink href="https://www.themoviedb.org/">TMDB</ExternalLink> and is used under
+        <ExternalLink href="https://www.themoviedb.org/api-terms-of-use">TMDB’s terms</ExternalLink
+        >. This product uses the TMDB API but is not endorsed or certified by TMDB.
       </li>
       <li v-if="site.info?.offersTvData !== false">
         TV series data and artwork come from
-        <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>
+        <ExternalLink href="https://thetvdb.com/">TheTVDB</ExternalLink>
         and are used under its API terms, separately from the software's license.
       </li>
       <li v-if="site.info?.offersGameData === true">
-        Game data and artwork come from <a href="https://www.igdb.com/" rel="noopener">IGDB</a>,
-        under the
-        <a href="https://www.twitch.tv/p/en/legal/developer-agreement/" rel="noopener"
-          >Twitch Developer Services Agreement</a
+        Game data and artwork come from
+        <ExternalLink href="https://www.igdb.com/">IGDB</ExternalLink>, under the
+        <ExternalLink href="https://www.twitch.tv/p/en/legal/developer-agreement/"
+          >Twitch Developer Services Agreement</ExternalLink
         >, separately from the software's license.
       </li>
     </ul>
