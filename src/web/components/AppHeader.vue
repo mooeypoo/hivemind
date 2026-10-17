@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTheme, type ThemeChoice } from '../composables/theme.ts';
-import { adminLinks, primaryLinks } from '../lib/navigation.ts';
+import { adminGuideUrl, adminLinks, primaryLinks } from '../lib/navigation.ts';
 import { api, loginUrl, navigation, type ApiError } from '../services/api.ts';
 import { session, signOut } from '../state/session.ts';
 import { site } from '../state/site.ts';
@@ -113,6 +113,9 @@ const deleteMyData = async () => {
             <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeMenu">
               {{ link.label }}
             </RouterLink>
+          </li>
+          <li>
+            <a class="menu__item" :href="adminGuideUrl" @click="closeMenu">Admin guide and FAQ</a>
           </li>
         </ul>
       </template>

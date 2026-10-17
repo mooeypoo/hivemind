@@ -81,15 +81,36 @@ const emit = defineEmits<{
         Your score: <strong>{{ finalScore }}</strong>
       </p>
     </div>
+    <section
+      v-if="entry !== null && (canSetAside === true || canDelete === true)"
+      class="entry-admin stack"
+      aria-label="Admin tools"
+    >
+      <h3>Admin tools</h3>
+      <p class="meta">
+        These actions affect the entry for everyone, not just your own nomination or score.
+      </p>
+      <div class="actions">
+        <button
+          v-if="canSetAside === true && entry !== null"
+          type="button"
+          class="button"
+          @click="emit('setAside', entry)"
+        >
+          {{ entry.setAsideReason == null ? 'Set aside...' : 'Edit set-aside status...' }}
+        </button>
+        <button
+          v-if="canDelete === true && entry.deletionToken != null"
+          type="button"
+          class="button button--danger"
+          :aria-label="`Permanently delete ${entry.item.title}`"
+          @click="emit('delete', entry)"
+        >
+          Delete entry...
+        </button>
+      </div>
+    </section>
     <template #actions>
-      <button
-        v-if="canSetAside === true && entry !== null"
-        type="button"
-        class="button"
-        @click="emit('setAside', entry)"
-      >
-        {{ entry.setAsideReason == null ? 'Set aside...' : 'Edit set-aside status...' }}
-      </button>
       <button
         v-if="entry?.withdrawalToken != null"
         type="button"
@@ -97,15 +118,6 @@ const emit = defineEmits<{
         @click="emit('withdraw', entry)"
       >
         Withdraw nomination
-      </button>
-      <button
-        v-if="canDelete === true && entry?.deletionToken != null"
-        type="button"
-        class="button button--danger"
-        :aria-label="`Permanently delete ${entry.item.title}`"
-        @click="emit('delete', entry)"
-      >
-        Delete entry...
       </button>
       <button type="button" class="button" @click="emit('close')">Close</button>
     </template>

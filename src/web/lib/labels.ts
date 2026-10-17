@@ -16,6 +16,16 @@ export const sourceLabel: Record<ItemSourceKind, string> = {
   preset: 'Preset list (CSV)',
 };
 
+export const sourceExplanation: Record<ItemSourceKind, string> = {
+  'tmdb-movie':
+    'Members search for movies and select a result, with posters and details from TMDB.',
+  'tvdb-series': 'Members search for TV series, not individual episodes, using TheTVDB.',
+  'igdb-game': 'Members search for video games, with covers and details from IGDB.',
+  freeform: 'Members type their own titles. There are no automatic posters or catalog details.',
+  preset:
+    'Upload your own collection as a CSV spreadsheet. Include every item or let members choose nominations.',
+};
+
 /** What to tell someone who comes back from Discord with `?login=<code>`. */
 export const loginMessage: Record<LoginOutcomeCode, string> = {
   cancelled: 'Sign-in was cancelled. You can try again whenever you like.',

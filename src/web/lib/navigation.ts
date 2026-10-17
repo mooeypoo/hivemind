@@ -4,6 +4,8 @@ export interface NavLink {
   readonly route: string;
 }
 
+export const adminGuideUrl = `${import.meta.env.VITE_SOURCE_URL.replace(/\/$/, '')}/blob/HEAD/docs/admin-guide.md`;
+
 /** Shown in the header on wide screens and at the top of the menu everywhere. */
 export const primaryLinks: readonly NavLink[] = [
   { label: 'Lists', route: 'lists' },

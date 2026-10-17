@@ -148,7 +148,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/admin/lists/films');
         await expect(page.locator('#editor-items input[value=preset]')).toBeEnabled();
         await expect(page.locator('#editor-rating input').first()).toBeDisabled();
-        await page.getByRole('radio', { name: 'Preset list (CSV)' }).check();
+        await page.getByRole('radio', { name: /^Preset list \(CSV\)/ }).check();
         await expect(page.getByRole('radio', { name: /^Rate them all/ })).toBeDisabled();
         await expectNoSidewaysScroll(page);
       });

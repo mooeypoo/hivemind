@@ -193,7 +193,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
             :to="{ name: 'edit-list', params: { slug: list.slug } }"
             class="button button--quiet"
           >
-            Edit
+            Admin · Manage list
           </RouterLink>
         </div>
       </div>

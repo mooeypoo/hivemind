@@ -189,6 +189,16 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test.each([false, true])('publishing review is accessible (named scores: %s)', async (named) => {
+    const wrapper = await renderAt('/admin/lists/draft', true);
+    if (named) await wrapper.get('input[name=score-visibility][value=public]').setValue(true);
+    await wrapper.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(document.querySelector('dialog[open] #publish-locks')).not.toBeNull();
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
   test.each(['/lists/best-sci-fi?tab=standings', '/lists/best-sci-fi/results'])(
     'separate and combined standings at %s are accessible',
     async (path) => {
@@ -440,6 +450,7 @@ describe('the menu', () => {
       'New list',
       'Roles',
       'Backups',
+      'Admin guide and FAQ',
       'Privacy',
       'Download my data',
       'Delete my data',
@@ -494,7 +505,7 @@ describe('list page dialogs', () => {
   test('withdrawal confirmation and its error pass automated accessibility checks', async () => {
     const wrapper = await renderAt('/lists/best-sci-fi', true);
     await wrapper.get('.entry__art').trigger('click');
-    await wrapper.get('dialog[open] .button--danger').trigger('click');
+    await wrapper.get('dialog[open] .dialog__actions .button--danger').trigger('click');
     await flushPromises();
     await expectAccessible(document.body);
     const original = globalThis.fetch;

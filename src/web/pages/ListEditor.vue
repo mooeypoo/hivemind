@@ -15,14 +15,16 @@ import type {
 } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import AppDialog from '../components/ui/AppDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { formatDateTime, fromLocalInput, toLocalInput } from '../lib/datetime.ts';
 import { clearDraft, loadDraft, saveDraft } from '../lib/drafts.ts';
-import { sourceLabel } from '../lib/labels.ts';
+import { sourceExplanation, sourceLabel } from '../lib/labels.ts';
 import { slugify } from '../lib/slugify.ts';
 import { usePageTitle } from '../lib/page-title.ts';
 import { site } from '../state/site.ts';
+import { adminGuideUrl } from '../lib/navigation.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -38,7 +40,7 @@ interface Form {
   /** Once the Admin edits the slug, it stops following the title. */
   slugEdited: boolean;
   description: string;
-  sourceKind: ItemSourceKind;
+  sourceKind: ItemSourceKind | null;
   presetId: string | null;
   presetCount: number | null;
   entryMode: 'nominations' | 'seeded';
@@ -68,7 +70,7 @@ const form = reactive<Form>({
   slug: '',
   slugEdited: false,
   description: '',
-  sourceKind: 'freeform',
+  sourceKind: null,
   presetId: null,
   presetCount: null,
   entryMode: 'nominations',
@@ -118,6 +120,13 @@ const deletionError = ref<ApiError | null>(null);
 const deleting = computed(() => existing.value?.deleting === true);
 const csv = ref('');
 const csvError = ref<ApiError | null>(null);
+const setupError = ref('');
+const editorForm = ref<HTMLFormElement | null>(null);
+const reviewing = ref(false);
+const locksAccepted = ref(false);
+const namedScoresAccepted = ref(false);
+const draftSavedForPublish = ref(false);
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 usePageTitle(() => (existing.value === null ? 'New list' : `Edit ${existing.value.title}`));
 
 /** Publishing locks settings except for the server-authorized source exception below. */
@@ -167,8 +176,16 @@ const load = async () => {
     api.get<SourcesDto>('/api/catalog/sources'),
     api.get<RoleLabelsDto>('/api/roles'),
   ]);
-  if (sourcesResult.ok) sources.value = sourcesResult.data.sources;
-  if (rolesResult.ok) roleLabels.value = rolesResult.data.labels;
+  if (!sourcesResult.ok) {
+    error.value = sourcesResult.error;
+    return;
+  }
+  sources.value = sourcesResult.data.sources;
+  if (!rolesResult.ok) {
+    error.value = rolesResult.error;
+    return;
+  }
+  roleLabels.value = rolesResult.data.labels;
 
   if (routeSlug.value !== null) {
     const result = await api.get<ListDetailDto>(
@@ -227,15 +244,15 @@ watch(
   },
 );
 
-const config = (): CreateListRequest => ({
+const config = (sourceKind: ItemSourceKind): CreateListRequest => ({
   title: form.title,
   slug: form.slug,
   description: form.description,
   itemSource:
-    form.sourceKind === 'preset'
+    sourceKind === 'preset'
       ? { kind: 'preset', presetId: form.presetId ?? '' }
-      : { kind: form.sourceKind },
-  entryMode: form.sourceKind === 'preset' ? form.entryMode : 'nominations',
+      : { kind: sourceKind },
+  entryMode: sourceKind === 'preset' ? form.entryMode : 'nominations',
   scale: { min: form.scaleMin, max: form.scaleMax },
   maxNominationsPerMember: form.unlimitedNominations ? null : form.maxNominationsPerMember,
   resultsVisibility: form.resultsVisibility,
@@ -244,6 +261,52 @@ const config = (): CreateListRequest => ({
   showNominators: form.showNominators,
   requiredRoleIds: form.requiredRoleIds,
 });
+
+const setupProblem = (): string | null => {
+  if (form.sourceKind === null) return 'Choose an item type before saving or publishing.';
+  if (
+    !sources.value.includes(form.sourceKind) &&
+    form.sourceKind !== existing.value?.itemSource.kind
+  )
+    return 'Choose an item type offered by this site.';
+  if (form.sourceKind === 'preset' && form.presetId === null)
+    return 'Import your collection before saving or publishing.';
+  if (form.title.trim().length === 0 || form.title.trim().length > 120)
+    return 'Enter a title of 1-120 characters.';
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) || form.slug.length > 60)
+    return 'Use lowercase letters, digits and single hyphens in the address, up to 60 characters.';
+  if (form.description.length > 2000) return 'Keep the description to 2000 characters.';
+  if (
+    !Number.isInteger(form.scaleMin) ||
+    !Number.isInteger(form.scaleMax) ||
+    form.scaleMin < 0 ||
+    form.scaleMax > 100 ||
+    form.scaleMin >= form.scaleMax
+  )
+    return 'Choose whole-number scores from 0 to 100, with the lowest below the highest.';
+  if (!Number.isInteger(form.minVotes) || form.minVotes < 0 || form.minVotes > 1000)
+    return 'Votes before a confirmed rank must be a whole number from 0 to 1000.';
+  if (
+    form.entryMode === 'nominations' &&
+    !form.unlimitedNominations &&
+    (!Number.isInteger(form.maxNominationsPerMember) ||
+      form.maxNominationsPerMember < 1 ||
+      form.maxNominationsPerMember > 50)
+  )
+    return 'Choose 1-50 nominations per member, or unlimited.';
+  if (form.requiredRoleIds.length > 25) return 'Choose no more than 25 participation roles.';
+  return null;
+};
+
+const validatedConfig = (): CreateListRequest | null => {
+  setupError.value = setupProblem() ?? '';
+  if (setupError.value !== '' || form.sourceKind === null) return null;
+  if (editorForm.value?.reportValidity() === false) {
+    setupError.value = 'Check the highlighted fields before continuing.';
+    return null;
+  }
+  return config(form.sourceKind);
+};
 
 const run = async <T,>(
   work: () => Promise<{ ok: true; data: T } | { ok: false; error: ApiError }>,
@@ -263,17 +326,32 @@ const run = async <T,>(
 };
 
 const afterSave = async (list: ListDto) => {
+  const draftDates =
+    list.lifecycle === 'draft'
+      ? {
+          opensMode: form.opensMode,
+          opensAt: form.opensAt,
+          nominationsCloseAt: form.nominationsCloseAt,
+          endMode: form.endMode,
+          closesAt: form.closesAt,
+        }
+      : null;
   clearDraft(draftKey.value);
   existing.value = list;
   if (list.slug !== routeSlug.value) {
+    if (draftDates !== null) saveDraft(`editor:${list.slug}`, { ...form, ...draftDates });
     await router.replace({ name: 'edit-list', params: { slug: list.slug } });
   } else {
     fillFrom(list);
+    if (draftDates !== null) Object.assign(form, draftDates);
   }
 };
 
 const create = async () => {
-  const list = await run(() => api.post<ListDto>('/api/lists', config()), 'Draft created.');
+  if (busy.value) return;
+  const input = validatedConfig();
+  if (input === null) return;
+  const list = await run(() => api.post<ListDto>('/api/lists', input), 'Draft created.');
   if (list !== null) await afterSave(list);
 };
 
@@ -286,17 +364,66 @@ const endChange = (): { closesAt?: string | null } => {
 };
 
 /** Why "Schedule & publish" can't be used yet, or null when it can. */
-const publishBlocker = computed((): string | null => {
-  if (form.opensMode === 'at' && fromLocalInput(form.opensAt) === null)
-    return 'Choose when it opens.';
-  if (form.endMode === 'at' && fromLocalInput(form.closesAt) === null) {
+const scheduleProblem = (): string | null => {
+  const now = Date.now();
+  const opens = form.opensMode === 'now' ? now : Date.parse(fromLocalInput(form.opensAt) ?? '');
+  const nominations = fromLocalInput(form.nominationsCloseAt);
+  const closes = form.endMode === 'at' ? fromLocalInput(form.closesAt) : null;
+  if (!Number.isFinite(opens)) return 'Choose when it opens.';
+  if (form.endMode === 'at' && closes === null) {
     return 'Choose when voting closes, or let it stay open.';
   }
+  if (form.entryMode === 'nominations' && form.nominationsCloseAt !== '' && nominations === null)
+    return 'Enter a valid nomination deadline.';
+  if (closes !== null && Date.parse(closes) <= now) return 'Voting must close in the future.';
+  if (closes !== null && Date.parse(closes) <= opens)
+    return 'Voting must close after participation opens.';
+  if (form.entryMode === 'nominations' && nominations !== null) {
+    if (Date.parse(nominations) <= opens)
+      return 'Nominations must close after participation opens.';
+    if (closes !== null && Date.parse(nominations) > Date.parse(closes))
+      return 'Nominations must close no later than voting.';
+  }
   return null;
-});
+};
+const publishBlocker = computed(scheduleProblem);
+const reviewDate = (value: string) => {
+  const iso = fromLocalInput(value);
+  return iso === null ? 'Not set' : formatDateTime(iso);
+};
+const participationSummary = computed(() =>
+  form.requiredRoleIds.length === 0
+    ? 'All community members'
+    : `Members with any of: ${roleChoices.value
+        .filter((role) => form.requiredRoleIds.includes(role.roleId))
+        .map((role) => role.name)
+        .join(', ')}`,
+);
+
+const reviewPublish = () => {
+  if (busy.value || validatedConfig() === null) return;
+  setupError.value = scheduleProblem() ?? '';
+  if (setupError.value !== '') return;
+  locksAccepted.value = false;
+  namedScoresAccepted.value = false;
+  draftSavedForPublish.value = false;
+  error.value = null;
+  reviewing.value = true;
+};
 
 const save = async () => {
-  if (existing.value === null) return;
+  if (existing.value === null || busy.value) return;
+  if (
+    locked.value &&
+    existing.value.maxNominationsPerMember !== null &&
+    form.unlimitedNominations &&
+    confirming.value !== 'remove-cap'
+  ) {
+    confirming.value = 'remove-cap';
+    return;
+  }
+  const input = validatedConfig();
+  if (input === null) return;
   const removeNominationCap =
     existing.value.maxNominationsPerMember !== null && form.unlimitedNominations
       ? { maxNominationsPerMember: null }
@@ -306,34 +433,68 @@ const save = async () => {
         description: form.description,
         ...endChange(),
         ...removeNominationCap,
-        ...(itemSourceEditable.value ? { itemSource: config().itemSource } : {}),
+        ...(itemSourceEditable.value ? { itemSource: input.itemSource } : {}),
       }
-    : config();
+    : input;
   const list = await run(
     () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
     'Saved.',
   );
-  if (list !== null) await afterSave(list);
+  if (list !== null) {
+    confirming.value = null;
+    await afterSave(list);
+  }
 };
 
 const schedule = async () => {
-  if (existing.value === null) return;
+  if (
+    existing.value === null ||
+    busy.value ||
+    !reviewing.value ||
+    !locksAccepted.value ||
+    (form.scoreVisibility === 'public' && !namedScoresAccepted.value)
+  )
+    return;
+  const input = validatedConfig();
+  if (input === null) return;
+  setupError.value = scheduleProblem() ?? '';
+  if (setupError.value !== '') return;
   const id = existing.value.id;
-  const saved = await run(() => api.put<ListDto>(`/api/lists/${id}`, config()), '');
-  if (saved === null) return;
-  const list = await run(
-    () =>
-      api.post<ListDto>(`/api/lists/${id}/schedule`, {
-        opensAt: form.opensMode === 'now' ? new Date().toISOString() : fromLocalInput(form.opensAt),
-        nominationsCloseAt: fromLocalInput(form.nominationsCloseAt),
-        closesAt: form.endMode === 'open-ended' ? null : fromLocalInput(form.closesAt),
-      }),
-    form.opensMode === 'now' ? 'Published. Members can see the list now.' : 'Scheduled.',
-  );
-  if (list !== null) await afterSave(list);
+  busy.value = true;
+  error.value = null;
+  status.value = '';
+  draftSavedForPublish.value = false;
+  try {
+    const saved = await api.put<ListDto>(`/api/lists/${id}`, input);
+    if (!saved.ok) {
+      error.value = saved.error;
+      return;
+    }
+    draftSavedForPublish.value = true;
+    const result = await api.post<ListDto>(`/api/lists/${id}/schedule`, {
+      opensAt: form.opensMode === 'now' ? new Date().toISOString() : fromLocalInput(form.opensAt),
+      nominationsCloseAt:
+        form.entryMode === 'nominations' ? fromLocalInput(form.nominationsCloseAt) : null,
+      closesAt: form.endMode === 'open-ended' ? null : fromLocalInput(form.closesAt),
+    });
+    if (!result.ok) {
+      error.value = result.error;
+      return;
+    }
+    reviewing.value = false;
+    status.value =
+      form.opensMode === 'now'
+        ? 'Published. Members can take part now.'
+        : 'Published with a scheduled opening.';
+    await afterSave(result.data);
+  } finally {
+    busy.value = false;
+  }
 };
 
-const confirming = ref<'close' | 'archive' | 'private-scores' | 'delete' | null>(null);
+const confirming = ref<'close' | 'archive' | 'private-scores' | 'delete' | 'remove-cap' | null>(
+  null,
+);
 
 const deleteList = async () => {
   const list = existing.value;
@@ -458,7 +619,7 @@ const importCsv = async () => {
   <div class="editor">
     <header class="page-header">
       <div>
-        <p class="eyebrow">List setup</p>
+        <p class="eyebrow">Admin · List setup</p>
         <h1>{{ existing === null ? 'New list' : `Edit “${existing.title}”` }}</h1>
       </div>
       <StatusBadge
@@ -468,6 +629,14 @@ const importCsv = async () => {
       />
     </header>
 
+    <p class="meta">
+      Save a draft, review the member experience, then publish.
+      <a :href="adminGuideUrl">Admin guide and FAQ</a>
+    </p>
+    <p v-if="!locked" class="notice">
+      Publishing fixes most settings immediately, even if participation opens later. You will review
+      the choices before publishing.
+    </p>
     <p v-if="deleting" class="notice" role="status">
       Deletion in progress. Members can no longer access this list. Normal edits and participation
       are blocked; retry deletion below to finish cleanup and release its address.
@@ -508,9 +677,15 @@ const importCsv = async () => {
       </a>
     </nav>
 
-    <form v-if="!deleting" class="stack" @submit.prevent="existing === null ? create() : save()">
+    <form
+      v-if="!deleting"
+      ref="editorForm"
+      class="stack"
+      @submit.prevent="existing === null ? create() : save()"
+    >
       <fieldset id="editor-basics" class="card stack" :disabled="finished">
         <legend>Basics</legend>
+        <p class="meta"><span class="pill">Fixed when published</span> Title and address.</p>
         <label for="title">Title</label>
         <input
           id="title"
@@ -539,12 +714,18 @@ const importCsv = async () => {
         <p id="slug-hint" class="meta">Lowercase letters, digits and hyphens.</p>
 
         <label for="description">Description</label>
+        <p class="meta"><span class="pill">Editable until voting closes</span> Description only.</p>
         <textarea id="description" v-model="form.description" rows="3" maxlength="2000" />
       </fieldset>
 
       <fieldset id="editor-items" class="card stack" :disabled="sourceLocked">
         <legend>Items</legend>
         <p class="meta">Where do the things in this list come from?</p>
+        <p class="meta">
+          <span class="pill">{{ sourceLocked ? 'Locked' : 'Editable while unused' }}</span>
+          Item type locks when the first entry is added, even if later withdrawn. A collection
+          included in full locks when published. Finished lists cannot change item type.
+        </p>
         <p v-if="locked && itemSourceEditable" class="meta">
           This list is unused. You can change its item source until the first entry is added.
           Published lists keep their nomination mode.
@@ -557,7 +738,10 @@ const importCsv = async () => {
         <div class="choices" role="radiogroup" aria-label="Item source">
           <label v-for="kind in sources" :key="kind" class="choice">
             <input v-model="form.sourceKind" type="radio" name="source" :value="kind" />
-            {{ sourceLabel[kind] }}
+            <span>
+              <strong>{{ sourceLabel[kind] }}</strong>
+              <span class="source-explanation">{{ sourceExplanation[kind] }}</span>
+            </span>
           </label>
         </div>
 
@@ -588,6 +772,9 @@ const importCsv = async () => {
           <ErrorNotice :error="csvError" />
 
           <p class="meta">How should members use these items?</p>
+          <p class="meta">
+            <span class="pill">Fixed when published</span> How items enter the list.
+          </p>
           <div class="choices" role="radiogroup" aria-label="Entry mode">
             <label class="choice">
               <input
@@ -615,6 +802,10 @@ const importCsv = async () => {
 
       <fieldset id="editor-rating" class="card stack" :disabled="locked">
         <legend>Rating</legend>
+        <p class="meta">
+          <span class="pill">Fixed when published</span>
+          Score range, votes needed for a rank, standings timing and nomination names.
+        </p>
         <div class="row">
           <div class="stack">
             <label for="scale-min">Lowest score</label>
@@ -676,10 +867,17 @@ const importCsv = async () => {
           <input v-model="form.showNominators" type="checkbox" />
           Show who nominated each entry
         </label>
+        <p class="meta">
+          Hiding nomination names does not hide individual scores. These are separate choices.
+        </p>
       </fieldset>
 
       <fieldset id="editor-scores" class="card stack" :disabled="locked">
         <legend>Scores</legend>
+        <p class="meta">
+          <span class="pill">One-way change after publishing</span>
+          Named scores can become private, but private scores can never become named.
+        </p>
         <div class="choices" role="radiogroup" aria-label="Score visibility">
           <label class="choice">
             <input
@@ -697,20 +895,25 @@ const importCsv = async () => {
               name="score-visibility"
               value="public"
             />
-            Public: everyone can see who gave what score
+            Named: community members can see who gave what score
           </label>
         </div>
         <p class="meta">
-          Choose before publishing. Public scores appear when results do; after publishing, a public
-          list can only become private.
+          Private scores still count toward standings. Named scores appear only when standings are
+          visible. Admins cannot inspect other members' private scores.
         </p>
       </fieldset>
 
       <fieldset id="editor-roles" class="card stack" :disabled="locked">
         <legend>Who can take part</legend>
+        <p class="meta"><span class="pill">Fixed when published</span> Participation roles.</p>
         <p id="roles-hint" class="meta">
           Leave every role unticked to let all members take part. Otherwise, members need at least
           one of the ticked roles.
+        </p>
+        <p class="meta">
+          Roles restrict nominating and rating, not viewing. Other signed-in community members can
+          still see a published list unless it is hidden.
         </p>
         <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
           <label v-for="role in roleChoices" :key="role.roleId" class="choice">
@@ -732,6 +935,11 @@ const importCsv = async () => {
         :disabled="finished"
       >
         <legend>Nominations</legend>
+        <p class="meta">
+          <span class="pill">Remove-only after publishing</span>
+          A limit can become unlimited, but cannot be lowered, increased to another finite limit,
+          added or restored.
+        </p>
         <template v-if="locked">
           <p v-if="existing?.maxNominationsPerMember !== null" class="meta">
             You can remove this limit to allow unlimited nominations. After saving, the limit cannot
@@ -775,11 +983,19 @@ const importCsv = async () => {
         :disabled="finished"
       >
         <legend>Schedule</legend>
-        <p class="meta">Times are in your time zone.</p>
+        <p class="meta">Times are shown in {{ timeZone }}.</p>
+        <p v-if="!locked" class="notice">
+          Dates are applied when publishing. Save draft does not save these dates to the site; they
+          are kept only in this browser tab until then.
+        </p>
 
         <fieldset class="stack" :disabled="locked">
           <legend class="legend--small">Opens</legend>
-          <p class="meta">From this moment members can see the list, nominate and rate.</p>
+          <p class="meta"><span class="pill">Fixed when published</span> Participation opening.</p>
+          <p class="meta">
+            From this moment eligible members can nominate and rate. A published list is visible to
+            signed-in members before opening, unless hidden.
+          </p>
           <div class="choices">
             <label class="choice">
               <input v-model="form.opensMode" type="radio" name="opens" value="now" />
@@ -798,6 +1014,7 @@ const importCsv = async () => {
 
         <template v-if="form.entryMode === 'nominations'">
           <label for="nominations-close">Nominations close (optional)</label>
+          <p class="meta"><span class="pill">Fixed when published</span> Nomination deadline.</p>
           <input
             id="nominations-close"
             v-model="form.nominationsCloseAt"
@@ -806,12 +1023,18 @@ const importCsv = async () => {
             :disabled="locked"
           />
           <p id="nominations-close-hint" class="meta">
-            After this, no new nominations; members can still rate.
+            After this, no new nominations; members can still rate. Leave blank to accept
+            nominations until voting closes.
           </p>
         </template>
 
         <fieldset class="stack">
           <legend class="legend--small">Voting</legend>
+          <p class="meta">
+            <span class="pill">Extend-only while active</span>
+            Move a deadline later, remove it, or give open-ended voting a future deadline. To end
+            voting immediately, use Close voting now. Closed voting cannot be reopened.
+          </p>
           <p class="meta">
             When voting closes, scores are final and the results are shown. The list stays visible;
             archive it to file it away.
@@ -834,6 +1057,7 @@ const importCsv = async () => {
       </fieldset>
 
       <ErrorNotice :error="error" />
+      <p v-if="setupError !== ''" class="notice notice--error" role="alert">{{ setupError }}</p>
       <p class="visually-hidden" aria-live="polite">{{ status }}</p>
       <p v-if="status !== ''" class="notice notice--success">{{ status }}</p>
 
@@ -859,9 +1083,10 @@ const importCsv = async () => {
             type="button"
             class="button button--primary"
             :disabled="busy || publishBlocker !== null"
-            @click="schedule"
+            data-review-publish
+            @click="reviewPublish"
           >
-            {{ form.opensMode === 'now' ? 'Publish now' : 'Schedule & publish' }}
+            Review &amp; publish
           </button>
         </template>
         <RouterLink
@@ -879,7 +1104,7 @@ const importCsv = async () => {
       class="card stack status-section"
       aria-labelledby="status-heading"
     >
-      <h2 id="status-heading">Status</h2>
+      <h2 id="status-heading">Admin controls</h2>
       <div v-if="existing.scoreVisibility === 'public'" class="stack">
         <p class="meta">Scores on this list are public and may include names with scores.</p>
         <button
@@ -936,7 +1161,7 @@ const importCsv = async () => {
               :disabled="busy"
               @change="changeVisibility('public')"
             />
-            Public: all members can see it
+            Community members: sign-in required
           </label>
           <label class="choice">
             <input
@@ -950,7 +1175,11 @@ const importCsv = async () => {
             Hidden: only Admins can see it
           </label>
         </div>
-        <p class="meta">Hiding keeps every nomination and score; make it public again any time.</p>
+        <p class="meta">
+          <span class="pill">Editable any time</span>
+          Hiding keeps every nomination and score; show it again any time. Hiding does not pause the
+          schedule. Shared-link previews may show a non-hidden published list's title.
+        </p>
       </fieldset>
       <p v-if="site.info?.backups === true" class="meta">
         <a :href="`/api/admin/backup?list=${encodeURIComponent(existing.id)}`" download>
@@ -978,6 +1207,163 @@ const importCsv = async () => {
         </button>
       </div>
     </section>
+
+    <AppDialog
+      :open="reviewing"
+      title="Review before publishing"
+      @close="!busy && (reviewing = false)"
+    >
+      <div class="stack">
+        <h3>{{ form.title }}</h3>
+        <p><strong>Member address:</strong> /lists/{{ form.slug }}</p>
+        <h3>What members will experience</h3>
+        <ul>
+          <li>
+            Item type: {{ form.sourceKind === null ? 'Not chosen' : sourceLabel[form.sourceKind] }}.
+          </li>
+          <li>{{ form.sourceKind === null ? '' : sourceExplanation[form.sourceKind] }}</li>
+          <li v-if="form.entryMode === 'seeded'">
+            Every item in the imported collection is included. Members do not nominate.
+          </li>
+          <li v-else>
+            Nominations per member:
+            {{ form.unlimitedNominations ? 'unlimited' : form.maxNominationsPerMember }}.
+          </li>
+          <li>
+            Scores: {{ form.scaleMin }} to {{ form.scaleMax }}; {{ form.minVotes }} votes needed for
+            a confirmed rank.
+          </li>
+          <li>
+            Standings:
+            {{
+              form.resultsVisibility === 'live'
+                ? 'visible during voting'
+                : 'hidden until voting ends'
+            }}.
+          </li>
+          <li>
+            Individual scores:
+            {{
+              form.scoreVisibility === 'private'
+                ? 'private'
+                : 'named, visible to community members when standings are visible'
+            }}.
+          </li>
+          <li v-if="form.entryMode === 'nominations'">
+            Nominator names: {{ form.showNominators ? 'shown' : 'hidden' }}.
+          </li>
+          <li>Who can take part: {{ participationSummary }}.</li>
+        </ul>
+        <h3>Timing · {{ timeZone }}</h3>
+        <ul>
+          <li>
+            Participation opens:
+            {{ form.opensMode === 'now' ? 'immediately on publishing' : reviewDate(form.opensAt) }}.
+          </li>
+          <li v-if="form.entryMode === 'nominations'">
+            Nominations close:
+            {{
+              form.nominationsCloseAt === ''
+                ? 'when voting closes'
+                : reviewDate(form.nominationsCloseAt)
+            }}.
+          </li>
+          <li>
+            Voting closes:
+            {{
+              form.endMode === 'open-ended'
+                ? 'No automatic end; an admin must close voting'
+                : reviewDate(form.closesAt)
+            }}.
+          </li>
+        </ul>
+        <p>
+          {{
+            existing?.visibility === 'hidden'
+              ? 'Only admins can see this hidden list.'
+              : 'Signed-in community members can see this list as soon as it is published, even before participation opens.'
+          }}
+        </p>
+        <p v-if="form.resultsVisibility === 'after-close'" class="notice">
+          Standings stay hidden from everyone, including admins, until voting ends.
+          <template v-if="form.endMode === 'open-ended'"
+            >An admin must close voting to reveal them.</template
+          >
+        </p>
+        <section class="notice stack" aria-labelledby="publish-lock-heading">
+          <h3 id="publish-lock-heading">What becomes fixed</h3>
+          <p>
+            Publishing locks the title, address, nomination mode, rating rules, standings timing,
+            nominator-name setting, participation roles, opening time and nomination deadline
+            immediately, not when voting starts.
+          </p>
+          <p>
+            Item type locks once an entry has been added, including withdrawn entries. Including a
+            whole imported collection locks its source when publishing. While active, the
+            description remains editable, voting can be extended and a nomination limit can only be
+            removed. List visibility can change any time.
+          </p>
+          <label class="choice" for="publish-locks">
+            <input id="publish-locks" v-model="locksAccepted" type="checkbox" :disabled="busy" />
+            I have reviewed the settings that become fixed.
+          </label>
+        </section>
+        <label v-if="form.scoreVisibility === 'public'" class="choice" for="publish-named-scores">
+          <input
+            id="publish-named-scores"
+            v-model="namedScoresAccepted"
+            type="checkbox"
+            :disabled="busy"
+          />
+          I understand members will see names with individual scores when standings are visible.
+          Making scores private later cannot undo what people have already seen.
+        </label>
+        <p v-if="draftSavedForPublish && error !== null" class="notice">
+          Draft settings saved, but publishing was not confirmed. Your dates remain in this tab. If
+          another admin published this list, reload to check its current state before continuing.
+        </p>
+        <ErrorNotice :error="error" />
+        <p v-if="setupError !== ''" class="notice notice--error" role="alert">{{ setupError }}</p>
+      </div>
+      <template #actions>
+        <button type="button" class="button" autofocus :disabled="busy" @click="reviewing = false">
+          Back to settings
+        </button>
+        <button
+          type="button"
+          class="button button--primary"
+          data-confirm-publish
+          :disabled="
+            busy || !locksAccepted || (form.scoreVisibility === 'public' && !namedScoresAccepted)
+          "
+          @click="schedule"
+        >
+          {{
+            busy
+              ? 'Publishing...'
+              : form.opensMode === 'now'
+                ? 'Publish and open voting'
+                : 'Publish with scheduled opening'
+          }}
+        </button>
+      </template>
+    </AppDialog>
+
+    <ConfirmDialog
+      :open="confirming === 'remove-cap'"
+      title="Allow unlimited nominations?"
+      confirm-label="Save with unlimited nominations"
+      :busy="busy"
+      @confirm="save"
+      @cancel="!busy && (confirming = null)"
+    >
+      <p>
+        This saves your other edits too. After publishing, a removed nomination limit cannot be
+        restored.
+      </p>
+      <ErrorNotice :error="error" />
+      <p v-if="setupError !== ''" class="notice notice--error" role="alert">{{ setupError }}</p>
+    </ConfirmDialog>
 
     <section v-if="existing !== null" class="card stack" aria-labelledby="danger-heading">
       <h2 id="danger-heading" class="danger-text">Danger zone</h2>
@@ -1042,6 +1428,10 @@ const importCsv = async () => {
       <p>
         Members won’t be able to nominate or change their scores. Scores become final and the
         results are shown, including results that were hidden until the end.
+      </p>
+      <p>
+        <strong>Voting cannot be reopened.</strong> Admin corrections and permanent entry deletion
+        can still change standings.
       </p>
     </ConfirmDialog>
     <ConfirmDialog
