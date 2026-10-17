@@ -237,7 +237,7 @@ to end immediately; you cannot schedule an earlier end by editing.
 
 ### Why isn't an entry ranked?
 
-It may need more ratings to reach the confirmed-rank threshold (5 by default).
+It may need more ratings to reach the confirmed-rank threshold (2 by default).
 It can still be rated. Unrated entries have no rank. Set-aside entries usually
 appear in a separate group. Standings are cached, so score changes can take about
 two minutes to appear.

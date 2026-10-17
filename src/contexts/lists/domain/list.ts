@@ -111,7 +111,7 @@ export const LIST_DEFAULTS = {
   scale: DEFAULT_SCALE,
   maxNominationsPerMember: null,
   resultsVisibility: 'live',
-  ranking: { strategy: 'bayesian', minVotes: 5 },
+  ranking: { strategy: 'bayesian', minVotes: 2 },
   showNominators: true,
   requiredRoleIds: [],
   scoreVisibility: 'private',

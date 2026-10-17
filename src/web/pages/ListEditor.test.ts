@@ -664,6 +664,7 @@ describe('ListEditor', () => {
       requiredRoleIds: ['900000000000000077'],
       showNominators: true,
       scoreVisibility: 'private',
+      ranking: { strategy: 'bayesian', minVotes: 2 },
     });
   });
 

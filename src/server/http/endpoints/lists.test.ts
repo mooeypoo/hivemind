@@ -617,6 +617,7 @@ describe('a TMDB movie list, end to end', () => {
       resultsVisibility: 'live',
       maxNominationsPerMember: null,
       schedule: null,
+      ranking: { strategy: 'bayesian', minVotes: 2 },
     });
     expect((await call<ListsDto>(listLists, 'GET', '/api/lists', ada)).body).toEqual({ lists: [] });
     expect((await call(getList, 'GET', '/api/lists/best-sci-fi', ada)).status).toBe(404);

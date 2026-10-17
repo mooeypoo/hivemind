@@ -83,7 +83,7 @@ const form = reactive<Form>({
   unlimitedNominations: true,
   resultsVisibility: 'live',
   scoreVisibility: 'private',
-  minVotes: 5,
+  minVotes: 2,
   showNominators: true,
   requiredRoleIds: [],
   opensMode: 'now',
