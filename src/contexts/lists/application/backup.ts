@@ -6,9 +6,11 @@ import {
   type DomainError,
   type IdGenerator,
   type MemberId,
+  type MemberActor,
   type Result,
   type RoleId,
 } from '../../../shared/kernel/index.ts';
+import { appendListActivity } from '../domain/list-activity.ts';
 import {
   entryIdFor,
   validateSetAsideReason,
@@ -200,6 +202,7 @@ export const makeRestoreFromBackup =
   async (
     backup: ListBackup,
     options: {
+      readonly importedBy?: MemberActor;
       /** Replaces the item source, e.g. a preset restored under a new id. */
       readonly itemSource?: ItemSourceRef;
       readonly keepMember: (memberId: string) => Promise<boolean>;
@@ -238,7 +241,7 @@ export const makeRestoreFromBackup =
     if (slug === null) return err(invalidBackup(['no free address for this list']));
     const renamed = slug !== config.value.slug;
     const schedule = backup.list.schedule;
-    const list: List = {
+    const restored: List = {
       id,
       config: { ...config.value, slug },
       draftSchedule: backup.list.phase === 'draft' ? draftSchedule : null,
@@ -256,6 +259,10 @@ export const makeRestoreFromBackup =
       createdAt: new Date(backup.list.createdAt),
       archivedAt: backup.list.archivedAt === null ? null : new Date(backup.list.archivedAt),
     };
+    const list =
+      options.importedBy === undefined
+        ? restored
+        : appendListActivity(restored, 'imported', options.importedBy, deps.clock.now());
     const writeToken = deps.ids.next();
     let completed = false;
     try {

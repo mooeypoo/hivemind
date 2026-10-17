@@ -11,6 +11,7 @@ const scheduleDto = (schedule: Schedule | null): ScheduleDto | null =>
       };
 
 export const listDto = (view: ListView): ListDto => ({
+  ...(view.createdBy === undefined ? {} : { createdBy: view.createdBy }),
   ...(view.settingsVersion === undefined ? {} : { settingsVersion: view.settingsVersion }),
   deleting: view.deleting,
   writeRevision: view.writeRevision,
@@ -47,6 +48,7 @@ export const listDto = (view: ListView): ListDto => ({
 });
 
 export const entryDto = (entry: EntryView): EntryDto => ({
+  ...(entry.moderation === undefined ? {} : { moderation: entry.moderation }),
   setAsideReason: entry.setAsideReason,
   id: entry.id,
   item: entry.item,

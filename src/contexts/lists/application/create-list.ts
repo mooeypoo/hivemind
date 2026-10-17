@@ -12,6 +12,7 @@ import { listsErrors } from '../domain/errors.ts';
 import { newList, validateConfig, type ListConfig, type ListId } from '../domain/list.ts';
 import type { Catalog, ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
+import { appendListActivity } from '../domain/list-activity.ts';
 
 export interface CreateListDeps {
   readonly lists: ListRepository;
@@ -35,7 +36,12 @@ export const makeCreateList =
     if (!source.ok) return source;
 
     const now = deps.clock.now();
-    const list = newList(deps.ids.next() as ListId, config.value, now);
+    const list = appendListActivity(
+      newList(deps.ids.next() as ListId, config.value, now),
+      'created',
+      admin.value,
+      now,
+    );
     if (!(await deps.slugs.claim(list.config.slug, list.id))) return err(listsErrors.slugTaken);
     if (!(await deps.lists.save(list, null))) {
       await deps.slugs.release(list.config.slug, list.id);

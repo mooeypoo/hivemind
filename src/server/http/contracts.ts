@@ -124,6 +124,8 @@ export type DraftScheduleDto = Omit<ScheduleDto, 'opensAt'> & { readonly opensAt
 export type Visibility = 'public' | 'hidden';
 
 export interface ListDto extends ListConfigDto {
+  /** Admin-only, null for older lists or after attribution expires/erasure. */
+  readonly createdBy?: string | null;
   /** Admin-only settings revision, independent of votes and technical write markers. */
   readonly settingsVersion?: number;
   /** Send with score changes; a permanent entry deletion invalidates older list snapshots. */
@@ -154,6 +156,8 @@ export interface DeleteEntryRequest {
 }
 
 export interface EntryDto {
+  /** Admin-only last moderation attribution, never part of ordinary member responses. */
+  readonly moderation?: { readonly adminName: string | null; readonly at: string } | null;
   readonly setAsideReason?: string | null;
   readonly id: string;
   readonly item: CatalogItemDto;
@@ -177,6 +181,33 @@ export interface SetEntryAsideRequest {
 /** `GET /api/lists` */
 export interface ListsDto {
   readonly lists: readonly ListDto[];
+}
+
+export interface ListActivityDto {
+  readonly events: readonly {
+    readonly id: string;
+    readonly action:
+      | 'created'
+      | 'imported'
+      | 'settings-edited'
+      | 'published'
+      | 'archived'
+      | 'voting-closed'
+      | 'visibility-changed'
+      | 'score-privacy-changed'
+      | 'entry-set-aside'
+      | 'entry-returned'
+      | 'explanation-edited'
+      | 'entry-deleted';
+    readonly at: string;
+    readonly adminName: string | null;
+    readonly entryTitle: string | null;
+    readonly changes: readonly {
+      readonly field: string;
+      readonly before: string | null;
+      readonly after: string | null;
+    }[];
+  }[];
 }
 
 /** `GET /api/lists/:list` (id or slug) */

@@ -77,10 +77,34 @@ const siteName = import.meta.env.VITE_SITE_NAME;
     <h2>Setting entries aside</h2>
     <p>
       Admins can set an entry aside as outside a list's criteria, with a member-visible explanation.
-      The classification and explanation are stored with the entry and included in list backups; no
-      Admin identity or edit history is recorded. Ratings are kept and members can still rate the
-      entry. Withdrawal and re-nomination retain the classification. Explanations should describe
-      the item, not contain personal information.
+      The classification and current explanation are stored with the entry and included in list
+      backups. Admin-only activity records who changed the classification, but never copies previous
+      explanations. Ratings are kept and members can still rate the entry. Withdrawal and
+      re-nomination retain the classification. Explanations should describe the item, not contain
+      personal information.
+    </p>
+    <h2>Admin activity history</h2>
+    <p>
+      Admins can see who created, imported, published or changed a list, changed its visibility,
+      closed voting, archived it, or moderated an entry. Each event stores the action, time, and the
+      acting admin’s Discord user ID and display name. Ordinary members cannot see this history or
+      admin attribution. Old actions from before this feature are not reconstructed.
+    </p>
+    <p>
+      Attribution is kept for one calendar year after each action (a February 29 anniversary falls
+      on February 28). Expired names are hidden immediately and stored IDs and names are removed by
+      the daily retention job. Unnamed actions remain while the list exists. Delete my data removes
+      your attribution immediately, keeping only unnamed events. Download my data includes activity
+      still attributed to you. Losing admin access does not erase your earlier attribution.
+    </p>
+    <p>
+      Events record which fields changed and old/new structured choices, including dates and
+      participation-role IDs. They never copy old or new titles, addresses, descriptions or
+      moderation explanations, and never record scores or request bodies. Entry titles shown
+      alongside events come from the current entry, not a history snapshot. Entry deletion removes
+      its identifying history and leaves only a generic deletion event; list deletion removes all
+      its activity. History is excluded from list backups; an imported list starts with a new import
+      event naming the importing admin.
     </p>
     <h2>Withdrawing a nomination</h2>
     <p>

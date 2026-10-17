@@ -799,6 +799,7 @@ describe('personal data', () => {
     const detail = await makeGetList(deps)(bob, { list: list.id });
     expect(detail.ok && detail.value.entries[0]?.nominatedBy).toBe('Member bob');
     expect(await personalData().exportFor('ada' as MemberId)).toEqual({
+      adminActivity: [],
       nominations: [],
       nominationRecords: [],
     });
@@ -808,6 +809,7 @@ describe('personal data', () => {
     await openList();
     await nominate(ada, '78');
     expect(await personalData().exportFor('ada' as MemberId)).toEqual({
+      adminActivity: [],
       nominations: [
         {
           listId: 'id-1',
@@ -834,6 +836,7 @@ describe('personal data', () => {
       ['The Matrix', 'Member bob'],
     ]);
     expect(await personalData().exportFor('ada' as MemberId)).toEqual({
+      adminActivity: [],
       nominations: [],
       nominationRecords: [],
     });

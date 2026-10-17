@@ -6,6 +6,54 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`admin publishing in ${colorScheme} mode`, () => {
     test.use({ colorScheme });
     for (const width of [320, 375, 1280]) {
+      test(`admin activity history fits and stays separate at ${String(width)}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 850 });
+        await fakeApi(page, admin);
+        await page.route('**/api/lists/list-1/activity', (route) =>
+          route.fulfill({
+            json: {
+              events: [
+                {
+                  id: '2',
+                  action: 'entry-set-aside',
+                  at: '2026-10-17T12:00:00Z',
+                  adminName: 'An admin with a long display name',
+                  entryTitle: 'A'.repeat(180),
+                  changes: [],
+                },
+                {
+                  id: '1',
+                  action: 'settings-edited',
+                  at: '2025-01-01T12:00:00Z',
+                  adminName: null,
+                  entryTitle: null,
+                  changes: [
+                    { field: 'maxNominationsPerMember', before: '3', after: 'null' },
+                    { field: 'description', before: null, after: null },
+                  ],
+                },
+              ],
+            },
+          }),
+        );
+        await page.goto('/admin/lists/films');
+        const activity = page.getByRole('region', { name: 'List activity', exact: true });
+        await expect(activity).toContainText('Admin only');
+        await activity.getByRole('button', { name: 'Show activity', exact: true }).click();
+        await expect(activity).toContainText('An admin with a long display name');
+        await expect(activity).toContainText('Admin identity removed');
+        await expect(activity).toContainText('3 → Unlimited');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await activity.getByRole('button', { name: 'Hide activity', exact: true }).click();
+        await expect(
+          activity.getByRole('button', { name: 'Show activity', exact: true }),
+        ).toBeVisible();
+      });
+
       test(`stale editor comparison retains input and fits at ${String(width)}px`, async ({
         page,
       }) => {

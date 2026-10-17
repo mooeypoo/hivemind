@@ -1,6 +1,7 @@
 import type { Store } from '@netlify/blobs';
 import type { Clock, IdGenerator } from '../../shared/kernel/index.ts';
 import { makeArchiveList } from './application/archive-list.ts';
+import { makeGetListActivity, makeAnonymiseActivity } from './application/activity.ts';
 import { makeCloseVoting, makeSetVisibility } from './application/close-voting.ts';
 import { makeSetScoreVisibility } from './application/score-visibility.ts';
 import { makeCreateList } from './application/create-list.ts';
@@ -60,9 +61,9 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     editList: makeEditList(shared),
     prepareListDeletion: makePrepareListDeletion(repositories),
     finishListDeletion: makeFinishListDeletion(repositories),
-    prepareEntryDeletion: makePrepareEntryDeletion({ ...repositories, ids: deps.ids }),
-    withEntryDeletion: makeWithEntryDeletion({ ...repositories, ids: deps.ids }),
-    finishEntryDeletion: makeFinishEntryDeletion({ ...repositories, ids: deps.ids }),
+    prepareEntryDeletion: makePrepareEntryDeletion({ ...shared, ids: deps.ids }),
+    withEntryDeletion: makeWithEntryDeletion({ ...shared, ids: deps.ids }),
+    finishEntryDeletion: makeFinishEntryDeletion({ ...shared, ids: deps.ids }),
     withListWrite: makeWithListWrite({ ...repositories, ids: deps.ids }),
     scheduleList: makeScheduleList({ ...shared, ids: deps.ids }),
     archiveList: makeArchiveList(shared),
@@ -78,7 +79,9 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     withdrawNomination: makeWithdrawNomination(shared),
     setEntryAside: makeSetEntryAside({ ...shared, ids: deps.ids }),
     refreshMovieDetails: makeRefreshMovieDetails(shared),
-    personalData: makeListsPersonalData(repositories),
+    personalData: makeListsPersonalData(shared),
+    getListActivity: makeGetListActivity(shared),
+    anonymiseExpiredActivity: makeAnonymiseActivity(shared),
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),
     entryExists: makeEntryExists(repositories),

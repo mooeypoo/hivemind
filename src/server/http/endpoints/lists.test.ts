@@ -5,6 +5,7 @@ import type {
   ErrorDto,
   ListDetailDto,
   ListDto,
+  ListActivityDto,
   ListsDto,
   MyDataExportDto,
   PresetImportedDto,
@@ -32,6 +33,8 @@ import {
   createList,
   editList,
   getList,
+  getListActivity,
+  setEntryAside,
   listLists,
   nominate,
   withdrawNomination,
@@ -101,6 +104,78 @@ const openList = async (body: Record<string, unknown>): Promise<ListDto> => {
   expect(scheduled.status).toBe(200);
   return scheduled.body;
 };
+
+describe('admin activity history', () => {
+  test('history and inline attribution are admin-only; export and erasure cover list and moderation events', async () => {
+    const list = await openList({
+      title: 'History',
+      slug: 'history',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${list.id}`;
+    const entry = await call<EntryDto>(nominate, 'POST', `${path}/entries`, ada, {
+      title: 'An item',
+    });
+    const aside = await call<EntryDto>(setEntryAside, 'POST', `${path}/entries/set-aside`, admin, {
+      entryId: entry.body.id,
+      token: entry.body.withdrawalToken,
+      expectedReason: null,
+      reason: 'Current explanation only',
+    });
+    expect(aside.status).toBe(200);
+    expect(aside.body.moderation?.adminName).toBe('dev');
+    expect((await call(getListActivity, 'GET', `${path}/activity`, null)).status).toBe(401);
+    expect((await call(getListActivity, 'GET', `${path}/activity`, ada)).status).toBe(403);
+    const ordinary = await call<ListDetailDto>(getList, 'GET', path, ada);
+    expect(ordinary.body).not.toHaveProperty('createdBy');
+    expect(ordinary.body.entries[0]).not.toHaveProperty('moderation');
+    const events = await call<ListActivityDto>(getListActivity, 'GET', `${path}/activity`, admin);
+    expect(events.status).toBe(200);
+    expect(events.body.events).toHaveLength(3);
+    expect(events.body.events.every((event) => event.adminName === 'dev')).toBe(true);
+    expect(JSON.stringify(events.body)).not.toContain(SITE_ADMIN_ID);
+    expect(JSON.stringify(events.body)).not.toContain('Current explanation only');
+    expect(events.body.events.find((event) => event.action === 'entry-set-aside')?.entryTitle).toBe(
+      'An item',
+    );
+    const exported = await call<MyDataExportDto>(exportMyData, 'GET', '/api/me/export', admin);
+    expect(JSON.stringify(exported.body.lists)).toContain('adminActivity');
+    expect(JSON.stringify(exported.body.lists)).toContain(SITE_ADMIN_ID);
+    expect((await call(deleteMyData, 'DELETE', '/api/me', admin)).status).toBe(204);
+    const second = await signInAs(h, {
+      id: '900000000000000012',
+      username: 'moderator',
+      roles: [ADMIN_ROLE_ID],
+    });
+    const erased = await call<ListActivityDto>(getListActivity, 'GET', `${path}/activity`, second);
+    expect(erased.body.events).toHaveLength(3);
+    expect(erased.body.events.every((event) => event.adminName === null)).toBe(true);
+    const storedList: unknown = await h.store('lists').get(`list/${list.id}`, { type: 'json' });
+    expect(JSON.stringify(storedList)).not.toContain(SITE_ADMIN_ID);
+    const storedEntry: unknown = await h
+      .store('lists')
+      .get(`entry/${list.id}/${entry.body.id}`, { type: 'json' });
+    expect(JSON.stringify(storedEntry)).not.toContain(SITE_ADMIN_ID);
+  });
+
+  test('names expire at the anniversary even before the daily retention job runs', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Retention',
+      slug: 'retention',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${created.body.id}`;
+    h.clock.set(new Date('2027-01-01T00:00:00Z'));
+    admin = await signInAs(h, { id: SITE_ADMIN_ID, username: 'dev' });
+    const events = await call<ListActivityDto>(getListActivity, 'GET', `${path}/activity`, admin);
+    expect(events.body.events).toMatchObject([{ adminName: null, action: 'created' }]);
+    expect((await call<ListDto>(getList, 'GET', path, admin)).body.createdBy).toBeNull();
+    expect(await h.app.lists.anonymiseExpiredActivity()).toEqual({ ok: true, value: 1 });
+    const stored: unknown = await h.store('lists').get(`list/${created.body.id}`, { type: 'json' });
+    expect(JSON.stringify(stored)).not.toContain(SITE_ADMIN_ID);
+    expect(JSON.stringify(stored)).not.toContain('"displayName"');
+  });
+});
 
 describe('shared draft schedules', () => {
   test('two admins cannot overwrite saved plans or publish settings reviewed before another edit', async () => {

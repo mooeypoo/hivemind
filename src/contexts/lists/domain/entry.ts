@@ -1,5 +1,6 @@
 import type { Brand, MemberId } from '../../../shared/kernel/index.ts';
 import type { ListId } from './list.ts';
+import type { ActivityEvent } from './activity.ts';
 import {
   domainError,
   err,
@@ -32,6 +33,7 @@ export interface Nominator {
 }
 
 export interface Entry {
+  readonly activity?: readonly ActivityEvent[];
   readonly id: EntryId;
   readonly listId: ListId;
   readonly item: ItemSnapshot;

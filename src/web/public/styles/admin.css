@@ -131,6 +131,38 @@
 
 /* Roles */
 
+.activity {
+  margin-block: 2rem;
+}
+
+.activity__timeline {
+  padding: 0;
+  list-style: none;
+}
+
+.activity__event {
+  position: relative;
+  margin-inline-start: 0.5rem;
+  padding: 0 0 1.5rem 1.25rem;
+  border-inline-start: 2px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.activity__event::before {
+  position: absolute;
+  top: 0.4rem;
+  inset-inline-start: -0.35rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--accent);
+  content: '';
+}
+
+.activity__changes {
+  padding-inline-start: 1.25rem;
+}
+
 .roles-table {
   width: 100%;
   border-collapse: separate;

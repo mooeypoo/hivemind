@@ -14,6 +14,7 @@ import { findList } from './find-list.ts';
 import type { ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
 import { checkSettingsVersion, type SettingsExpectation } from './settings-version.ts';
+import { appendListActivity, settingsChanges } from '../domain/list-activity.ts';
 
 interface Deps {
   readonly lists: ListRepository;
@@ -34,7 +35,18 @@ export const makeCloseVoting =
       const now = deps.clock.now();
       const closed = closeVoting(found.value.value, now);
       if (!closed.ok) return closed;
-      if (!(await deps.lists.save(closed.value, found.value.version)))
+      if (
+        !(await deps.lists.save(
+          appendListActivity(
+            closed.value,
+            'voting-closed',
+            admin.value,
+            now,
+            settingsChanges(found.value.value, closed.value),
+          ),
+          found.value.version,
+        ))
+      )
         return err(listsErrors.conflict);
       return ok(toListView(closed.value, admin.value, now, 0));
     });
@@ -54,6 +66,17 @@ export const makeSetVisibility =
       const expected = checkSettingsVersion(found.value.value, input);
       if (!expected.ok) return expected;
       const changed = setVisibility(found.value.value, input.visibility);
-      if (!(await deps.lists.save(changed, found.value.version))) return err(listsErrors.conflict);
+      const changes = settingsChanges(found.value.value, changed);
+      const recorded =
+        changes.length === 0
+          ? changed
+          : appendListActivity(
+              changed,
+              'visibility-changed',
+              admin.value,
+              deps.clock.now(),
+              changes,
+            );
+      if (!(await deps.lists.save(recorded, found.value.version))) return err(listsErrors.conflict);
       return ok(toListView(changed, admin.value, deps.clock.now(), 0));
     });

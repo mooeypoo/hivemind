@@ -170,9 +170,27 @@ published, closed or archived, load the latest settings to see what is still edi
 The site does not automatically merge changes. Coordinate with your fellow admins
 before replacing their choices.
 
-There is currently **no stored admin creator attribution or activity history**.
-You cannot tell from the site who published, changed settings or set an entry aside.
-Agree moderation decisions with your team outside the site until history is available.
+### Admin-only activity
+
+Open **List activity → Show activity** in the list editor to see who created, imported,
+published or changed a list, changed its visibility, closed voting, archived it, or
+moderated an entry. Entries also show the last moderation attribution in **Admin tools**.
+Ordinary members cannot see these identities or the activity history. Older lists have
+no retrospective history for actions taken before this feature was introduced.
+
+Names are kept for **one calendar year after each action**, then removed automatically.
+The action and time remain for as long as the list exists. **Delete my data** removes an
+admin's attribution immediately; their still-attributed activity is included in **Download
+my data**. Losing admin access does not erase earlier attribution.
+
+History records changed fields and old/new structured settings, such as nomination
+limits and dates. It does not keep old titles, addresses, descriptions or moderation
+explanations, or record scores. This is a collaboration aid, not a tamper-proof audit log.
+
+Deleting an entry removes its identifying history; only a generic entry-deletion event
+remains. Deleting a list removes its history. **Activity history is not included in list
+backups**: an imported copy starts with a new import event attributed to the importing
+admin, not the original list's history.
 
 The **Roles** page gives names to Discord roles for participation choices. It does
 not grant site-admin access or assign roles in Discord. Ask the site operator about

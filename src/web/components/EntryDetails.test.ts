@@ -22,6 +22,18 @@ const entry: EntryDto = {
 };
 
 describe('EntryDetails', () => {
+  test('last moderation attribution appears in the separate admin tools only', () => {
+    const props = {
+      entry: { ...entry, moderation: { adminName: 'Alex', at: '2026-01-01T12:00:00Z' } },
+      scale: { min: 1, max: 10 },
+    };
+    const ordinary = mount(EntryDetails, { props });
+    expect(ordinary.text()).not.toContain('Alex');
+    ordinary.unmount();
+    const admin = mount(EntryDetails, { props: { ...props, canSetAside: true } });
+    expect(admin.get('.entry-admin').text()).toContain('Last moderation: Alex');
+    admin.unmount();
+  });
   test('shows game synopsis and developer/publisher companies with their own labels', () => {
     const dialog = mount(EntryDetails, {
       props: {

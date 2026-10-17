@@ -17,6 +17,7 @@ import type { Catalog, EntryRepository, ListRepository, SlugIndex } from './port
 import { toListView, type ListView } from './views.ts';
 import { withEntryWrite } from './entry-write.ts';
 import { checkSettingsVersion, type SettingsExpectation } from './settings-version.ts';
+import { appendListActivity, settingsChanges } from '../domain/list-activity.ts';
 
 export interface ScheduleListDeps {
   readonly lists: ListRepository;
@@ -57,7 +58,16 @@ export const makeScheduleList =
           const seeded = await seed(deps, published.value, now);
           if (!seeded.ok) return seeded;
         }
-        if (!(await deps.lists.save(published.value, current.version))) {
+        const recorded = appendListActivity(
+          published.value,
+          'published',
+          admin.value,
+          now,
+          settingsChanges(current.value, published.value).filter(
+            (change) => !change.field.startsWith('draftSchedule.'),
+          ),
+        );
+        if (!(await deps.lists.save(recorded, current.version))) {
           return err(listsErrors.conflict);
         }
         return ok(toListView(published.value, admin.value, now, 0));

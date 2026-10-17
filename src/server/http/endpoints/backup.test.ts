@@ -7,6 +7,7 @@ import type {
   ImportSummaryDto,
   ListDetailDto,
   ListDto,
+  ListActivityDto,
 } from '../contracts.ts';
 import { SESSION_COOKIE } from '../cookies.ts';
 import {
@@ -23,6 +24,7 @@ import {
   createList,
   editList,
   getList,
+  getListActivity,
   nominate,
   scheduleList,
   setVisibility,
@@ -93,6 +95,34 @@ afterEach(async () => {
 });
 
 describe('backups', () => {
+  test('admin history stays out of files and imported copies record only their importing admin', async () => {
+    const exported = await call<unknown>(
+      exportBackup,
+      'GET',
+      '/api/admin/backup?list=games',
+      admin,
+    );
+    expect(exported.status).toBe(200);
+    expect(exported.text).not.toContain('"activity"');
+    expect(exported.text).not.toContain(SITE_ADMIN_ID);
+    expect(exported.text).not.toContain('"dev"');
+    const imported = await call<ImportSummaryDto>(
+      importBackup,
+      'POST',
+      '/api/admin/backup',
+      admin,
+      exported.body,
+    );
+    expect(imported.status).toBe(200);
+    const activity = await call<ListActivityDto>(
+      getListActivity,
+      'GET',
+      '/api/lists/games-2/activity',
+      admin,
+    );
+    expect(activity.body.events).toMatchObject([{ action: 'imported', adminName: 'dev' }]);
+    expect(activity.body.events).toHaveLength(1);
+  });
   test('saved draft plans survive export/import without starting participation', async () => {
     const draft = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
       title: 'Planned',

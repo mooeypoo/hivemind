@@ -85,10 +85,17 @@ test('trims a required explanation of at most 500 characters; null restores the 
     (await run(admin, { ...input('Different reason'), expectedReason: 'x'.repeat(500) })).ok,
   ).toBe(true);
   expect((await run(admin, { ...input(null), expectedReason: 'Different reason' })).ok).toBe(true);
-  expect((await deps.entries.get(listId, entry.id))?.value).toEqual({
+  const restored = (await deps.entries.get(listId, entry.id))?.value;
+  const { activity, ...retained } = restored ?? {};
+  expect(retained).toEqual({
     ...entry,
     setAsideReason: null,
   });
+  expect(activity?.map((event) => event.action)).toEqual([
+    'entry-set-aside',
+    'explanation-edited',
+    'entry-returned',
+  ]);
 });
 
 test('rejects stale explanation edits rather than overwriting another Admin', async () => {

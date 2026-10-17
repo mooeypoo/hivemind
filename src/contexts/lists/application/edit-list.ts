@@ -14,6 +14,7 @@ import { findList } from './find-list.ts';
 import type { Catalog, EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
 import { checkSettingsVersion, type SettingsExpectation } from './settings-version.ts';
+import { appendListActivity, settingsChanges } from '../domain/list-activity.ts';
 
 export interface EditListDeps {
   readonly lists: ListRepository;
@@ -51,7 +52,11 @@ export const makeEditList =
       }
       const edited = editList(before, input.edit, now, { itemSourceEditable: changesSource });
       if (!edited.ok) return edited;
-      const after = edited.value;
+      const changes = settingsChanges(before, edited.value);
+      const after =
+        changes.length === 0
+          ? edited.value
+          : appendListActivity(edited.value, 'settings-edited', admin.value, now, changes);
 
       const sourceChanged =
         JSON.stringify(after.config.itemSource) !== JSON.stringify(before.config.itemSource) ||

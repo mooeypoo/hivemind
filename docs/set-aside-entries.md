@@ -14,7 +14,11 @@ or its ratings. This is entry metadata, not a second List aggregate.
 - Withdrawal hides the entry as usual. Re-nomination of the same item retains its
   classification and explanation, so it cannot bypass an Admin's decision.
 - Older entries and backups without this metadata mean "not set aside".
-- Backups preserve the classification. No Admin identity or change history is stored.
+- Backups preserve the classification, but exclude Admin attribution and activity history.
+  Admin-only activity records classification changes and the responsible Admin for one
+  calendar year (or until data erasure), then retains unnamed events with the list.
+  Previous explanations are never copied into history. Deleting an entry deletes its
+  identifying history. See [the admin guide](./admin-guide.md#admin-only-activity).
   Explanations should describe the item, not contain personal information.
 
 ## Viewing rankings

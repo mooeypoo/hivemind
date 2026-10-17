@@ -5,6 +5,7 @@ import { defined, listParam, parseWith, queryOf, readJson } from '../body.ts';
 import type {
   ListDetailDto,
   ListDto,
+  ListActivityDto,
   ListsDto,
   CatalogItemDto,
   RefreshMovieDetailsDto,
@@ -32,6 +33,12 @@ import {
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
   result.ok ? json(map(result.value), status) : domainErrorResponse(result.error);
+
+export const getListActivity = async (request: Request, app: App): Promise<Response> =>
+  respond(
+    await app.lists.getListActivity(await actorOf(request, app), { list: listParam(request) }),
+    (events): ListActivityDto => ({ events }),
+  );
 
 export const setEntryAside = async (request: Request, app: App): Promise<Response> => {
   const rejected = rejectForeignOrigin(request, app.siteOrigin(request));

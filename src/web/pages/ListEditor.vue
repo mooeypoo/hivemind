@@ -16,6 +16,7 @@ import type {
 } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import ListActivity from '../components/ListActivity.vue';
 import AppDialog from '../components/ui/AppDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
@@ -798,6 +799,9 @@ const importCsv = async () => {
       Save a draft, review the member experience, then publish.
       <a :href="adminGuideUrl">Admin guide and FAQ</a>
     </p>
+    <p v-if="existing?.createdBy != null" class="meta">
+      Created or imported by {{ existing.createdBy }}
+    </p>
     <section
       v-if="settingsConflict"
       class="card stack settings-conflict"
@@ -1579,6 +1583,12 @@ const importCsv = async () => {
       <ErrorNotice :error="error" />
       <p v-if="setupError !== ''" class="notice notice--error" role="alert">{{ setupError }}</p>
     </ConfirmDialog>
+
+    <ListActivity
+      v-if="ready && existing !== null && !deleting"
+      :list-id="existing.id"
+      :settings-version="existing.settingsVersion"
+    />
 
     <section v-if="ready && existing !== null" class="card stack" aria-labelledby="danger-heading">
       <h2 id="danger-heading" class="danger-text">Danger zone</h2>

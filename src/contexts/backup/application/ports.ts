@@ -1,4 +1,4 @@
-import type { DomainError, Result } from '../../../shared/kernel/index.ts';
+import type { DomainError, MemberActor, Result } from '../../../shared/kernel/index.ts';
 import type { BackupListPart } from '../domain/backup-file.ts';
 
 /** The list part of a backup, owned by the lists context. */
@@ -25,6 +25,7 @@ export interface ListsBackup {
   restore(
     backup: ListBackupData,
     options: {
+      readonly importedBy?: MemberActor;
       readonly itemSource?: { readonly kind: string; readonly presetId?: string };
       readonly keepMember: (memberId: string) => Promise<boolean>;
     },

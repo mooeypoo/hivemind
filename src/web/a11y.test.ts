@@ -169,6 +169,27 @@ const renderAt = async (
         labels: [{ roleId: '900000000000000077', name: 'Film Club' }],
         version: 'v1',
       }),
+    'GET /api/lists/list-1/activity': () =>
+      Response.json({
+        events: [
+          {
+            id: 'a1',
+            action: 'settings-edited',
+            at: '2026-01-02T12:00:00Z',
+            adminName: 'Alex',
+            entryTitle: null,
+            changes: [{ field: 'maxNominationsPerMember', before: '3', after: 'null' }],
+          },
+          {
+            id: 'a2',
+            action: 'entry-set-aside',
+            at: '2025-01-01T12:00:00Z',
+            adminName: null,
+            entryTitle: 'An item',
+            changes: [],
+          },
+        ],
+      }),
   });
   const { createAppRouter } = await import('./router.ts');
   const router = createAppRouter(createMemoryHistory());
@@ -189,6 +210,18 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test('admin activity history is accessible with named and anonymised decisions', async () => {
+    const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Show activity')
+      ?.trigger('click');
+    await flushPromises();
+    expect(wrapper.get('.activity').text()).toContain('Admin identity removed');
+    expect(wrapper.get('.activity').text()).toContain('Alex');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
   test('stale editor settings comparison is accessible', async () => {
     sessionStorage.setItem(
       'draft:editor:draft',
@@ -742,6 +775,7 @@ describe('site-wide content', () => {
       'What we store about you',
       'What we never store',
       'Setting entries aside',
+      'Admin activity history',
       'Withdrawing a nomination',
       'When an Admin deletes a list',
       'When an Admin deletes an entry',

@@ -7,6 +7,7 @@ import {
   type RoleId,
 } from '../../../shared/kernel/index.ts';
 import { invalidConfig, invalidSchedule, listsErrors, lockedFields } from './errors.ts';
+import type { ActivityEvent } from './activity.ts';
 
 export type ListId = Brand<string, 'ListId'>;
 
@@ -76,6 +77,7 @@ export type Phase = 'draft' | 'published' | 'archived';
 export type Lifecycle = 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
 
 export interface List {
+  readonly activity?: readonly ActivityEvent[];
   readonly id: ListId;
   /** Admin settings only; participation and technical write fencing do not advance this. */
   readonly settingsVersion?: number;

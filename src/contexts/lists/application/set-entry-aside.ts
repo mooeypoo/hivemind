@@ -21,6 +21,7 @@ import { findList } from './find-list.ts';
 import { withEntryWrite } from './entry-write.ts';
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 import { toEntryView, type EntryView } from './views.ts';
+import { activityEvent, retainActivityIdentity } from '../domain/activity.ts';
 
 interface Deps {
   readonly lists: ListRepository;
@@ -71,7 +72,23 @@ export const makeSetEntryAside =
             ),
           );
         }
-        const updated = { ...entry.value, setAsideReason: reason.value };
+        if ((entry.value.setAsideReason ?? null) === reason.value)
+          return ok(toEntryView(entry.value, current.value, admin.value, deps.clock.now()));
+        const now = deps.clock.now();
+        const action =
+          reason.value === null
+            ? 'entry-returned'
+            : entry.value.setAsideReason == null
+              ? 'entry-set-aside'
+              : 'explanation-edited';
+        const updated = {
+          ...entry.value,
+          setAsideReason: reason.value,
+          activity: [
+            ...retainActivityIdentity(entry.value.activity ?? [], now),
+            activityEvent(deps.ids.next(), action, admin.value, now),
+          ],
+        };
         if (!(await deps.entries.save(updated, entry.version))) return err(listsErrors.conflict);
         return ok(toEntryView(updated, current.value, admin.value, deps.clock.now()));
       });

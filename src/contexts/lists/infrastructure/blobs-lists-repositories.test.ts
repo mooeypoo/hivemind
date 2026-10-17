@@ -4,6 +4,7 @@ import {
   type LocalBlobs,
 } from '../../../shared/infrastructure/testing/local-blobs.ts';
 import type { MemberId } from '../../../shared/kernel/index.ts';
+import { activityEvent } from '../domain/activity.ts';
 import { entryIdFor, type Entry } from '../domain/entry.ts';
 import { DEFAULT_SCALE, newList, publish, type ListId } from '../domain/list.ts';
 import {
@@ -42,6 +43,55 @@ const draft = newList(
 );
 
 describe('Blobs lists repositories', () => {
+  test('list and entry activity use versioned records and round-trip attribution, dates and anonymisation', async () => {
+    const store = blobs.store('activity-records');
+    const lists = createBlobsListRepository(store);
+    const entries = createBlobsEntryRepository(store);
+    const event = activityEvent(
+      'event-1',
+      'created',
+      {
+        kind: 'member',
+        memberId: 'admin' as MemberId,
+        displayName: 'Alex',
+        isAdmin: true,
+        roleIds: [],
+      },
+      new Date('2026-01-01T12:00:00Z'),
+    );
+    expect(await lists.save({ ...draft, activity: [event] }, null)).toBe(true);
+    expect((await lists.get(listId))?.value.activity).toEqual([event]);
+    const item = {
+      source: 'freeform',
+      externalId: 'one',
+      title: 'One',
+      subtitle: null,
+      imageUrl: null,
+    };
+    const entry: Entry = {
+      id: entryIdFor(item),
+      listId,
+      item,
+      nominatedBy: null,
+      nominatedAt: event.at,
+      snapshotPurgedAt: null,
+      setAsideReason: null,
+      activity: [{ ...event, action: 'entry-set-aside' }],
+    };
+    expect(await entries.create(entry)).toBe(true);
+    const current = await entries.get(listId, entry.id);
+    expect(current?.value).toEqual(entry);
+    if (current === null) throw new Error('fixture');
+    expect(
+      await entries.save({ ...entry, activity: [{ ...event, admin: null }] }, current.version),
+    ).toBe(true);
+    const stored: unknown = await store.get(`entry/${listId}/${entry.id}`, { type: 'json' });
+    expect(stored).toMatchObject({
+      v: 1,
+      activity: [{ at: '2026-01-01T12:00:00.000Z', admin: null }],
+    });
+    expect(JSON.stringify(stored)).not.toContain('Alex');
+  });
   test('settings revisions round-trip and legacy records start at zero', async () => {
     const store = blobs.store('settings-revisions');
     const repo = createBlobsListRepository(store);
