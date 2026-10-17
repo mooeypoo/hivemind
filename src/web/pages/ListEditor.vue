@@ -1066,7 +1066,7 @@ const importCsv = async () => {
           get a place yet: they wait below the ranking, so a few early 10s can’t top the list.
         </p>
 
-        <p class="meta">When can members see the results?</p>
+        <p class="field-label">When can members see the results?</p>
         <div class="choices" role="radiogroup" aria-label="Results visibility">
           <label class="choice">
             <input v-model="form.resultsVisibility" type="radio" name="visibility" value="live" />

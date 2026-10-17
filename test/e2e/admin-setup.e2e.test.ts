@@ -11,6 +11,17 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await fakeApi(page, admin);
         await page.goto('/admin/lists/new');
+        const questionStyle = await page
+          .getByText('When can members see the results?', { exact: true })
+          .evaluate((el) => {
+            const style = getComputedStyle(el);
+            return { size: style.fontSize, weight: style.fontWeight, color: style.color };
+          });
+        const labelStyle = await page.locator('label[for="min-votes"]').evaluate((el) => {
+          const style = getComputedStyle(el);
+          return { size: style.fontSize, weight: style.fontWeight, color: style.color };
+        });
+        expect(questionStyle).toEqual(labelStyle);
         const guide = page
           .getByRole('link', { name: 'Admin guide and FAQ (opens in a new tab)', exact: true })
           .first();
