@@ -61,6 +61,64 @@ for (const colorScheme of ['light', 'dark'] as const) {
         );
       });
 
+      test(`draft steps allow going back without losing choices at ${String(width)}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 850 });
+        await fakeApi(page, admin);
+        const draft = {
+          ...list,
+          title: 'Community picks',
+          slug: 'community-picks',
+          lifecycle: 'draft',
+          schedule: null,
+          draftSchedule: null,
+          entries: [],
+          settingsVersion: 0,
+          itemSourceEditable: true,
+          itemSource: { kind: 'freeform' },
+          maxNominationsPerMember: null,
+          ranking: { strategy: 'bayesian', minVotes: 2 },
+          scoreVisibility: 'private',
+        };
+        let writes = 0;
+        await page.route('**/api/lists', async (route) => {
+          expect(route.request().method()).toBe('POST');
+          writes += 1;
+          await route.fulfill({ status: 201, json: draft });
+        });
+        await page.route('**/api/lists/community-picks', (route) => route.fulfill({ json: draft }));
+        await page.goto('/admin/lists/new');
+        await page.getByLabel('Title', { exact: true }).fill('Community picks');
+        await page.locator('input[value="freeform"]').check();
+        await page.getByRole('button', { name: 'Create draft', exact: true }).click();
+        await expect(
+          page.getByRole('heading', {
+            name: 'Draft saved. Next, choose when participation opens.',
+          }),
+        ).toBeFocused();
+        await expect(page.locator('#editor-basics')).not.toBeVisible();
+        await expect(page.locator('#editor-schedule')).toBeVisible();
+        await page.locator('input[name="opens"][value="at"]').check();
+        await page.locator('#opens').fill('2099-07-01T18:00');
+        await page.getByRole('button', { name: 'Edit setup', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Step 1: Edit setup' })).toBeFocused();
+        await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Community picks');
+        await page.locator('#min-votes').fill('4');
+        await page.locator('[data-review-publish]').click();
+        await expect(page.locator('#opens')).toHaveValue('2099-07-01T18:00');
+        await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+        const review = page.getByRole('dialog', { name: 'Review before publishing' });
+        await expect(review).toBeVisible();
+        await page.getByRole('button', { name: 'Back to timing', exact: true }).click();
+        await page.getByRole('button', { name: '1. Set up', exact: true }).click();
+        await expect(page.locator('#min-votes')).toHaveValue('4');
+        expect(writes).toBe(1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+      });
+
       test(`admin activity history fits and stays separate at ${String(width)}px`, async ({
         page,
       }) => {
@@ -152,6 +210,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           await route.fulfill({ json: shared });
         });
         await page.goto('/admin/lists/films');
+        await page.getByRole('button', { name: 'Edit setup', exact: true }).click();
         await page.getByLabel('Description', { exact: true }).fill('My unsaved description');
         shared = { ...shared, settingsVersion: 1, description: `Other admin: ${'x'.repeat(180)}` };
         await page.getByRole('button', { name: 'Save draft', exact: true }).click();
@@ -271,18 +330,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
           expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
         };
         await page.goto('/admin/lists/films');
+        await page.getByRole('button', { name: 'Edit setup', exact: true }).click();
         await page.getByRole('radio', { name: /^Named:/ }).check();
-        await page.getByRole('button', { name: 'Review & publish', exact: true }).click();
+        await page.locator('[data-review-publish]').click();
+        await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
         const review = page.getByRole('dialog', { name: 'Review before publishing' });
         await expect(review).toBeVisible();
-        await expect(review.getByRole('button', { name: 'Back to settings' })).toBeFocused();
+        await expect(review.getByRole('button', { name: 'Back to timing' })).toBeFocused();
         await expect(review).toContainText('What becomes fixed');
         await fits();
         expect(saved).toBe(false);
-        await review.getByRole('button', { name: 'Back to settings' }).click();
+        await review.getByRole('button', { name: 'Back to timing' }).click();
         await expect(review).not.toBeVisible();
         expect(published).toBe(false);
-        await page.getByRole('button', { name: 'Review & publish', exact: true }).click();
+        await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
         const confirm = review.getByRole('button', {
           name: 'Publish and open voting',
           exact: true,

@@ -11,14 +11,21 @@ menu and look for **Admin**.
 3. Choose an item type deliberately. A movie list and a write-in list work differently.
 4. Check rating, nomination, participation and privacy settings.
 5. Choose **Create draft**. Only admins can see a draft.
-6. Choose dates, or leave participation starting immediately with no automatic end.
-7. Choose **Review & publish**. Read the member experience and settings that will lock.
+6. In **Choose timing**, choose dates, or leave participation starting immediately with no automatic end.
+7. Choose **Continue to review**. Read the member experience and settings that will lock.
 8. Confirm the review, then publish. A scheduled opening still publishes the list now.
 
 Drafts are safe to edit. Publishing fixes most settings immediately, not when the first
 person votes. **Save draft** saves planned dates to the site too, so another admin can
 review and continue the plan. It does not publish the list or start participation.
 Unsaved edits remain only in your browser tab.
+
+After creating a draft, the editor moves to **Choose timing** and summarizes your setup.
+Choose **Edit setup** or **1. Set up** to go back and change earlier choices, then
+**Continue to timing** to return. Your unsaved settings and dates stay in the form
+when you move between steps. From the publication review, **Back to timing** lets
+you check dates or return to setup again. Moving between steps never saves or publishes.
+Use **Save draft** when you want to save your work and finish later.
 
 New lists allow **unlimited nominations per member** by default. Uncheck **Unlimited**
 and choose a limit if your community needs one. Existing lists keep their saved limits.

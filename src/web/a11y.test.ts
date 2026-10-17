@@ -250,6 +250,22 @@ describe('every page passes automated accessibility checks', () => {
     await expectAccessible(document.body);
     wrapper.unmount();
   });
+  test('returning to draft setup and timing is accessible and preserves unsaved choices', async () => {
+    const wrapper = await renderAt('/admin/lists/draft', true);
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Edit setup')
+      ?.trigger('click');
+    await flushPromises();
+    await wrapper.get('#description').setValue('Unsaved setup');
+    await expectAccessible(document.body);
+    await wrapper.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('#description').element).toHaveProperty('value', 'Unsaved setup');
+    expect(wrapper.get('.editor-setup').classes()).toContain('editor-setup--collapsed');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
 
   test.each(['/lists/best-sci-fi?tab=standings', '/lists/best-sci-fi/results'])(
     'separate and combined standings at %s are accessible',
@@ -668,7 +684,7 @@ describe('score visibility editor', () => {
 
     const published = await renderAt('/admin/lists/best-sci-fi', true);
     const section = (legend: string) =>
-      [...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset')].find(
+      [...document.querySelectorAll<HTMLFieldSetElement>('form fieldset.card')].find(
         (fieldset) => fieldset.querySelector('legend')?.textContent === legend,
       );
     expect(section('Rating')?.disabled).toBe(true);
