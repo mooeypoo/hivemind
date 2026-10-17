@@ -8,5 +8,7 @@ export const runRetention = async (app: App): Promise<string> => {
   const purged = await app.lists.purgeExpiredSnapshots();
   const stale = await app.ranking.dropStaleLeaderboards();
   const forgotten = await app.identity.forgetOldErasures();
-  return `Retention: checked ${String(purged.listsChecked)} archived lists, removed details from ${String(purged.entriesPurged)} entries, cleared ${String(stale.dropped)} cached leaderboards, forgot ${String(forgotten)} erasures older than two years.`;
+  const activity = await app.lists.anonymiseExpiredActivity();
+  if (!activity.ok) throw new Error(`Admin activity retention failed: ${activity.error.code}`);
+  return `Retention: checked ${String(purged.listsChecked)} archived lists, removed details from ${String(purged.entriesPurged)} entries, cleared ${String(stale.dropped)} cached leaderboards, forgot ${String(forgotten)} erasures older than two years, anonymised ${String(activity.value)} admin activity records.`;
 };

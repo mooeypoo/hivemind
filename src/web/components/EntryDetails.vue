@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '../lib/datetime.ts';
 import type { EntryDto, LeaderboardRowDto } from '../../server/http/contracts.ts';
 import PublicScoreDisclosure from './PublicScoreDisclosure.vue';
 import AppDialog from './ui/AppDialog.vue';
@@ -81,15 +82,40 @@ const emit = defineEmits<{
         Your score: <strong>{{ finalScore }}</strong>
       </p>
     </div>
+    <section
+      v-if="entry !== null && (canSetAside === true || canDelete === true)"
+      class="entry-admin stack"
+      aria-label="Admin tools"
+    >
+      <h3>Admin tools</h3>
+      <p v-if="entry.moderation != null" class="meta">
+        Last moderation: {{ entry.moderation.adminName ?? 'Admin identity removed' }} ·
+        <time :datetime="entry.moderation.at">{{ formatDateTime(entry.moderation.at) }}</time>
+      </p>
+      <p class="meta">
+        These actions affect the entry for everyone, not just your own nomination or score.
+      </p>
+      <div class="actions">
+        <button
+          v-if="canSetAside === true && entry !== null"
+          type="button"
+          class="button"
+          @click="emit('setAside', entry)"
+        >
+          {{ entry.setAsideReason == null ? 'Set aside...' : 'Edit set-aside status...' }}
+        </button>
+        <button
+          v-if="canDelete === true && entry.deletionToken != null"
+          type="button"
+          class="button button--danger"
+          :aria-label="`Permanently delete ${entry.item.title}`"
+          @click="emit('delete', entry)"
+        >
+          Delete entry...
+        </button>
+      </div>
+    </section>
     <template #actions>
-      <button
-        v-if="canSetAside === true && entry !== null"
-        type="button"
-        class="button"
-        @click="emit('setAside', entry)"
-      >
-        {{ entry.setAsideReason == null ? 'Set aside...' : 'Edit set-aside status...' }}
-      </button>
       <button
         v-if="entry?.withdrawalToken != null"
         type="button"
@@ -97,15 +123,6 @@ const emit = defineEmits<{
         @click="emit('withdraw', entry)"
       >
         Withdraw nomination
-      </button>
-      <button
-        v-if="canDelete === true && entry?.deletionToken != null"
-        type="button"
-        class="button button--danger"
-        :aria-label="`Permanently delete ${entry.item.title}`"
-        @click="emit('delete', entry)"
-      >
-        Delete entry...
       </button>
       <button type="button" class="button" @click="emit('close')">Close</button>
     </template>

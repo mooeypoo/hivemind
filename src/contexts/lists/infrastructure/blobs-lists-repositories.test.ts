@@ -4,6 +4,7 @@ import {
   type LocalBlobs,
 } from '../../../shared/infrastructure/testing/local-blobs.ts';
 import type { MemberId } from '../../../shared/kernel/index.ts';
+import { activityEvent } from '../domain/activity.ts';
 import { entryIdFor, type Entry } from '../domain/entry.ts';
 import { DEFAULT_SCALE, newList, publish, type ListId } from '../domain/list.ts';
 import {
@@ -42,6 +43,93 @@ const draft = newList(
 );
 
 describe('Blobs lists repositories', () => {
+  test('list and entry activity use versioned records and round-trip attribution, dates and anonymisation', async () => {
+    const store = blobs.store('activity-records');
+    const lists = createBlobsListRepository(store);
+    const entries = createBlobsEntryRepository(store);
+    const event = activityEvent(
+      'event-1',
+      'created',
+      {
+        kind: 'member',
+        memberId: 'admin' as MemberId,
+        displayName: 'Alex',
+        isAdmin: true,
+        roleIds: [],
+      },
+      new Date('2026-01-01T12:00:00Z'),
+    );
+    expect(await lists.save({ ...draft, activity: [event] }, null)).toBe(true);
+    expect((await lists.get(listId))?.value.activity).toEqual([event]);
+    const item = {
+      source: 'freeform',
+      externalId: 'one',
+      title: 'One',
+      subtitle: null,
+      imageUrl: null,
+    };
+    const entry: Entry = {
+      id: entryIdFor(item),
+      listId,
+      item,
+      nominatedBy: null,
+      nominatedAt: event.at,
+      snapshotPurgedAt: null,
+      setAsideReason: null,
+      activity: [{ ...event, action: 'entry-set-aside' }],
+    };
+    expect(await entries.create(entry)).toBe(true);
+    const current = await entries.get(listId, entry.id);
+    expect(current?.value).toEqual(entry);
+    if (current === null) throw new Error('fixture');
+    expect(
+      await entries.save({ ...entry, activity: [{ ...event, admin: null }] }, current.version),
+    ).toBe(true);
+    const stored: unknown = await store.get(`entry/${listId}/${entry.id}`, { type: 'json' });
+    expect(stored).toMatchObject({
+      v: 1,
+      activity: [{ at: '2026-01-01T12:00:00.000Z', admin: null }],
+    });
+    expect(JSON.stringify(stored)).not.toContain('Alex');
+  });
+  test('settings revisions round-trip and legacy records start at zero', async () => {
+    const store = blobs.store('settings-revisions');
+    const repo = createBlobsListRepository(store);
+    expect(await repo.save({ ...draft, settingsVersion: 7 }, null)).toBe(true);
+    expect((await repo.get(listId))?.value.settingsVersion).toBe(7);
+    const record: unknown = await store.get(`list/${listId}`, { type: 'json' });
+    if (typeof record !== 'object' || record === null || !('settingsVersion' in record))
+      throw new Error('fixture');
+    const { settingsVersion, ...legacy } = record;
+    expect(settingsVersion).toBe(7);
+    await store.setJSON(`list/${listId}`, legacy);
+    expect((await repo.get(listId))?.value.settingsVersion).toBe(0);
+  });
+  test('draft schedules round-trip with nullable opening and older records have no plan', async () => {
+    const store = blobs.store('draft-schedules');
+    const repo = createBlobsListRepository(store);
+    const plan = {
+      opensAt: null,
+      nominationsCloseAt: new Date('2026-04-10T00:00:00Z'),
+      closesAt: new Date('2026-04-20T00:00:00Z'),
+    };
+    expect(await repo.save({ ...draft, draftSchedule: plan }, null)).toBe(true);
+    expect((await repo.get(listId))?.value.draftSchedule).toEqual(plan);
+    const record: unknown = await store.get(`list/${listId}`, { type: 'json' });
+    expect(record).toMatchObject({
+      draftSchedule: {
+        opensAt: null,
+        nominationsCloseAt: '2026-04-10T00:00:00.000Z',
+        closesAt: '2026-04-20T00:00:00.000Z',
+      },
+    });
+    if (typeof record !== 'object' || record === null) throw new Error('fixture');
+    const { draftSchedule: omitted, ...legacy } = record as Record<string, unknown>;
+    expect(omitted).toBeDefined();
+    await store.setJSON(`list/${listId}`, legacy);
+    expect((await repo.get(listId))?.value.draftSchedule).toBeNull();
+  });
+
   test('permanent deletion keeps only an ID fence and prevents stale aggregate resurrection', async () => {
     const store = blobs.store('deleted-list-fence');
     const repo = createBlobsListRepository(store);

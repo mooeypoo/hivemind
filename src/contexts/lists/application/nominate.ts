@@ -99,6 +99,9 @@ export const makeNominate =
             : {
                 ...entry,
                 setAsideReason: current.value.setAsideReason ?? null,
+                ...(current.value.activity === undefined
+                  ? {}
+                  : { activity: current.value.activity }),
                 withdrawnNominationIds: current.value.withdrawnNominationIds ?? [],
               };
         const saved =

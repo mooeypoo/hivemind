@@ -52,6 +52,17 @@ With `DEMO_MODE=true` (set in `.env.example`), local dev and Netlify deploy prev
 
 ## Operations
 
+Admins creating and managing lists can start with the [Admin guide and FAQ](docs/admin-guide.md).
+It explains item types, publishing locks, dates, score privacy and moderation without requiring
+deployment knowledge. The editor and Admin menu link to the guide in the configured source repository.
+Saving a draft also saves its planned dates for other admins to review; it does not publish
+the list or start participation. Publishing checks deadlines again.
+
+The editor's **List activity** records admin decisions. Attribution lasts one calendar year
+or until the admin erases their data; unnamed events stay with the list. Activity is
+excluded from backups, and imported copies start with a new import event. The daily
+retention job removes expired admin IDs and names. See the guide for scope and deletion.
+
 - **Permanently deleting a list:** Admins can use the editor's **Danger zone** in any lifecycle, including drafts and archives. Review the warning and type the current slug before confirming. Deletion removes all entries (including withdrawn ones), nomination records, ballots and the leaderboard, and releases the slug only after cleanup. It does not remove accounts or shared catalog presets. A replacement list gets a new internal ID with no inherited entries or votes; old shared links can lead to that replacement. Previously downloaded backups are not erased and can restore a separate copy.
 - **Permanently deleting an entry:** Admins can select **Delete entry** on a list item and type its title to confirm. This erases that entry, its scores and nomination records, frees the nomination allowance and recalculates the entire ranking. Unlike withdrawal, re-nomination starts without earlier scores. This also works on seeded and finished lists; deleting from a closed or archived list changes its final results. Nominations, score changes, list edits and backup export for the affected list pause during cleanup. Pending operations show **Retry entry deletion** on the list page, including after reload. Interrupted cleanup is never reported as success. Previously downloaded backups are unaffected.
 - **Setting entries aside:** Admins can use an entry's details to set it aside as outside the list's criteria, with a member-visible explanation. Ratings remain and voting continues normally. Standings default to independent main and set-aside rankings; open the collapsed **Ranking view** controls and choose **Combine ranking** to recalculate all entries together. Admins can edit explanations or return entries to the main ranking, including after voting closes, but not after archiving. Backups and re-nominations retain the classification. See [Set-aside entries](docs/set-aside-entries.md) for the behavior and calculation rules.

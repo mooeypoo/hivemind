@@ -37,6 +37,399 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test('free text warns admins about unfiltered submissions when choosing and reviewing', async () => {
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    const choice = editor.get('input[value=freeform]').element.closest('label');
+    expect(choice?.textContent).toContain(
+      'No automatic content filter: any words or free text can be submitted, so moderation may be needed.',
+    );
+    await editor.get('input[value=freeform]').setValue(true);
+    await editor.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(editor.get('dialog[open]').text()).toContain(
+      'No automatic content filter: any words or free text can be submitted, so moderation may be needed.',
+    );
+    editor.unmount();
+  });
+
+  test('the form cannot accept input before its saved settings arrive', async () => {
+    stubApi({ 'GET /api/catalog/sources': sources, 'GET /api/roles': roles });
+    const fetch = globalThis.fetch;
+    let respond: ((response: Response) => void) | undefined;
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) =>
+      input === '/api/lists/best-sci-fi'
+        ? new Promise<Response>((resolve) => {
+            respond = resolve;
+          })
+        : fetch(input, init),
+    );
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.find('form').exists()).toBe(false);
+    expect(editor.text()).toContain('Loading list settings');
+    if (respond === undefined) throw new Error('Missing list request');
+    respond(Response.json(openTmdbList({ description: 'Saved description' })));
+    await flushPromises();
+    expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'Saved description',
+    );
+    editor.unmount();
+  });
+  test('a draft published by another admin keeps restored input for comparison but cannot rebase locked settings', async () => {
+    sessionStorage.setItem(
+      'draft:editor:best-sci-fi',
+      JSON.stringify({
+        form: { title: 'My unsaved title', description: 'My description' },
+        settingsVersion: 0,
+        lifecycle: 'draft',
+      }),
+    );
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList({ settingsVersion: 1 })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect((editor.get('#title').element as HTMLInputElement).value).toBe('My unsaved title');
+    expect(editor.get('.settings-conflict').text()).toContain('My unsaved title');
+    expect(editor.get('.settings-conflict').text()).toContain('list’s status has changed');
+    expect(
+      editor
+        .findAll('button')
+        .find((button) => button.text() === 'Keep my input after comparison')
+        ?.attributes('disabled'),
+    ).toBeDefined();
+    editor.unmount();
+  });
+  test('a stale save keeps input and requires an explicit comparison before saving against the latest version', async () => {
+    let version = 0;
+    const draft = (description: string) =>
+      openTmdbList({ lifecycle: 'draft', schedule: null, settingsVersion: version, description });
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(draft(version === 0 ? '' : 'Other admin')),
+      'GET /api/lists/list-1': () => Response.json(draft('Other admin')),
+      'PUT /api/lists/list-1': (call) => {
+        const body = call.body as { expectedSettingsVersion: number; description: string };
+        if (body.expectedSettingsVersion !== version)
+          return Response.json(
+            { error: { code: 'lists.settings-changed', message: 'Settings changed' } },
+            { status: 409 },
+          );
+        version += 1;
+        return Response.json(draft(body.description));
+      },
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('#description').setValue('My unsaved description');
+    version = 1;
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(editor.text()).toContain('Compare before continuing');
+    expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'My unsaved description',
+    );
+    await editor.get('form').trigger('submit');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+    await editor
+      .findAll('button')
+      .find((button) => button.text() === 'Compare latest settings')
+      ?.trigger('click');
+    await flushPromises();
+    expect(editor.text()).toContain('Other admin');
+    expect(editor.text()).toContain('My unsaved description');
+    await editor
+      .findAll('button')
+      .find((button) => button.text() === 'Keep my input after comparison')
+      ?.trigger('click');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.filter((call) => call.method === 'PUT').at(-1)?.body).toMatchObject({
+      expectedSettingsVersion: 1,
+      description: 'My unsaved description',
+    });
+    editor.unmount();
+  });
+
+  test('restored input keeps its original version instead of silently rebasing onto another admin’s changes', async () => {
+    let version = 0;
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(
+          openTmdbList({
+            lifecycle: 'draft',
+            schedule: null,
+            settingsVersion: version,
+            description: version === 0 ? '' : 'Other admin',
+          }),
+        ),
+    });
+    const first = await mountAt('/admin/lists/best-sci-fi');
+    await first.get('#description').setValue('Keep across reload');
+    first.unmount();
+    version = 1;
+    const restored = await mountAt('/admin/lists/best-sci-fi');
+    expect((restored.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'Keep across reload',
+    );
+    expect(restored.text()).toContain('Compare before continuing');
+    expect(restored.text()).toContain('Other admin');
+    await restored.get('form').trigger('submit');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    await restored
+      .findAll('button')
+      .find((button) => button.text() === 'Replace my input with latest settings')
+      ?.trigger('click');
+    expect((restored.get('#description').element as HTMLTextAreaElement).value).toBe('Other admin');
+    restored.unmount();
+  });
+
+  test('publishing uses the saved version and a conflict closes review without losing the form', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null, settingsVersion: 3 })),
+      'PUT /api/lists/list-1': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null, settingsVersion: 4 })),
+      'POST /api/lists/list-1/schedule': () =>
+        Response.json(
+          { error: { code: 'lists.settings-changed', message: 'Changed during publication' } },
+          { status: 409 },
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('#description').setValue('Reviewed description');
+    await editor.get('[data-review-publish]').trigger('click');
+    await editor.get('#publish-locks').setValue(true);
+    await editor.get('[data-confirm-publish]').trigger('click');
+    await flushPromises();
+    expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+      expectedSettingsVersion: 3,
+    });
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      expectedSettingsVersion: 4,
+    });
+    expect(editor.find('dialog[open]').exists()).toBe(false);
+    expect(editor.text()).toContain('Compare before continuing');
+    expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
+      'Reviewed description',
+    );
+    editor.unmount();
+  });
+
+  test('new lists require an item choice and keep names visible with private individual scores', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+    });
+    const editor = await mountAt('/admin/lists/new');
+    expect(editor.findAll('input[name=source]:checked')).toHaveLength(0);
+    await editor.get('#title').setValue('Community favourites');
+    await editor.get('form').trigger('submit');
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+    expect(editor.get('p[role=alert]').text()).toContain('Choose an item type');
+    expect(
+      (editor.get('input[name=score-visibility][value=private]').element as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(editor.get('#editor-rating').text()).toContain('Fixed when published');
+    editor.unmount();
+  });
+
+  test('review explains named scores and requires both acknowledgments before publishing', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+      'PUT /api/lists/list-1': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+      'POST /api/lists/list-1/schedule': () => Response.json(openTmdbList()),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('input[name=score-visibility][value=public]').setValue(true);
+    await editor.get('input[name=visibility][value=after-close]').setValue(true);
+    await editor.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(calls.some((call) => call.method === 'PUT' || call.method === 'POST')).toBe(false);
+    const dialog = editor.get('dialog[open]');
+    expect(dialog.text()).toContain('Standings stay hidden from everyone, including admins');
+    expect(dialog.text()).toContain('No automatic end');
+    const confirm = dialog.get('[data-confirm-publish]');
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await dialog.get('#publish-locks').setValue(true);
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await dialog.get('#publish-named-scores').setValue(true);
+    await confirm.trigger('click');
+    await flushPromises();
+    expect(calls.some((call) => call.url.endsWith('/schedule'))).toBe(true);
+    editor.unmount();
+  });
+
+  test('invalid date order blocks review without saving or publishing', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('input[name=opens][value=at]').setValue(true);
+    await editor.get('#opens').setValue('2099-06-10T18:00');
+    await editor.get('#nominations-close').setValue('2099-06-09T18:00');
+    expect(editor.text()).toContain('Nominations must close after participation opens');
+    expect(editor.get('[data-review-publish]').attributes('disabled')).toBeDefined();
+    expect(calls.some((call) => call.method === 'PUT' || call.method === 'POST')).toBe(false);
+    editor.unmount();
+  });
+
+  test.each([
+    ['scale', 'Choose whole-number scores'],
+    ['preset', 'Import your collection'],
+  ])('invalid %s blocks publishing review', async (kind, message) => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(
+          openTmdbList({ lifecycle: 'draft', schedule: null, itemSourceEditable: true }),
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    if (kind === 'scale') await editor.get('#scale-min').setValue(10);
+    else await editor.get('input[value=preset]').setValue(true);
+    await editor.get('[data-review-publish]').trigger('click');
+    expect(editor.find('dialog[open]').exists()).toBe(false);
+    expect(editor.get('p[role=alert]').text()).toContain(message);
+    expect(calls.some((call) => call.method === 'PUT' || call.method === 'POST')).toBe(false);
+    editor.unmount();
+  });
+
+  test('removing a published nomination limit requires confirmation before saving', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList()),
+      'PUT /api/lists/list-1': () => Response.json(openTmdbList({ maxNominationsPerMember: null })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('#unlimited').setValue(true);
+    await editor.get('form').trigger('submit');
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+    const dialog = editor.get('dialog[open]');
+    expect(dialog.text()).toContain('cannot be restored');
+    await dialog
+      .findAll('button')
+      .find((button) => button.text() === 'Cancel')
+      ?.trigger('click');
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+    await editor.get('form').trigger('submit');
+    await editor
+      .get('dialog[open]')
+      .findAll('button')
+      .find((button) => button.text() === 'Save with unlimited nominations')
+      ?.trigger('click');
+    await flushPromises();
+    expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+      maxNominationsPerMember: null,
+    });
+    editor.unmount();
+  });
+
+  test('saving draft shares dates and reload restores them without browser storage', async () => {
+    const plan = {
+      opensAt: new Date('2099-01-01T18:00').toISOString(),
+      nominationsCloseAt: null,
+      closesAt: null,
+    };
+    const draft = openTmdbList({ lifecycle: 'draft', schedule: null, draftSchedule: plan });
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(draft),
+      'PUT /api/lists/list-1': () => Response.json(draft),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('input[name=opens][value=at]').setValue(true);
+    await editor.get('#opens').setValue('2099-01-01T18:00');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect((editor.get('#opens').element as HTMLInputElement).value).toBe('2099-01-01T18:00');
+    expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+      draftSchedule: plan,
+    });
+    editor.unmount();
+    sessionStorage.clear();
+    const reloaded = await mountAt('/admin/lists/best-sci-fi');
+    expect((reloaded.get('#opens').element as HTMLInputElement).value).toBe('2099-01-01T18:00');
+    expect(
+      (reloaded.get('input[name=end][value=open-ended]').element as HTMLInputElement).checked,
+    ).toBe(true);
+    reloaded.unmount();
+  });
+
+  test('an elapsed saved plan can remain a draft but cannot be published', async () => {
+    const plan = {
+      opensAt: '2020-01-01T18:00:00.000Z',
+      nominationsCloseAt: null,
+      closesAt: '2020-02-01T18:00:00.000Z',
+    };
+    const draft = openTmdbList({ lifecycle: 'draft', schedule: null, draftSchedule: plan });
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(draft),
+      'PUT /api/lists/list-1': () => Response.json(draft),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.get('[data-review-publish]').attributes('disabled')).toBeDefined();
+    expect(editor.text()).toContain('Voting must close in the future.');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.some((call) => call.method === 'PUT')).toBe(true);
+    expect(calls.some((call) => call.url.endsWith('/schedule'))).toBe(false);
+    editor.unmount();
+  });
+
+  test('failed publishing preserves the review and explains that the draft was saved', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+      'PUT /api/lists/list-1': () =>
+        Response.json(openTmdbList({ lifecycle: 'draft', schedule: null })),
+      'POST /api/lists/list-1/schedule': () =>
+        Response.json(
+          { error: { code: 'lists.conflict', message: 'Please retry.' } },
+          { status: 409 },
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    const dialog = editor.get('dialog[open]');
+    await dialog.get('#publish-locks').setValue(true);
+    await dialog.get('[data-confirm-publish]').trigger('click');
+    await flushPromises();
+    expect(dialog.get('[role=alert]').text()).toContain('Please retry.');
+    expect(dialog.text()).toContain(
+      'Draft settings and planned dates saved, but publishing was not confirmed',
+    );
+    expect(calls.filter((call) => call.url.endsWith('/schedule'))).toHaveLength(1);
+    editor.unmount();
+  });
+
   test.each(['draft', 'open', 'archived'] as const)(
     'a %s list requires a typed slug before permanent deletion',
     async (lifecycle) => {
@@ -255,11 +648,13 @@ describe('ListEditor', () => {
     });
     const editor = await mountAt('/admin/lists/new');
     await editor.get('#title').setValue('Club picks');
+    await editor.get('input[value=freeform]').setValue(true);
     const checkbox = (label: string) =>
       editor
         .findAll('input[type=checkbox]')
         .find((box) => box.element.closest('label')?.textContent.includes(label));
-    await checkbox('Unlimited')?.setValue(true);
+    expect((editor.get('#unlimited').element as HTMLInputElement).checked).toBe(true);
+    expect(editor.get('.editor-next-step').text()).toContain('Next step: choose dates and publish');
     expect((editor.get('#cap').element as HTMLInputElement).disabled).toBe(true);
     await checkbox('Film Club')?.setValue(true);
     await editor.get('form').trigger('submit');
@@ -267,6 +662,9 @@ describe('ListEditor', () => {
     expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
       maxNominationsPerMember: null,
       requiredRoleIds: ['900000000000000077'],
+      showNominators: true,
+      scoreVisibility: 'private',
+      ranking: { strategy: 'bayesian', minVotes: 2 },
     });
   });
 
@@ -318,15 +716,26 @@ describe('ListEditor', () => {
       'POST /api/lists/list-1/schedule': () => Response.json(openTmdbList()),
     });
     const editor = await mountAt('/admin/lists/best-sci-fi');
-    expect(editor.text()).toContain(
-      'From this moment members can see the list, nominate and rate.',
-    );
+    expect(editor.text()).toContain('From this moment eligible members can nominate and rate.');
     expect(editor.text()).toContain(
       'When voting closes, scores are final and the results are shown.',
     );
-    const publish = editor.findAll('button').find((b) => b.text() === 'Publish now');
-    expect((publish?.element as HTMLButtonElement | undefined)?.disabled).toBe(false);
-    await publish?.trigger('click');
+    const publish = editor.find('[data-review-publish]');
+    expect((publish.element as HTMLButtonElement).disabled).toBe(false);
+    await publish.trigger('click');
+    await flushPromises();
+    expect(calls.some((call) => call.url.endsWith('/schedule'))).toBe(false);
+    const dialog = editor.get('dialog[open]');
+    const fact = (label: string) =>
+      dialog
+        .findAll('dl > div')
+        .find((row) => row.find('dt').text() === label)
+        ?.get('dd')
+        .text();
+    expect(fact('Nominator names')).toBe('Shown');
+    expect(fact('Individual scores')).toBe('Private');
+    await dialog.get('#publish-locks').setValue(true);
+    await dialog.get('[data-confirm-publish]').trigger('click');
     await flushPromises();
     const body = calls.find((call) => call.url.endsWith('/schedule'))?.body as {
       opensAt: string;
@@ -346,8 +755,8 @@ describe('ListEditor', () => {
     const editor = await mountAt('/admin/lists/best-sci-fi');
     await editor.get('input[name=end][value=at]').setValue(true);
     expect(editor.text()).toContain('Choose when voting closes, or let it stay open.');
-    const button = editor.findAll('button').find((b) => b.text() === 'Publish now');
-    expect((button?.element as HTMLButtonElement | undefined)?.disabled).toBe(true);
+    const button = editor.find('[data-review-publish]');
+    expect((button.element as HTMLButtonElement).disabled).toBe(true);
   });
 
   test('a published list can be hidden, and voting closed after confirming', async () => {
@@ -362,7 +771,7 @@ describe('ListEditor', () => {
     const editor = await mountAt('/admin/lists/best-sci-fi');
     await editor.get('input[name=visibility][value=hidden]').setValue(true);
     await flushPromises();
-    expect(calls.find((call) => call.url.endsWith('/visibility'))?.body).toEqual({
+    expect(calls.find((call) => call.url.endsWith('/visibility'))?.body).toMatchObject({
       visibility: 'hidden',
     });
     expect(editor.text()).toContain('Hidden: only Admins can see it now.');

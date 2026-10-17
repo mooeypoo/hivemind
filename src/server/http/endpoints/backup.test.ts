@@ -7,6 +7,7 @@ import type {
   ImportSummaryDto,
   ListDetailDto,
   ListDto,
+  ListActivityDto,
 } from '../contracts.ts';
 import { SESSION_COOKIE } from '../cookies.ts';
 import {
@@ -21,7 +22,9 @@ import {
 import { exportBackup, importBackup } from './backup.ts';
 import {
   createList,
+  editList,
   getList,
+  getListActivity,
   nominate,
   scheduleList,
   setVisibility,
@@ -92,6 +95,56 @@ afterEach(async () => {
 });
 
 describe('backups', () => {
+  test('admin history stays out of files and imported copies record only their importing admin', async () => {
+    const exported = await call<unknown>(
+      exportBackup,
+      'GET',
+      '/api/admin/backup?list=games',
+      admin,
+    );
+    expect(exported.status).toBe(200);
+    expect(exported.text).not.toContain('"activity"');
+    expect(exported.text).not.toContain(SITE_ADMIN_ID);
+    expect(exported.text).not.toContain('"dev"');
+    const imported = await call<ImportSummaryDto>(
+      importBackup,
+      'POST',
+      '/api/admin/backup',
+      admin,
+      exported.body,
+    );
+    expect(imported.status).toBe(200);
+    const activity = await call<ListActivityDto>(
+      getListActivity,
+      'GET',
+      '/api/lists/games-2/activity',
+      admin,
+    );
+    expect(activity.body.events).toMatchObject([{ action: 'imported', adminName: 'dev' }]);
+    expect(activity.body.events).toHaveLength(1);
+  });
+  test('saved draft plans survive export/import without starting participation', async () => {
+    const draft = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Planned',
+      slug: 'planned',
+      itemSource: { kind: 'freeform' },
+    });
+    const plan = { opensAt: null, nominationsCloseAt: '2026-01-10T00:00:00.000Z', closesAt: null };
+    expect(
+      (await call(editList, 'PUT', `/api/lists/${draft.body.id}`, admin, { draftSchedule: plan }))
+        .status,
+    ).toBe(200);
+    const file = (await call<unknown>(exportBackup, 'GET', '/api/admin/backup?list=planned', admin))
+      .body;
+    expect((await call(importBackup, 'POST', '/api/admin/backup', admin, file)).status).toBe(200);
+    const restored = await call<ListDetailDto>(getList, 'GET', '/api/lists/planned-2', admin);
+    expect(restored.body).toMatchObject({
+      lifecycle: 'draft',
+      schedule: null,
+      draftSchedule: plan,
+    });
+  });
+
   test('set-aside explanations survive the HTTP backup schema and import', async () => {
     const detail = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', admin);
     const root = detail.body.entries.find((entry) => entry.item.title === 'Root');

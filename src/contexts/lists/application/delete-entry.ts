@@ -4,6 +4,7 @@ import {
   requireAdmin,
   withConflictRetry,
   type Actor,
+  type Clock,
   type DomainError,
   type IdGenerator,
   type Result,
@@ -13,6 +14,7 @@ import { release } from '../domain/ledger.ts';
 import { listsErrors } from '../domain/errors.ts';
 import type { List, ListId } from '../domain/list.ts';
 import type { EntryRepository, LedgerRepository, ListRepository, SlugIndex } from './ports.ts';
+import { appendListActivity } from '../domain/list-activity.ts';
 
 export interface EntryDeletionInput {
   readonly listId: string;
@@ -27,6 +29,7 @@ interface Deps {
   readonly ledgers: LedgerRepository;
   readonly slugs: SlugIndex;
   readonly ids: IdGenerator;
+  readonly clock: Clock;
 }
 
 const matches = (list: List, input: EntryDeletionInput): boolean =>
@@ -188,7 +191,18 @@ export const makeFinishEntryDeletion =
       }
       if (!matches(current.value, input)) return err(listsErrors.conflict);
       if (await deps.lists.hasEntryWrites(id)) return err(listsErrors.deletionBusy);
-      return (await deps.lists.save({ ...current.value, entryDeletion: null }, current.version))
+      // The entry's own history is deleted with it; retain no entry ID, title or explanation.
+      const recorded = appendListActivity(
+        {
+          ...current.value,
+          entryDeletion: null,
+          settingsVersion: (current.value.settingsVersion ?? 0) + 1,
+        },
+        'entry-deleted',
+        admin.value,
+        deps.clock.now(),
+      );
+      return (await deps.lists.save(recorded, current.version))
         ? ok(undefined)
         : err(listsErrors.conflict);
     });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CommunityBadge from '../components/CommunityBadge.vue';
+import ExternalLink from '../components/ui/ExternalLink.vue';
 import IgdbAttribution from '../components/IgdbAttribution.vue';
 import { usePageTitle } from '../lib/page-title.ts';
 import { site } from '../state/site.ts';
@@ -41,7 +42,7 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
     <p v-if="site.info?.community != null">
       <CommunityBadge :community="site.info.community" />
       <template v-if="site.info.community.inviteUrl != null">
-        · <a :href="site.info.community.inviteUrl" rel="noopener">Join the server</a>
+        · <ExternalLink :href="site.info.community.inviteUrl">Join the server</ExternalLink>
       </template>
     </p>
     <p v-else>This site serves a Discord community.</p>
@@ -49,18 +50,20 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
 
     <h2>Credits</h2>
     <p>
-      Made by <a href="https://moriel.tech" rel="noopener">Moriel Schottlender</a>.
-      <a :href="sourceUrl" rel="noopener">Source code</a> is licensed under the GPL-3.0-or-later.
-      Community lists and scores belong to their members.
+      Made by <ExternalLink href="https://moriel.tech">Moriel Schottlender</ExternalLink>.
+      <ExternalLink :href="sourceUrl">Source code</ExternalLink> is licensed under the
+      GPL-3.0-or-later. Community lists and scores belong to their members.
     </p>
     <p v-if="site.info?.offersMovieData === true">
-      Movie data from <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a>, used under
-      <a href="https://www.themoviedb.org/api-terms-of-use" rel="noopener">its terms</a>. This
-      product uses the TMDB API but is not endorsed or certified by TMDB.
+      Movie data from <ExternalLink href="https://www.themoviedb.org/">TMDB</ExternalLink>, used
+      under
+      <ExternalLink href="https://www.themoviedb.org/api-terms-of-use">its terms</ExternalLink>.
+      This product uses the TMDB API but is not endorsed or certified by TMDB.
     </p>
     <p v-if="site.info?.offersTvData === true">
-      TV series data and artwork from <a href="https://thetvdb.com/" rel="noopener">TheTVDB</a>,
-      used under its API terms. Available credits vary by series.
+      TV series data and artwork from
+      <ExternalLink href="https://thetvdb.com/">TheTVDB</ExternalLink>, used under its API terms.
+      Available credits vary by series.
     </p>
     <IgdbAttribution v-if="site.info?.offersGameData === true" />
   </article>

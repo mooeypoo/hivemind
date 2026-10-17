@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import type { ListDetailDto } from '../../server/http/contracts.ts';
 
 export const openTmdbList = (overrides: Partial<ListDetailDto> = {}): ListDetailDto => ({
+  settingsVersion: 0,
   id: 'list-1',
   title: 'Best Sci-Fi Movies',
   slug: 'best-sci-fi',

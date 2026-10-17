@@ -1,9 +1,13 @@
+<script setup lang="ts">
+import ExternalLink from './ui/ExternalLink.vue';
+</script>
+
 <template>
   <p class="meta">
     Game data and artwork from
-    <a href="https://www.igdb.com/" rel="noopener">IGDB</a>, used under the
-    <a href="https://www.twitch.tv/p/en/legal/developer-agreement/" rel="noopener"
-      >Twitch Developer Services Agreement</a
+    <ExternalLink href="https://www.igdb.com/">IGDB</ExternalLink>, used under the
+    <ExternalLink href="https://www.twitch.tv/p/en/legal/developer-agreement/"
+      >Twitch Developer Services Agreement</ExternalLink
     >.
   </p>
 </template>

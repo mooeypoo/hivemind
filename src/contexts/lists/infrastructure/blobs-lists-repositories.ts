@@ -1,4 +1,5 @@
 import type { Store } from '@netlify/blobs';
+import type { ActivityEvent } from '../domain/activity.ts';
 import { readVersioned, writeVersioned } from '../../../shared/infrastructure/blobs.ts';
 import type { MemberId, RoleId } from '../../../shared/kernel/index.ts';
 import type {
@@ -20,6 +21,34 @@ import type { List, ListConfig, ListId, Phase, Schedule, Visibility } from '../d
  * Records are versioned (`v: 1`); domain objects are never stored directly.
  */
 
+interface ActivityRecord {
+  readonly id: string;
+  readonly action: ActivityEvent['action'];
+  readonly at: string;
+  readonly admin: { readonly memberId: string; readonly displayName: string } | null;
+  readonly changes: ActivityEvent['changes'];
+}
+const activityToRecord = (event: ActivityEvent): ActivityRecord => ({
+  id: event.id,
+  action: event.action,
+  at: event.at.toISOString(),
+  admin:
+    event.admin === null
+      ? null
+      : { memberId: event.admin.memberId, displayName: event.admin.displayName },
+  changes: event.changes,
+});
+const activityFromRecord = (record: ActivityRecord): ActivityEvent => ({
+  id: record.id,
+  action: record.action,
+  at: new Date(record.at),
+  admin:
+    record.admin === null
+      ? null
+      : { memberId: record.admin.memberId as MemberId, displayName: record.admin.displayName },
+  changes: record.changes,
+});
+
 interface ScheduleRecord {
   readonly opensAt: string;
   readonly nominationsCloseAt: string | null;
@@ -34,10 +63,17 @@ type ConfigRecord = Omit<ListConfig, 'requiredRoleIds' | 'scoreVisibility'> & {
 
 /** v2: several required roles and an optional nomination cap. */
 interface ListRecordV2 {
+  readonly activity?: readonly ActivityRecord[];
   readonly v: 2;
+  readonly settingsVersion?: number;
   readonly id: string;
   readonly config: ConfigRecord;
   readonly schedule: ScheduleRecord | null;
+  readonly draftSchedule?: {
+    readonly opensAt: string | null;
+    readonly nominationsCloseAt: string | null;
+    readonly closesAt: string | null;
+  } | null;
   readonly phase: Phase;
   readonly createdAt: string;
   /** Added after v2 shipped; absent on lists archived before it existed. */
@@ -59,6 +95,7 @@ interface ListRecordV1 extends Omit<ListRecordV2, 'v' | 'config'> {
 }
 
 interface EntryRecordV1 {
+  readonly activity?: readonly ActivityRecord[];
   readonly setAsideReason?: string | null;
   readonly v: 1;
   readonly id: string;
@@ -107,9 +144,19 @@ const scheduleFromRecord = (record: ScheduleRecord | null): Schedule | null =>
 
 const listToRecord = (list: List): ListRecordV2 => ({
   v: 2,
+  settingsVersion: list.settingsVersion ?? 0,
+  ...(list.activity === undefined ? {} : { activity: list.activity.map(activityToRecord) }),
   id: list.id,
   config: list.config,
   schedule: scheduleToRecord(list.schedule),
+  draftSchedule:
+    list.draftSchedule == null
+      ? null
+      : {
+          opensAt: list.draftSchedule.opensAt?.toISOString() ?? null,
+          nominationsCloseAt: list.draftSchedule.nominationsCloseAt?.toISOString() ?? null,
+          closesAt: list.draftSchedule.closesAt?.toISOString() ?? null,
+        },
   phase: list.phase,
   createdAt: list.createdAt.toISOString(),
   archivedAt: list.archivedAt?.toISOString() ?? null,
@@ -139,6 +186,8 @@ const listFromRecord = (data: unknown): List => {
   const record = upgradeList(data);
   return {
     id: record.id as ListId,
+    settingsVersion: record.settingsVersion ?? 0,
+    ...(record.activity === undefined ? {} : { activity: record.activity.map(activityFromRecord) }),
     config: {
       ...record.config,
       requiredRoleIds: record.config.requiredRoleIds as RoleId[],
@@ -146,6 +195,21 @@ const listFromRecord = (data: unknown): List => {
       scoreVisibility: record.config.scoreVisibility ?? 'private',
     },
     schedule: scheduleFromRecord(record.schedule),
+    draftSchedule:
+      record.draftSchedule == null
+        ? null
+        : {
+            opensAt:
+              record.draftSchedule.opensAt === null ? null : new Date(record.draftSchedule.opensAt),
+            nominationsCloseAt:
+              record.draftSchedule.nominationsCloseAt === null
+                ? null
+                : new Date(record.draftSchedule.nominationsCloseAt),
+            closesAt:
+              record.draftSchedule.closesAt === null
+                ? null
+                : new Date(record.draftSchedule.closesAt),
+          },
     phase: record.phase,
     createdAt: new Date(record.createdAt),
     visibility: record.visibility ?? 'public',
@@ -162,6 +226,7 @@ const listFromRecord = (data: unknown): List => {
 };
 
 const entryToRecord = (entry: Entry): EntryRecordV1 => ({
+  ...(entry.activity === undefined ? {} : { activity: entry.activity.map(activityToRecord) }),
   setAsideReason: entry.setAsideReason ?? null,
   v: 1,
   id: entry.id,
@@ -184,6 +249,7 @@ const entryFromRecord = (data: unknown): Entry => {
   const record = data as EntryRecordV1;
   return {
     id: record.id as EntryId,
+    ...(record.activity === undefined ? {} : { activity: record.activity.map(activityFromRecord) }),
     listId: record.listId as ListId,
     item: record.item,
     nominatedBy:

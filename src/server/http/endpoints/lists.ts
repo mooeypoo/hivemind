@@ -5,6 +5,7 @@ import { defined, listParam, parseWith, queryOf, readJson } from '../body.ts';
 import type {
   ListDetailDto,
   ListDto,
+  ListActivityDto,
   ListsDto,
   CatalogItemDto,
   RefreshMovieDetailsDto,
@@ -18,6 +19,7 @@ import {
   deleteListBody,
   deleteEntryBody,
   editListBody,
+  listActionBody,
   nominateBody,
   refreshDetailsQuery,
   resolveItemQuery,
@@ -31,6 +33,12 @@ import {
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
   result.ok ? json(map(result.value), status) : domainErrorResponse(result.error);
+
+export const getListActivity = async (request: Request, app: App): Promise<Response> =>
+  respond(
+    await app.lists.getListActivity(await actorOf(request, app), { list: listParam(request) }),
+    (events): ListActivityDto => ({ events }),
+  );
 
 export const setEntryAside = async (request: Request, app: App): Promise<Response> => {
   const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
@@ -104,10 +112,12 @@ export const editList = async (request: Request, app: App): Promise<Response> =>
   if (rejected !== null) return rejected;
   const body = await readJson(request, editListBody);
   if (!body.ok) return body.response;
+  const { expectedSettingsVersion, ...edit } = body.data;
   return respond(
     await app.lists.editList(await actorOf(request, app), {
       list: listParam(request),
-      edit: defined(body.data),
+      ...defined({ expectedSettingsVersion }),
+      edit: defined(edit),
     }),
     (view): ListDto => listDto(view),
   );
@@ -119,10 +129,12 @@ export const scheduleList = async (request: Request, app: App): Promise<Response
   if (rejected !== null) return rejected;
   const body = await readJson(request, scheduleBody);
   if (!body.ok) return body.response;
+  const { expectedSettingsVersion, ...schedule } = body.data;
   return respond(
     await app.lists.scheduleList(await actorOf(request, app), {
       list: listParam(request),
-      schedule: body.data,
+      ...defined({ expectedSettingsVersion }),
+      schedule,
     }),
     (view): ListDto => listDto(view),
   );
@@ -132,8 +144,14 @@ export const scheduleList = async (request: Request, app: App): Promise<Response
 export const archiveList = async (request: Request, app: App): Promise<Response> => {
   const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
+  const body =
+    request.body === null ? parseWith(listActionBody, {}) : await readJson(request, listActionBody);
+  if (!body.ok) return body.response;
   return respond(
-    await app.lists.archiveList(await actorOf(request, app), { list: listParam(request) }),
+    await app.lists.archiveList(await actorOf(request, app), {
+      list: listParam(request),
+      ...defined(body.data),
+    }),
     (view): ListDto => listDto(view),
   );
 };
@@ -213,8 +231,14 @@ export const refreshMovieDetails = async (request: Request, app: App): Promise<R
 export const closeVoting = async (request: Request, app: App): Promise<Response> => {
   const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
+  const body =
+    request.body === null ? parseWith(listActionBody, {}) : await readJson(request, listActionBody);
+  if (!body.ok) return body.response;
   return respond(
-    await app.lists.closeVoting(await actorOf(request, app), { list: listParam(request) }),
+    await app.lists.closeVoting(await actorOf(request, app), {
+      list: listParam(request),
+      ...defined(body.data),
+    }),
     (view): ListDto => listDto(view),
   );
 };
@@ -229,6 +253,7 @@ export const setVisibility = async (request: Request, app: App): Promise<Respons
     await app.lists.setVisibility(await actorOf(request, app), {
       list: listParam(request),
       visibility: body.data.visibility,
+      ...defined({ expectedSettingsVersion: body.data.expectedSettingsVersion }),
     }),
     (view): ListDto => listDto(view),
   );
@@ -244,6 +269,7 @@ export const setScoreVisibility = async (request: Request, app: App): Promise<Re
     await app.lists.setScoreVisibility(await actorOf(request, app), {
       list: listParam(request),
       scoreVisibility: body.data.scoreVisibility,
+      ...defined({ expectedSettingsVersion: body.data.expectedSettingsVersion }),
     }),
     (view): ListDto => listDto(view),
   );

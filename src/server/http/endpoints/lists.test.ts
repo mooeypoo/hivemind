@@ -5,6 +5,7 @@ import type {
   ErrorDto,
   ListDetailDto,
   ListDto,
+  ListActivityDto,
   ListsDto,
   MyDataExportDto,
   PresetImportedDto,
@@ -19,6 +20,7 @@ import {
   request,
   signInAs,
   SITE_ADMIN_ID,
+  ADMIN_ROLE_ID,
   SITE_URL,
   startHarness,
   testConfig,
@@ -31,6 +33,8 @@ import {
   createList,
   editList,
   getList,
+  getListActivity,
+  setEntryAside,
   listLists,
   nominate,
   withdrawNomination,
@@ -100,6 +104,227 @@ const openList = async (body: Record<string, unknown>): Promise<ListDto> => {
   expect(scheduled.status).toBe(200);
   return scheduled.body;
 };
+
+describe('admin activity history', () => {
+  test('history and inline attribution are admin-only; export and erasure cover list and moderation events', async () => {
+    const list = await openList({
+      title: 'History',
+      slug: 'history',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${list.id}`;
+    const entry = await call<EntryDto>(nominate, 'POST', `${path}/entries`, ada, {
+      title: 'An item',
+    });
+    const aside = await call<EntryDto>(setEntryAside, 'POST', `${path}/entries/set-aside`, admin, {
+      entryId: entry.body.id,
+      token: entry.body.withdrawalToken,
+      expectedReason: null,
+      reason: 'Current explanation only',
+    });
+    expect(aside.status).toBe(200);
+    expect(aside.body.moderation?.adminName).toBe('dev');
+    expect((await call(getListActivity, 'GET', `${path}/activity`, null)).status).toBe(401);
+    expect((await call(getListActivity, 'GET', `${path}/activity`, ada)).status).toBe(403);
+    const ordinary = await call<ListDetailDto>(getList, 'GET', path, ada);
+    expect(ordinary.body).not.toHaveProperty('createdBy');
+    expect(ordinary.body.entries[0]).not.toHaveProperty('moderation');
+    const events = await call<ListActivityDto>(getListActivity, 'GET', `${path}/activity`, admin);
+    expect(events.status).toBe(200);
+    expect(events.body.events).toHaveLength(3);
+    expect(events.body.events.every((event) => event.adminName === 'dev')).toBe(true);
+    expect(JSON.stringify(events.body)).not.toContain(SITE_ADMIN_ID);
+    expect(JSON.stringify(events.body)).not.toContain('Current explanation only');
+    expect(events.body.events.find((event) => event.action === 'entry-set-aside')?.entryTitle).toBe(
+      'An item',
+    );
+    const exported = await call<MyDataExportDto>(exportMyData, 'GET', '/api/me/export', admin);
+    expect(JSON.stringify(exported.body.lists)).toContain('adminActivity');
+    expect(JSON.stringify(exported.body.lists)).toContain(SITE_ADMIN_ID);
+    expect((await call(deleteMyData, 'DELETE', '/api/me', admin)).status).toBe(204);
+    const second = await signInAs(h, {
+      id: '900000000000000012',
+      username: 'moderator',
+      roles: [ADMIN_ROLE_ID],
+    });
+    const erased = await call<ListActivityDto>(getListActivity, 'GET', `${path}/activity`, second);
+    expect(erased.body.events).toHaveLength(3);
+    expect(erased.body.events.every((event) => event.adminName === null)).toBe(true);
+    const storedList: unknown = await h.store('lists').get(`list/${list.id}`, { type: 'json' });
+    expect(JSON.stringify(storedList)).not.toContain(SITE_ADMIN_ID);
+    const storedEntry: unknown = await h
+      .store('lists')
+      .get(`entry/${list.id}/${entry.body.id}`, { type: 'json' });
+    expect(JSON.stringify(storedEntry)).not.toContain(SITE_ADMIN_ID);
+  });
+
+  test('names expire at the anniversary even before the daily retention job runs', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Retention',
+      slug: 'retention',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${created.body.id}`;
+    h.clock.set(new Date('2027-01-01T00:00:00Z'));
+    admin = await signInAs(h, { id: SITE_ADMIN_ID, username: 'dev' });
+    const events = await call<ListActivityDto>(getListActivity, 'GET', `${path}/activity`, admin);
+    expect(events.body.events).toMatchObject([{ adminName: null, action: 'created' }]);
+    expect((await call<ListDto>(getList, 'GET', path, admin)).body.createdBy).toBeNull();
+    expect(await h.app.lists.anonymiseExpiredActivity()).toEqual({ ok: true, value: 1 });
+    const stored: unknown = await h.store('lists').get(`list/${created.body.id}`, { type: 'json' });
+    expect(JSON.stringify(stored)).not.toContain(SITE_ADMIN_ID);
+    expect(JSON.stringify(stored)).not.toContain('"displayName"');
+  });
+});
+
+describe('shared draft schedules', () => {
+  test('two admins cannot overwrite saved plans or publish settings reviewed before another edit', async () => {
+    const second = await signInAs(h, {
+      id: '900000000000000012',
+      username: 'moderator',
+      roles: [ADMIN_ROLE_ID],
+    });
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Shared list',
+      slug: 'shared',
+      itemSource: { kind: 'freeform' },
+    });
+    expect(created.body.settingsVersion).toBe(0);
+    const path = `/api/lists/${created.body.id}`;
+    const plan = { opensAt: null, nominationsCloseAt: NOMINATIONS_CLOSE, closesAt: CLOSES };
+    const saved = await call<ListDto>(editList, 'PUT', path, second, {
+      description: 'Second admin',
+      draftSchedule: plan,
+      expectedSettingsVersion: 0,
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.settingsVersion).toBe(1);
+    const stale = await call<ErrorDto>(editList, 'PUT', path, admin, {
+      description: 'Old editor',
+      draftSchedule: null,
+      expectedSettingsVersion: 0,
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('lists.settings-changed');
+    expect((await call<ListDto>(getList, 'GET', path, admin)).body).toMatchObject({
+      description: 'Second admin',
+      draftSchedule: plan,
+    });
+    const stalePublication = await call<ErrorDto>(scheduleList, 'POST', `${path}/schedule`, admin, {
+      opensAt: OPENS,
+      nominationsCloseAt: null,
+      closesAt: null,
+      expectedSettingsVersion: 0,
+    });
+    expect(stalePublication.status).toBe(409);
+    const published = await call<ListDto>(scheduleList, 'POST', `${path}/schedule`, second, {
+      opensAt: OPENS,
+      nominationsCloseAt: null,
+      closesAt: null,
+      expectedSettingsVersion: 1,
+    });
+    expect(published.status).toBe(200);
+    expect(published.body.settingsVersion).toBe(2);
+    expect((await call<ListDto>(getList, 'GET', path, ada)).body.settingsVersion).toBeUndefined();
+    for (const [endpoint, method, suffix, body] of [
+      [editList, 'PUT', '', { description: 'Stale' }],
+      [setVisibility, 'PUT', '/visibility', { visibility: 'hidden' }],
+      [setScoreVisibility, 'PUT', '/score-visibility', { scoreVisibility: 'private' }],
+      [closeVoting, 'POST', '/close', {}],
+      [archiveList, 'POST', '/archive', {}],
+    ] as const) {
+      const conflict = await call<ErrorDto>(endpoint, method, `${path}${suffix}`, admin, {
+        ...body,
+        expectedSettingsVersion: 1,
+      });
+      expect(conflict.status).toBe(409);
+      expect(conflict.body.error.code).toBe('lists.settings-changed');
+    }
+  });
+
+  test.each([-1, 1.5, '0', Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid settings version %s',
+    async (expectedSettingsVersion) => {
+      const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+        title: 'Versioned list',
+        slug: 'versioned',
+        itemSource: { kind: 'freeform' },
+      });
+      expect(
+        (
+          await call(editList, 'PUT', `/api/lists/${created.body.id}`, admin, {
+            description: 'No change',
+            expectedSettingsVersion,
+          })
+        ).status,
+      ).toBe(422);
+    },
+  );
+
+  test('a second admin sees saved dates without publication; members cannot see or edit them', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Planned list',
+      slug: 'planned',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${created.body.id}`;
+    const plan = { opensAt: null, nominationsCloseAt: NOMINATIONS_CLOSE, closesAt: CLOSES };
+    const saved = await call<ListDto>(editList, 'PUT', path, admin, { draftSchedule: plan });
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ lifecycle: 'draft', schedule: null, draftSchedule: plan });
+    const secondAdmin = await signInAs(h, {
+      id: '900000000000000012',
+      username: 'moderator',
+      roles: [ADMIN_ROLE_ID],
+    });
+    const loaded = await call<ListDetailDto>(getList, 'GET', path, secondAdmin);
+    expect(loaded.body.draftSchedule).toEqual(plan);
+    expect((await call(getList, 'GET', path, ada)).status).toBe(404);
+    expect((await call(editList, 'PUT', path, ada, { draftSchedule: plan })).status).toBe(403);
+    expect(
+      (await call(nominate, 'POST', `${path}/entries`, secondAdmin, { title: 'An item' })).status,
+    ).toBe(403);
+    const published = await call<ListDto>(scheduleList, 'POST', `${path}/schedule`, secondAdmin, {
+      ...plan,
+      opensAt: OPENS,
+    });
+    expect(published.status).toBe(200);
+    expect(published.body.lifecycle).toBe('open');
+    expect(published.body.draftSchedule).toBeUndefined();
+    expect((await call<ListDto>(getList, 'GET', path, ada)).body.draftSchedule).toBeUndefined();
+    expect((await call(editList, 'PUT', path, admin, { draftSchedule: plan })).status).toBe(422);
+  });
+
+  test('draft plans can be cleared; malformed and contradictory dates are rejected', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Planned list',
+      slug: 'planned',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${created.body.id}`;
+    for (const plan of [
+      { opensAt: 'invalid', nominationsCloseAt: null, closesAt: null },
+      { opensAt: CLOSES, nominationsCloseAt: null, closesAt: OPENS },
+      { opensAt: null, nominationsCloseAt: CLOSES, closesAt: NOMINATIONS_CLOSE },
+      { opensAt: null, nominationsCloseAt: null, closesAt: null, extra: true },
+    ])
+      expect((await call(editList, 'PUT', path, admin, { draftSchedule: plan })).status).toBe(422);
+    expect(
+      (
+        await call(editList, 'PUT', path, admin, {
+          draftSchedule: {
+            opensAt: OPENS,
+            nominationsCloseAt: null,
+            closesAt: CLOSES,
+          },
+        })
+      ).status,
+    ).toBe(200);
+    const cleared = await call<ListDto>(editList, 'PUT', path, admin, { draftSchedule: null });
+    expect(cleared.body.draftSchedule).toBeNull();
+    expect(cleared.body.lifecycle).toBe('draft');
+  });
+});
 
 describe('correcting an unused published list source', () => {
   test('the Admin can correct the source, but a nomination including a withdrawn one locks it', async () => {
@@ -390,7 +615,9 @@ describe('a TMDB movie list, end to end', () => {
       scale: { min: 1, max: 10 },
       entryMode: 'nominations',
       resultsVisibility: 'live',
+      maxNominationsPerMember: null,
       schedule: null,
+      ranking: { strategy: 'bayesian', minVotes: 2 },
     });
     expect((await call<ListsDto>(listLists, 'GET', '/api/lists', ada)).body).toEqual({ lists: [] });
     expect((await call(getList, 'GET', '/api/lists/best-sci-fi', ada)).status).toBe(404);

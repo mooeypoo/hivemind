@@ -1,5 +1,116 @@
 /* Admin pages: the list editor, Roles and Backups. */
 
+.publish-review {
+  width: min(58rem, calc(100vw - 2rem));
+  overflow: hidden;
+}
+
+.publish-review .dialog__content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem - 2px);
+  padding: 0;
+}
+
+.publish-review .dialog__title {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.publish-review .dialog__body {
+  min-height: 0;
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.publish-review .dialog__actions {
+  flex-shrink: 0;
+  justify-content: space-between;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.publish-review__identity {
+  overflow-wrap: anywhere;
+}
+
+.publish-review__identity h3 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+}
+
+.publish-review__columns {
+  display: grid;
+  gap: 1rem;
+  margin-block: 0.5rem;
+}
+
+.publish-review__section {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.publish-review__facts,
+.publish-review__rules {
+  margin: 0;
+}
+
+.publish-review__facts > div {
+  display: grid;
+  gap: 0.15rem;
+  padding-block: 0.65rem;
+}
+
+.publish-review__facts > div + div {
+  border-top: 1px solid var(--border);
+}
+
+.publish-review dt {
+  font-weight: 650;
+}
+
+.publish-review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.publish-review__rules {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.publish-review__rules dd {
+  margin-top: 0.25rem;
+}
+
+.publish-review__acknowledgment {
+  align-items: flex-start;
+  padding-block: 0.5rem;
+}
+
+.publish-review__acknowledgment input {
+  margin-top: 0.2rem;
+}
+
+@media (min-width: 50rem) {
+  .publish-review__columns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .publish-review__facts > div {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 0.75rem;
+  }
+}
+
 .editor,
 .admin-page {
   max-width: 54rem;
@@ -8,6 +119,119 @@
 
 .editor > .page-header {
   align-items: flex-end;
+}
+
+.editor-setup--collapsed {
+  display: none;
+}
+
+.setup-steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-steps button,
+.setup-steps span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.setup-steps [aria-current='step'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.setup-steps button:disabled {
+  color: var(--muted);
+}
+
+#draft-step-heading {
+  scroll-margin-top: 5rem;
+}
+
+.source-choices {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.source-choice {
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 2px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.source-choice > input {
+  margin: 0.1rem 0 0;
+}
+
+.source-choice > span {
+  min-width: 0;
+}
+
+.source-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.source-choice:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.source-choice:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.source-choice:hover:has(input:enabled) {
+  border-color: var(--accent);
+}
+
+.source-explanation {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.editor-next-step {
+  border-inline-start: 3px solid var(--accent);
+  font-size: 1.1rem;
+}
+
+.editor-next-step h2 {
+  margin-bottom: 0.5rem;
+}
+
+.entry-admin {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.settings-conflict dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 /* Section links, sticky under the header like the list tabs. */
@@ -45,11 +269,13 @@
 }
 
 /* Each section is a card; its legend reads as the card's title. */
-.editor form > fieldset.card {
+.editor form > fieldset.card,
+.editor-setup fieldset.card {
   padding: 1.25rem clamp(1rem, 3vw, 1.5rem) 1.5rem;
 }
 
-.editor form > fieldset.card > legend {
+.editor form > fieldset.card > legend,
+.editor-setup fieldset.card > legend {
   float: left;
   width: 100%;
   margin-bottom: 0.75rem;
@@ -59,7 +285,8 @@
   font-weight: 800;
 }
 
-.editor form > fieldset.card > legend + * {
+.editor form > fieldset.card > legend + *,
+.editor-setup fieldset.card > legend + * {
   clear: both;
 }
 
@@ -107,6 +334,38 @@
 }
 
 /* Roles */
+
+.activity {
+  margin-block: 2rem;
+}
+
+.activity__timeline {
+  padding: 0;
+  list-style: none;
+}
+
+.activity__event {
+  position: relative;
+  margin-inline-start: 0.5rem;
+  padding: 0 0 1.5rem 1.25rem;
+  border-inline-start: 2px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.activity__event::before {
+  position: absolute;
+  top: 0.4rem;
+  inset-inline-start: -0.35rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--accent);
+  content: '';
+}
+
+.activity__changes {
+  padding-inline-start: 1.25rem;
+}
 
 .roles-table {
   width: 100%;

@@ -2,15 +2,19 @@ import {
   err,
   ok,
   type DomainError,
+  type Clock,
   type MemberId,
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { isActiveEntry, type EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
 import type { ListId } from '../domain/list.ts';
-import type { EntryRepository, LedgerRepository } from './ports.ts';
+import type { EntryRepository, LedgerRepository, ListRepository } from './ports.ts';
+import { exportAdminActivity, makeAnonymiseActivity } from './activity.ts';
 
 export interface ListsPersonalDataDeps {
+  readonly lists: ListRepository;
+  readonly clock: Clock;
   readonly entries: EntryRepository;
   readonly ledgers: LedgerRepository;
 }
@@ -42,12 +46,15 @@ export const makeListsPersonalData = (deps: ListsPersonalDataDeps) => ({
       ),
     );
     return {
+      adminActivity: await exportAdminActivity(deps, memberId),
       nominations: nominations.filter((nomination) => nomination !== null),
       nominationRecords: ledgers,
     };
   },
 
   async eraseFor(memberId: MemberId): Promise<Result<void, DomainError>> {
+    const history = await makeAnonymiseActivity(deps)(memberId);
+    if (!history.ok) return history;
     for (const ledger of await deps.ledgers.forMember(memberId)) {
       for (const entryId of ledger.entryIds) {
         if (!(await anonymise(deps, ledger.listId, entryId, memberId))) {

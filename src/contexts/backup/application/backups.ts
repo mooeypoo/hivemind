@@ -117,6 +117,7 @@ export const makeImportLists =
       const sealed = part.ballots;
       const listData = { list: part.list, entries: part.entries, nominators: part.nominators };
       const restored = await deps.lists.restore(listData, {
+        importedBy: admin.value,
         keepMember,
         ...(itemSource === undefined ? {} : { itemSource }),
       });

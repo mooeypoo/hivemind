@@ -117,10 +117,17 @@ export interface ScheduleDto {
   readonly closesAt: string | null;
 }
 
+/** Draft-only plan. Null opening means "when published"; no participation starts on save. */
+export type DraftScheduleDto = Omit<ScheduleDto, 'opensAt'> & { readonly opensAt: string | null };
+
 /** `hidden`: only Admins can see the list. */
 export type Visibility = 'public' | 'hidden';
 
 export interface ListDto extends ListConfigDto {
+  /** Admin-only, null for older lists or after attribution expires/erasure. */
+  readonly createdBy?: string | null;
+  /** Admin-only settings revision, independent of votes and technical write markers. */
+  readonly settingsVersion?: number;
   /** Send with score changes; a permanent entry deletion invalidates older list snapshots. */
   readonly writeRevision?: string | null;
   readonly participationPaused?: boolean;
@@ -129,6 +136,7 @@ export interface ListDto extends ListConfigDto {
   readonly id: string;
   readonly lifecycle: Lifecycle;
   readonly schedule: ScheduleDto | null;
+  readonly draftSchedule?: DraftScheduleDto | null;
   readonly visibility: Visibility;
   readonly viewer: {
     readonly canParticipate: boolean;
@@ -148,6 +156,8 @@ export interface DeleteEntryRequest {
 }
 
 export interface EntryDto {
+  /** Admin-only last moderation attribution, never part of ordinary member responses. */
+  readonly moderation?: { readonly adminName: string | null; readonly at: string } | null;
   readonly setAsideReason?: string | null;
   readonly id: string;
   readonly item: CatalogItemDto;
@@ -173,6 +183,33 @@ export interface ListsDto {
   readonly lists: readonly ListDto[];
 }
 
+export interface ListActivityDto {
+  readonly events: readonly {
+    readonly id: string;
+    readonly action:
+      | 'created'
+      | 'imported'
+      | 'settings-edited'
+      | 'published'
+      | 'archived'
+      | 'voting-closed'
+      | 'visibility-changed'
+      | 'score-privacy-changed'
+      | 'entry-set-aside'
+      | 'entry-returned'
+      | 'explanation-edited'
+      | 'entry-deleted';
+    readonly at: string;
+    readonly adminName: string | null;
+    readonly entryTitle: string | null;
+    readonly changes: readonly {
+      readonly field: string;
+      readonly before: string | null;
+      readonly after: string | null;
+    }[];
+  }[];
+}
+
 /** `GET /api/lists/:list` (id or slug) */
 export interface ListDetailDto extends ListDto {
   /** Admin-only management of retained withdrawals, never included in rankings. */
@@ -196,6 +233,8 @@ export type CreateListRequest = Pick<ListConfigDto, 'title' | 'slug' | 'itemSour
 
 /** `PUT /api/lists/:list` body. Published lists may remove, but never restore, a nomination cap. */
 export type EditListRequest = Partial<ListConfigDto> & {
+  readonly expectedSettingsVersion?: number;
+  readonly draftSchedule?: DraftScheduleDto | null;
   /** A later end, an end for an open-ended list, or null to remove the end. */
   readonly closesAt?: string | null;
 };
@@ -203,10 +242,11 @@ export type EditListRequest = Partial<ListConfigDto> & {
 /** `PUT /api/lists/:list/visibility` body. */
 export interface SetVisibilityRequest {
   readonly visibility: Visibility;
+  readonly expectedSettingsVersion?: number;
 }
 
 /** `POST /api/lists/:list/schedule` body. */
-export type ScheduleListRequest = ScheduleDto;
+export type ScheduleListRequest = ScheduleDto & { readonly expectedSettingsVersion?: number };
 
 /** `GET /api/lists/:list/search?q=` */
 export interface SearchResultsDto {

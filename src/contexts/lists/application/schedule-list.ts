@@ -16,6 +16,8 @@ import { findList } from './find-list.ts';
 import type { Catalog, EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 import { toListView, type ListView } from './views.ts';
 import { withEntryWrite } from './entry-write.ts';
+import { checkSettingsVersion, type SettingsExpectation } from './settings-version.ts';
+import { appendListActivity, settingsChanges } from '../domain/list-activity.ts';
 
 export interface ScheduleListDeps {
   readonly lists: ListRepository;
@@ -34,13 +36,20 @@ const SEED_BATCH = 20;
  */
 export const makeScheduleList =
   (deps: ScheduleListDeps) =>
-  (actor: Actor, input: { readonly list: string; readonly schedule: Schedule }) =>
+  (
+    actor: Actor,
+    input: { readonly list: string; readonly schedule: Schedule } & SettingsExpectation,
+  ) =>
     withConflictRetry(async (): Promise<Result<ListView, DomainError>> => {
       const admin = requireAdmin(actor);
       if (!admin.ok) return admin;
       const found = await findList(deps, admin.value, input.list);
       if (!found.ok) return found;
+      const expected = checkSettingsVersion(found.value.value, input);
+      if (!expected.ok) return expected;
       return withEntryWrite(deps.lists, found.value.value, deps.ids.next(), async (current) => {
+        const admitted = checkSettingsVersion(current.value, input);
+        if (!admitted.ok) return admitted;
         const now = deps.clock.now();
         const published = publish(current.value, input.schedule, now);
         if (!published.ok) return published;
@@ -49,7 +58,16 @@ export const makeScheduleList =
           const seeded = await seed(deps, published.value, now);
           if (!seeded.ok) return seeded;
         }
-        if (!(await deps.lists.save(published.value, current.version))) {
+        const recorded = appendListActivity(
+          published.value,
+          'published',
+          admin.value,
+          now,
+          settingsChanges(current.value, published.value).filter(
+            (change) => !change.field.startsWith('draftSchedule.'),
+          ),
+        );
+        if (!(await deps.lists.save(recorded, current.version))) {
           return err(listsErrors.conflict);
         }
         return ok(toListView(published.value, admin.value, now, 0));

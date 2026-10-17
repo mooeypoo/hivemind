@@ -26,6 +26,7 @@ export {
   deleteEntry,
   editList,
   getList,
+  getListActivity,
   listLists,
   nominate,
   resolveItemForList,

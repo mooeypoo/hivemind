@@ -148,7 +148,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/admin/lists/films');
         await expect(page.locator('#editor-items input[value=preset]')).toBeEnabled();
         await expect(page.locator('#editor-rating input').first()).toBeDisabled();
-        await page.getByRole('radio', { name: 'Preset list (CSV)' }).check();
+        await page.getByRole('radio', { name: /^Preset list \(CSV\)/ }).check();
         await expect(page.getByRole('radio', { name: /^Rate them all/ })).toBeDisabled();
         await expectNoSidewaysScroll(page);
       });
@@ -285,7 +285,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(details.getByText('Publisher', { exact: true })).toBeVisible();
         await expectNoSidewaysScroll(page);
         await details.getByRole('button', { name: 'Close', exact: true }).click();
-        await expect(page.getByRole('link', { name: 'IGDB', exact: true }).first()).toBeVisible();
+        const attribution = page
+          .getByRole('link', { name: 'IGDB (opens in a new tab)', exact: true })
+          .first();
+        await expect(attribution).toBeVisible();
+        await expect(attribution).toHaveAttribute('target', '_blank');
+        await expect(attribution.locator('.external-link-icon')).toBeVisible();
       });
 
       test(`compact movie standings at ${String(width)} px fit and open details`, async ({

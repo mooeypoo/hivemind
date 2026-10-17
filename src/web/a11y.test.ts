@@ -169,6 +169,27 @@ const renderAt = async (
         labels: [{ roleId: '900000000000000077', name: 'Film Club' }],
         version: 'v1',
       }),
+    'GET /api/lists/list-1/activity': () =>
+      Response.json({
+        events: [
+          {
+            id: 'a1',
+            action: 'settings-edited',
+            at: '2026-01-02T12:00:00Z',
+            adminName: 'Alex',
+            entryTitle: null,
+            changes: [{ field: 'maxNominationsPerMember', before: '3', after: 'null' }],
+          },
+          {
+            id: 'a2',
+            action: 'entry-set-aside',
+            at: '2025-01-01T12:00:00Z',
+            adminName: null,
+            entryTitle: 'An item',
+            changes: [],
+          },
+        ],
+      }),
   });
   const { createAppRouter } = await import('./router.ts');
   const router = createAppRouter(createMemoryHistory());
@@ -189,6 +210,63 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test('admin activity history is accessible with named and anonymised decisions', async () => {
+    const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Show activity')
+      ?.trigger('click');
+    await flushPromises();
+    expect(wrapper.get('.activity').text()).toContain('Admin identity removed');
+    expect(wrapper.get('.activity').text()).toContain('Alex');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+  test('stale editor settings comparison is accessible', async () => {
+    sessionStorage.setItem(
+      'draft:editor:draft',
+      JSON.stringify({
+        form: { description: 'My unsaved description' },
+        settingsVersion: -1,
+        lifecycle: 'draft',
+      }),
+    );
+    try {
+      const wrapper = await renderAt('/admin/lists/draft', true);
+      expect(wrapper.get('#settings-conflict-heading').text()).toBe('Compare before continuing');
+      expect(wrapper.get('.settings-conflict').text()).toContain('My unsaved description');
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    } finally {
+      sessionStorage.removeItem('draft:editor:draft');
+    }
+  });
+  test.each([false, true])('publishing review is accessible (named scores: %s)', async (named) => {
+    const wrapper = await renderAt('/admin/lists/draft', true);
+    if (named) await wrapper.get('input[name=score-visibility][value=public]').setValue(true);
+    await wrapper.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(document.querySelector('dialog[open] #publish-locks')).not.toBeNull();
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+  test('returning to draft setup and timing is accessible and preserves unsaved choices', async () => {
+    const wrapper = await renderAt('/admin/lists/draft', true);
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Edit setup')
+      ?.trigger('click');
+    await flushPromises();
+    await wrapper.get('#description').setValue('Unsaved setup');
+    await expectAccessible(document.body);
+    await wrapper.get('[data-review-publish]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('#description').element).toHaveProperty('value', 'Unsaved setup');
+    expect(wrapper.get('.editor-setup').classes()).toContain('editor-setup--collapsed');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
   test.each(['/lists/best-sci-fi?tab=standings', '/lists/best-sci-fi/results'])(
     'separate and combined standings at %s are accessible',
     async (path) => {
@@ -440,12 +518,17 @@ describe('the menu', () => {
       'New list',
       'Roles',
       'Backups',
+      'Admin guide and FAQ (opens in a new tab)',
       'Privacy',
       'Download my data',
       'Delete my data',
     ]);
     expect(menuDialog()?.textContent).toContain('Appearance');
     expect(menuDialog()?.textContent).toContain('Sign out');
+    const guide = menuDialog()?.querySelector('a[target="_blank"]');
+    expect(guide?.textContent).toContain('Admin guide and FAQ');
+    expect(guide?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(guide?.querySelector('.external-link-icon')).not.toBeNull();
     wrapper.unmount();
   });
 
@@ -494,7 +577,7 @@ describe('list page dialogs', () => {
   test('withdrawal confirmation and its error pass automated accessibility checks', async () => {
     const wrapper = await renderAt('/lists/best-sci-fi', true);
     await wrapper.get('.entry__art').trigger('click');
-    await wrapper.get('dialog[open] .button--danger').trigger('click');
+    await wrapper.get('dialog[open] .dialog__actions .button--danger').trigger('click');
     await flushPromises();
     await expectAccessible(document.body);
     const original = globalThis.fetch;
@@ -585,6 +668,16 @@ describe('archiving', () => {
 });
 
 describe('score visibility editor', () => {
+  test('published fixed settings can be expanded for accessible read-only inspection', async () => {
+    const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
+    const panels = [...document.querySelectorAll<HTMLDetailsElement>('.fixed-settings')];
+    expect(panels.length).toBeGreaterThan(0);
+    expect(panels.every((panel) => !panel.open)).toBe(true);
+    for (const panel of panels) panel.open = true;
+    await expectAccessible(document.body);
+    expect(document.querySelector<HTMLFieldSetElement>('#editor-rating')?.disabled).toBe(true);
+    wrapper.unmount();
+  });
   test('drafts offer the choice and published lists lock it', async () => {
     const draft = await renderAt('/admin/lists/new', true);
     const privateChoice = document.querySelector<HTMLInputElement>(
@@ -601,7 +694,7 @@ describe('score visibility editor', () => {
 
     const published = await renderAt('/admin/lists/best-sci-fi', true);
     const section = (legend: string) =>
-      [...document.querySelectorAll<HTMLFieldSetElement>('form > fieldset')].find(
+      [...document.querySelectorAll<HTMLFieldSetElement>('form fieldset.card')].find(
         (fieldset) => fieldset.querySelector('legend')?.textContent === legend,
       );
     expect(section('Rating')?.disabled).toBe(true);
@@ -660,7 +753,7 @@ describe('site-wide content', () => {
     expect(footer?.querySelector('a[href="https://moriel.tech"]')).not.toBeNull();
     expect(
       footer?.querySelector('a[href="https://github.com/mooeypoo/hivemind"]')?.textContent,
-    ).toBe('Source code');
+    ).toBe('Source code (opens in a new tab)');
     expect(footer?.textContent).toContain('GPL-3.0-or-later');
     expect(footer?.textContent).toContain('Movie data from TMDB');
     wrapper.unmount();
@@ -691,9 +784,12 @@ describe('site-wide content', () => {
       'Lists are only for members of the Film Club Discord server.',
     );
     expect(document.querySelector('.site-footer')?.textContent).not.toContain('signed-in members');
-    expect(document.querySelector('a[href="https://discord.gg/x"]')?.textContent.trim()).toBe(
-      'Join the server',
-    );
+    expect(
+      document
+        .querySelector('a[href="https://discord.gg/x"]')
+        ?.textContent.replace(/\s+/g, ' ')
+        .trim(),
+    ).toBe('Join the server (opens in a new tab)');
     wrapper.unmount();
   });
 
@@ -712,6 +808,7 @@ describe('site-wide content', () => {
       'What we store about you',
       'What we never store',
       'Setting entries aside',
+      'Admin activity history',
       'Withdrawing a nomination',
       'When an Admin deletes a list',
       'When an Admin deletes an entry',
