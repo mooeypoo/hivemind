@@ -19,6 +19,7 @@ import {
 } from '../domain/entry.ts';
 import {
   validateConfig,
+  validateDraftSchedule,
   type ItemSourceRef,
   type List,
   type ListConfig,
@@ -37,6 +38,11 @@ export interface ListBackup {
     };
     readonly schedule: {
       readonly opensAt: string;
+      readonly nominationsCloseAt: string | null;
+      readonly closesAt: string | null;
+    } | null;
+    readonly draftSchedule?: {
+      readonly opensAt: string | null;
       readonly nominationsCloseAt: string | null;
       readonly closesAt: string | null;
     } | null;
@@ -88,6 +94,14 @@ const toBackup = async (deps: BackupDeps, list: List): Promise<ListBackup> => {
   return {
     list: {
       config: list.config,
+      draftSchedule:
+        list.phase !== 'draft' || list.draftSchedule == null
+          ? null
+          : {
+              opensAt: iso(list.draftSchedule.opensAt),
+              nominationsCloseAt: iso(list.draftSchedule.nominationsCloseAt),
+              closesAt: iso(list.draftSchedule.closesAt),
+            },
       schedule:
         list.schedule === null
           ? null
@@ -205,6 +219,20 @@ export const makeRestoreFromBackup =
       if (!reason.ok) return err(invalidBackup([reason.error.message]));
     }
 
+    const plan = backup.list.draftSchedule;
+    const draftSchedule =
+      plan == null
+        ? null
+        : {
+            opensAt: plan.opensAt === null ? null : new Date(plan.opensAt),
+            nominationsCloseAt:
+              plan.nominationsCloseAt === null ? null : new Date(plan.nominationsCloseAt),
+            closesAt: plan.closesAt === null ? null : new Date(plan.closesAt),
+          };
+    if (draftSchedule !== null) {
+      const valid = validateDraftSchedule(draftSchedule);
+      if (!valid.ok) return err(invalidBackup(valid.error.details ?? [valid.error.message]));
+    }
     const id = deps.ids.next() as ListId;
     const slug = await claimFreeSlug(deps.slugs, config.value.slug, id);
     if (slug === null) return err(invalidBackup(['no free address for this list']));
@@ -213,6 +241,7 @@ export const makeRestoreFromBackup =
     const list: List = {
       id,
       config: { ...config.value, slug },
+      draftSchedule: backup.list.phase === 'draft' ? draftSchedule : null,
       schedule:
         schedule === null
           ? null

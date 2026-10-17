@@ -65,6 +65,9 @@ export interface Schedule {
   readonly closesAt: Date | null;
 }
 
+/** A saved plan, not publication. Null opening means "when published". */
+export type DraftSchedule = Omit<Schedule, 'opensAt'> & { readonly opensAt: Date | null };
+
 /** `hidden`: only Admins can see the list. Changeable at any time. */
 export type Visibility = 'public' | 'hidden';
 
@@ -76,6 +79,7 @@ export interface List {
   readonly id: ListId;
   readonly config: ListConfig;
   readonly schedule: Schedule | null;
+  readonly draftSchedule?: DraftSchedule | null;
   readonly phase: Phase;
   readonly createdAt: Date;
   /** When it was archived; snapshot retention counts from here. */
@@ -162,10 +166,31 @@ export const validateSchedule = (schedule: Schedule, now: Date): Result<Schedule
   return problems.length > 0 ? err(invalidSchedule(problems)) : ok(schedule);
 };
 
+export const validateDraftSchedule = (plan: DraftSchedule): Result<DraftSchedule, DomainError> => {
+  const { opensAt, nominationsCloseAt, closesAt } = plan;
+  const problems: string[] = [];
+  if (
+    [opensAt, nominationsCloseAt, closesAt].some(
+      (date) => date !== null && !Number.isFinite(date.getTime()),
+    )
+  )
+    problems.push('planned dates must be valid');
+  if (opensAt !== null && closesAt !== null && opensAt >= closesAt)
+    problems.push('opensAt must be before closesAt');
+  if (
+    nominationsCloseAt !== null &&
+    ((opensAt !== null && nominationsCloseAt <= opensAt) ||
+      (closesAt !== null && nominationsCloseAt > closesAt))
+  )
+    problems.push('nominationsCloseAt must be after opensAt and no later than closesAt');
+  return problems.length > 0 ? err(invalidSchedule(problems)) : ok(plan);
+};
+
 export const newList = (id: ListId, config: ListConfig, now: Date): List => ({
   id,
   config,
   schedule: null,
+  draftSchedule: null,
   phase: 'draft',
   createdAt: now,
   archivedAt: null,
@@ -184,7 +209,9 @@ export const lifecycleOf = (list: List, now: Date): Lifecycle => {
 export const publish = (list: List, schedule: Schedule, now: Date): Result<List, DomainError> => {
   if (list.phase !== 'draft') return err(listsErrors.notADraft);
   const valid = validateSchedule(schedule, now);
-  return valid.ok ? ok({ ...list, schedule: valid.value, phase: 'published' }) : valid;
+  return valid.ok
+    ? ok({ ...list, schedule: valid.value, draftSchedule: null, phase: 'published' })
+    : valid;
 };
 
 /**
@@ -206,7 +233,10 @@ export const closeVoting = (list: List, now: Date): Result<List, DomainError> =>
     : err(listsErrors.notOpen);
 
 /** A change to a list. `closesAt` moves the end; a live cap can only be removed, never restored. */
-export type ListEdit = Partial<ListConfig> & { readonly closesAt?: Date | null };
+export type ListEdit = Partial<ListConfig> & {
+  readonly closesAt?: Date | null;
+  readonly draftSchedule?: DraftSchedule | null;
+};
 
 const EDITABLE_WHEN_LIVE: ReadonlySet<string> = new Set(['description', 'closesAt']);
 const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -222,11 +252,12 @@ export const editList = (
   options: { readonly itemSourceEditable: boolean } = { itemSourceEditable: false },
 ): Result<List, DomainError> => {
   const lifecycle = lifecycleOf(list, now);
-  const { closesAt, ...configEdit } = edit;
+  const { closesAt, draftSchedule, ...configEdit } = edit;
 
   if (lifecycle === 'closed' || lifecycle === 'archived') return err(listsErrors.locked);
 
   if (lifecycle !== 'draft') {
+    if (draftSchedule !== undefined) return err(lockedFields(['draftSchedule']));
     const locked = Object.entries(configEdit)
       .filter(([field, value]) => {
         const current = list.config[field as keyof ListConfig];
@@ -247,6 +278,10 @@ export const editList = (
     if (locked.length > 0) return err(lockedFields(locked));
   }
 
+  if (draftSchedule != null) {
+    const valid = validateDraftSchedule(draftSchedule);
+    if (!valid.ok) return valid;
+  }
   let schedule = list.schedule;
   if (closesAt !== undefined) {
     if (schedule === null) return err(listsErrors.notScheduled);
@@ -260,7 +295,14 @@ export const editList = (
   }
 
   const config = validateConfig({ ...list.config, ...configEdit });
-  return config.ok ? ok({ ...list, config: config.value, schedule }) : config;
+  return config.ok
+    ? ok({
+        ...list,
+        config: config.value,
+        schedule,
+        ...(draftSchedule === undefined ? {} : { draftSchedule }),
+      })
+    : config;
 };
 
 /** Nominations: the list is open, it is not seeded, and `nominationsCloseAt` has not passed. */

@@ -57,7 +57,17 @@ export const createListBody = z.strictObject({
 export const editListBody = z
   .strictObject(listConfigFields)
   .partial()
-  .extend({ closesAt: isoDate.nullable().optional() });
+  .extend({
+    closesAt: isoDate.nullable().optional(),
+    draftSchedule: z
+      .strictObject({
+        opensAt: isoDate.nullable(),
+        nominationsCloseAt: isoDate.nullable(),
+        closesAt: isoDate.nullable(),
+      })
+      .nullable()
+      .optional(),
+  });
 
 /** `closesAt: null`: open-ended, until an Admin closes voting. */
 export const scheduleBody = z.strictObject({
@@ -125,6 +135,14 @@ const isoString = z.iso.datetime({ offset: true });
 
 const backupListPart = z.object({
   list: z.object({
+    draftSchedule: z
+      .object({
+        opensAt: isoString.nullable(),
+        nominationsCloseAt: isoString.nullable(),
+        closesAt: isoString.nullable(),
+      })
+      .nullable()
+      .optional(),
     // Backups made before score visibility existed had private scores.
     config: z.object({
       ...listConfigFields,

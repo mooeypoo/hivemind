@@ -16,8 +16,9 @@ menu and look for **Admin**.
 8. Confirm the review, then publish. A scheduled opening still publishes the list now.
 
 Drafts are safe to edit. Publishing fixes most settings immediately, not when the first
-person votes. Saving a draft does **not** save planned dates to the site: until publishing,
-those dates are kept only in your browser tab. Other admins do not receive them.
+person votes. **Save draft** saves planned dates to the site too, so another admin can
+review and continue the plan. It does not publish the list or start participation.
+Unsaved edits remain only in your browser tab.
 
 ## Choose the right item type
 
@@ -84,6 +85,10 @@ different local clock times for the same moment.
 
 The nomination deadline must be after opening and no later than voting closes.
 Voting must close after opening, and a chosen end must be in the future.
+Saved draft dates may become outdated while you plan; you can still save draft edits,
+but publishing checks the dates again. Correct any expired end date before publishing.
+If opening is **Right away when published**, it means the moment you actually publish,
+not the time you saved the draft.
 Choosing after-close standings with no end date means results wait until an admin closes voting.
 
 Hiding a list does **not** pause its clock.
@@ -152,7 +157,7 @@ replacement list.
 
 ## Working with other admins
 
-Drafts and saved changes are shared, but unsaved input is local to your browser tab.
+Drafts, including their saved dates, are shared, but unsaved input is local to your browser tab.
 Coordinate before editing the same list; the editor does not merge changes from
 different admins. Reload before starting work on a list someone else has just edited.
 

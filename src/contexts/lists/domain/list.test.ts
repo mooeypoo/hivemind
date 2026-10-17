@@ -90,6 +90,50 @@ describe('lifecycle', () => {
 describe('schedule', () => {
   const now = t('01T00:00:00');
 
+  test('draft plans remain private drafts and cannot admit participation', () => {
+    const plan = { ...schedule, opensAt: null };
+    const result = editList(draft, { draftSchedule: plan }, now);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.draftSchedule).toEqual(plan);
+    expect(result.value.schedule).toBeNull();
+    expect(lifecycleOf(result.value, t('25T00:00:00'))).toBe('draft');
+    expect(nominationsOpen(result.value, t('12T00:00:00'))).toBe(false);
+  });
+
+  test('draft dates can be revised or cleared and publication discards the plan', () => {
+    const planned = { ...draft, draftSchedule: schedule };
+    const cleared = editList(planned, { draftSchedule: null }, now);
+    expect(cleared.ok && cleared.value.draftSchedule).toBeNull();
+    const published = publish(planned, schedule, now);
+    expect(published.ok && published.value.draftSchedule).toBeNull();
+  });
+
+  test('draft plans validate ordering and reject invalid dates, but allow elapsed deadlines for later review', () => {
+    expect(editList(draft, { draftSchedule: schedule }, t('25T00:00:00')).ok).toBe(true);
+    expect(
+      editList(draft, { draftSchedule: { ...schedule, closesAt: schedule.opensAt } }, now).ok,
+    ).toBe(false);
+    expect(
+      editList(draft, { draftSchedule: { ...schedule, opensAt: new Date('invalid') } }, now).ok,
+    ).toBe(false);
+    expect(
+      editList(
+        draft,
+        { draftSchedule: { ...schedule, opensAt: null, nominationsCloseAt: t('21T00:00:00') } },
+        now,
+      ).ok,
+    ).toBe(false);
+    expect(publish({ ...draft, draftSchedule: schedule }, schedule, t('25T00:00:00')).ok).toBe(
+      false,
+    );
+  });
+
+  test('published lists cannot change draft plans or use them to alter locked dates', () => {
+    const result = editList(published(), { draftSchedule: schedule }, now);
+    expect(!result.ok && result.error.kind).toBe('invalid');
+  });
+
   test('requires opensAt < nominationsCloseAt ≤ closesAt', () => {
     expect(validateSchedule(schedule, now).ok).toBe(true);
     expect(validateSchedule({ ...schedule, nominationsCloseAt: schedule.closesAt }, now).ok).toBe(

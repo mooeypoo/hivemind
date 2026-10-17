@@ -42,6 +42,31 @@ const draft = newList(
 );
 
 describe('Blobs lists repositories', () => {
+  test('draft schedules round-trip with nullable opening and older records have no plan', async () => {
+    const store = blobs.store('draft-schedules');
+    const repo = createBlobsListRepository(store);
+    const plan = {
+      opensAt: null,
+      nominationsCloseAt: new Date('2026-04-10T00:00:00Z'),
+      closesAt: new Date('2026-04-20T00:00:00Z'),
+    };
+    expect(await repo.save({ ...draft, draftSchedule: plan }, null)).toBe(true);
+    expect((await repo.get(listId))?.value.draftSchedule).toEqual(plan);
+    const record: unknown = await store.get(`list/${listId}`, { type: 'json' });
+    expect(record).toMatchObject({
+      draftSchedule: {
+        opensAt: null,
+        nominationsCloseAt: '2026-04-10T00:00:00.000Z',
+        closesAt: '2026-04-20T00:00:00.000Z',
+      },
+    });
+    if (typeof record !== 'object' || record === null) throw new Error('fixture');
+    const { draftSchedule: omitted, ...legacy } = record as Record<string, unknown>;
+    expect(omitted).toBeDefined();
+    await store.setJSON(`list/${listId}`, legacy);
+    expect((await repo.get(listId))?.value.draftSchedule).toBeNull();
+  });
+
   test('permanent deletion keeps only an ID fence and prevents stale aggregate resurrection', async () => {
     const store = blobs.store('deleted-list-fence');
     const repo = createBlobsListRepository(store);

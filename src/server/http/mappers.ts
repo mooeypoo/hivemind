@@ -30,6 +30,18 @@ export const listDto = (view: ListView): ListDto => ({
   lifecycle: view.lifecycle,
   visibility: view.visibility,
   schedule: scheduleDto(view.schedule),
+  ...(view.draftSchedule === undefined
+    ? {}
+    : {
+        draftSchedule:
+          view.draftSchedule === null
+            ? null
+            : {
+                opensAt: view.draftSchedule.opensAt?.toISOString() ?? null,
+                nominationsCloseAt: view.draftSchedule.nominationsCloseAt?.toISOString() ?? null,
+                closesAt: view.draftSchedule.closesAt?.toISOString() ?? null,
+              },
+      }),
   viewer: view.viewer,
 });
 

@@ -10,6 +10,7 @@ import {
   type ListConfig,
   type ListId,
   type Schedule,
+  type DraftSchedule,
   type Visibility,
 } from '../domain/list.ts';
 
@@ -20,6 +21,7 @@ export interface ListView extends ListConfig {
   readonly id: ListId;
   readonly lifecycle: Lifecycle;
   readonly schedule: Schedule | null;
+  readonly draftSchedule?: DraftSchedule | null;
   readonly visibility: Visibility;
   /** What the caller may do here. */
   readonly viewer: {
@@ -68,6 +70,9 @@ export const toListView = (
     id: list.id,
     lifecycle: lifecycleOf(list, now),
     schedule: list.schedule,
+    ...(actor.isAdmin && list.phase === 'draft'
+      ? { draftSchedule: list.draftSchedule ?? null }
+      : {}),
     visibility: list.visibility,
     viewer: {
       canParticipate,

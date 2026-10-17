@@ -117,6 +117,9 @@ export interface ScheduleDto {
   readonly closesAt: string | null;
 }
 
+/** Draft-only plan. Null opening means "when published"; no participation starts on save. */
+export type DraftScheduleDto = Omit<ScheduleDto, 'opensAt'> & { readonly opensAt: string | null };
+
 /** `hidden`: only Admins can see the list. */
 export type Visibility = 'public' | 'hidden';
 
@@ -129,6 +132,7 @@ export interface ListDto extends ListConfigDto {
   readonly id: string;
   readonly lifecycle: Lifecycle;
   readonly schedule: ScheduleDto | null;
+  readonly draftSchedule?: DraftScheduleDto | null;
   readonly visibility: Visibility;
   readonly viewer: {
     readonly canParticipate: boolean;
@@ -196,6 +200,7 @@ export type CreateListRequest = Pick<ListConfigDto, 'title' | 'slug' | 'itemSour
 
 /** `PUT /api/lists/:list` body. Published lists may remove, but never restore, a nomination cap. */
 export type EditListRequest = Partial<ListConfigDto> & {
+  readonly draftSchedule?: DraftScheduleDto | null;
   /** A later end, an end for an open-ended list, or null to remove the end. */
   readonly closesAt?: string | null;
 };

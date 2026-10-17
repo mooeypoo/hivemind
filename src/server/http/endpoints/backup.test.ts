@@ -21,6 +21,7 @@ import {
 import { exportBackup, importBackup } from './backup.ts';
 import {
   createList,
+  editList,
   getList,
   nominate,
   scheduleList,
@@ -92,6 +93,28 @@ afterEach(async () => {
 });
 
 describe('backups', () => {
+  test('saved draft plans survive export/import without starting participation', async () => {
+    const draft = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Planned',
+      slug: 'planned',
+      itemSource: { kind: 'freeform' },
+    });
+    const plan = { opensAt: null, nominationsCloseAt: '2026-01-10T00:00:00.000Z', closesAt: null };
+    expect(
+      (await call(editList, 'PUT', `/api/lists/${draft.body.id}`, admin, { draftSchedule: plan }))
+        .status,
+    ).toBe(200);
+    const file = (await call<unknown>(exportBackup, 'GET', '/api/admin/backup?list=planned', admin))
+      .body;
+    expect((await call(importBackup, 'POST', '/api/admin/backup', admin, file)).status).toBe(200);
+    const restored = await call<ListDetailDto>(getList, 'GET', '/api/lists/planned-2', admin);
+    expect(restored.body).toMatchObject({
+      lifecycle: 'draft',
+      schedule: null,
+      draftSchedule: plan,
+    });
+  });
+
   test('set-aside explanations survive the HTTP backup schema and import', async () => {
     const detail = await call<ListDetailDto>(getList, 'GET', '/api/lists/games', admin);
     const root = detail.body.entries.find((entry) => entry.item.title === 'Root');

@@ -38,6 +38,11 @@ interface ListRecordV2 {
   readonly id: string;
   readonly config: ConfigRecord;
   readonly schedule: ScheduleRecord | null;
+  readonly draftSchedule?: {
+    readonly opensAt: string | null;
+    readonly nominationsCloseAt: string | null;
+    readonly closesAt: string | null;
+  } | null;
   readonly phase: Phase;
   readonly createdAt: string;
   /** Added after v2 shipped; absent on lists archived before it existed. */
@@ -110,6 +115,14 @@ const listToRecord = (list: List): ListRecordV2 => ({
   id: list.id,
   config: list.config,
   schedule: scheduleToRecord(list.schedule),
+  draftSchedule:
+    list.draftSchedule == null
+      ? null
+      : {
+          opensAt: list.draftSchedule.opensAt?.toISOString() ?? null,
+          nominationsCloseAt: list.draftSchedule.nominationsCloseAt?.toISOString() ?? null,
+          closesAt: list.draftSchedule.closesAt?.toISOString() ?? null,
+        },
   phase: list.phase,
   createdAt: list.createdAt.toISOString(),
   archivedAt: list.archivedAt?.toISOString() ?? null,
@@ -146,6 +159,21 @@ const listFromRecord = (data: unknown): List => {
       scoreVisibility: record.config.scoreVisibility ?? 'private',
     },
     schedule: scheduleFromRecord(record.schedule),
+    draftSchedule:
+      record.draftSchedule == null
+        ? null
+        : {
+            opensAt:
+              record.draftSchedule.opensAt === null ? null : new Date(record.draftSchedule.opensAt),
+            nominationsCloseAt:
+              record.draftSchedule.nominationsCloseAt === null
+                ? null
+                : new Date(record.draftSchedule.nominationsCloseAt),
+            closesAt:
+              record.draftSchedule.closesAt === null
+                ? null
+                : new Date(record.draftSchedule.closesAt),
+          },
     phase: record.phase,
     createdAt: new Date(record.createdAt),
     visibility: record.visibility ?? 'public',

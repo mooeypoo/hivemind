@@ -19,6 +19,7 @@ import {
   request,
   signInAs,
   SITE_ADMIN_ID,
+  ADMIN_ROLE_ID,
   SITE_URL,
   startHarness,
   testConfig,
@@ -100,6 +101,72 @@ const openList = async (body: Record<string, unknown>): Promise<ListDto> => {
   expect(scheduled.status).toBe(200);
   return scheduled.body;
 };
+
+describe('shared draft schedules', () => {
+  test('a second admin sees saved dates without publication; members cannot see or edit them', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Planned list',
+      slug: 'planned',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${created.body.id}`;
+    const plan = { opensAt: null, nominationsCloseAt: NOMINATIONS_CLOSE, closesAt: CLOSES };
+    const saved = await call<ListDto>(editList, 'PUT', path, admin, { draftSchedule: plan });
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ lifecycle: 'draft', schedule: null, draftSchedule: plan });
+    const secondAdmin = await signInAs(h, {
+      id: '900000000000000012',
+      username: 'moderator',
+      roles: [ADMIN_ROLE_ID],
+    });
+    const loaded = await call<ListDetailDto>(getList, 'GET', path, secondAdmin);
+    expect(loaded.body.draftSchedule).toEqual(plan);
+    expect((await call(getList, 'GET', path, ada)).status).toBe(404);
+    expect((await call(editList, 'PUT', path, ada, { draftSchedule: plan })).status).toBe(403);
+    expect(
+      (await call(nominate, 'POST', `${path}/entries`, secondAdmin, { title: 'An item' })).status,
+    ).toBe(403);
+    const published = await call<ListDto>(scheduleList, 'POST', `${path}/schedule`, secondAdmin, {
+      ...plan,
+      opensAt: OPENS,
+    });
+    expect(published.status).toBe(200);
+    expect(published.body.lifecycle).toBe('open');
+    expect(published.body.draftSchedule).toBeUndefined();
+    expect((await call<ListDto>(getList, 'GET', path, ada)).body.draftSchedule).toBeUndefined();
+    expect((await call(editList, 'PUT', path, admin, { draftSchedule: plan })).status).toBe(422);
+  });
+
+  test('draft plans can be cleared; malformed and contradictory dates are rejected', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Planned list',
+      slug: 'planned',
+      itemSource: { kind: 'freeform' },
+    });
+    const path = `/api/lists/${created.body.id}`;
+    for (const plan of [
+      { opensAt: 'invalid', nominationsCloseAt: null, closesAt: null },
+      { opensAt: CLOSES, nominationsCloseAt: null, closesAt: OPENS },
+      { opensAt: null, nominationsCloseAt: CLOSES, closesAt: NOMINATIONS_CLOSE },
+      { opensAt: null, nominationsCloseAt: null, closesAt: null, extra: true },
+    ])
+      expect((await call(editList, 'PUT', path, admin, { draftSchedule: plan })).status).toBe(422);
+    expect(
+      (
+        await call(editList, 'PUT', path, admin, {
+          draftSchedule: {
+            opensAt: OPENS,
+            nominationsCloseAt: null,
+            closesAt: CLOSES,
+          },
+        })
+      ).status,
+    ).toBe(200);
+    const cleared = await call<ListDto>(editList, 'PUT', path, admin, { draftSchedule: null });
+    expect(cleared.body.draftSchedule).toBeNull();
+    expect(cleared.body.lifecycle).toBe('draft');
+  });
+});
 
 describe('correcting an unused published list source', () => {
   test('the Admin can correct the source, but a nomination including a withdrawn one locks it', async () => {

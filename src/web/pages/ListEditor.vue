@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type {
   CreateListRequest,
+  DraftScheduleDto,
   DeleteListRequest,
   ItemSourceKind,
   ListDetailDto,
@@ -139,7 +140,10 @@ const finished = computed(
     existing.value?.lifecycle === 'archived',
 );
 
+let fillingForm = false;
 const fillFrom = (list: ListDto) => {
+  fillingForm = true;
+  const dates = list.lifecycle === 'draft' ? (list.draftSchedule ?? list.schedule) : list.schedule;
   Object.assign(form, {
     title: list.title,
     slug: list.slug,
@@ -158,16 +162,15 @@ const fillFrom = (list: ListDto) => {
     minVotes: list.ranking.minVotes,
     showNominators: list.showNominators,
     requiredRoleIds: [...list.requiredRoleIds],
-    opensMode: list.schedule === null ? 'now' : 'at',
-    opensAt: list.schedule === null ? '' : toLocalInput(list.schedule.opensAt),
+    opensMode: dates?.opensAt == null ? 'now' : 'at',
+    opensAt: dates?.opensAt == null ? '' : toLocalInput(dates.opensAt),
     nominationsCloseAt:
-      list.schedule?.nominationsCloseAt == null
-        ? ''
-        : toLocalInput(list.schedule.nominationsCloseAt),
+      dates?.nominationsCloseAt == null ? '' : toLocalInput(dates.nominationsCloseAt),
     // A draft without a schedule starts open-ended, so it can be published with no dates.
-    endMode: list.schedule?.closesAt == null ? 'open-ended' : 'at',
-    closesAt: list.schedule?.closesAt == null ? '' : toLocalInput(list.schedule.closesAt),
+    endMode: dates?.closesAt == null ? 'open-ended' : 'at',
+    closesAt: dates?.closesAt == null ? '' : toLocalInput(dates.closesAt),
   } satisfies Partial<Form>);
+  fillingForm = false;
 };
 
 const load = async () => {
@@ -226,8 +229,9 @@ watch(routeSlug, load);
 watch(
   () => ({ ...form }),
   (value) => {
-    saveDraft(draftKey.value, value);
+    if (!fillingForm) saveDraft(draftKey.value, value);
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -326,24 +330,12 @@ const run = async <T,>(
 };
 
 const afterSave = async (list: ListDto) => {
-  const draftDates =
-    list.lifecycle === 'draft'
-      ? {
-          opensMode: form.opensMode,
-          opensAt: form.opensAt,
-          nominationsCloseAt: form.nominationsCloseAt,
-          endMode: form.endMode,
-          closesAt: form.closesAt,
-        }
-      : null;
   clearDraft(draftKey.value);
   existing.value = list;
   if (list.slug !== routeSlug.value) {
-    if (draftDates !== null) saveDraft(`editor:${list.slug}`, { ...form, ...draftDates });
     await router.replace({ name: 'edit-list', params: { slug: list.slug } });
   } else {
     fillFrom(list);
-    if (draftDates !== null) Object.assign(form, draftDates);
   }
 };
 
@@ -364,7 +356,7 @@ const endChange = (): { closesAt?: string | null } => {
 };
 
 /** Why "Schedule & publish" can't be used yet, or null when it can. */
-const scheduleProblem = (): string | null => {
+const scheduleProblem = (publishing = true): string | null => {
   const now = Date.now();
   const opens = form.opensMode === 'now' ? now : Date.parse(fromLocalInput(form.opensAt) ?? '');
   const nominations = fromLocalInput(form.nominationsCloseAt);
@@ -375,18 +367,25 @@ const scheduleProblem = (): string | null => {
   }
   if (form.entryMode === 'nominations' && form.nominationsCloseAt !== '' && nominations === null)
     return 'Enter a valid nomination deadline.';
-  if (closes !== null && Date.parse(closes) <= now) return 'Voting must close in the future.';
-  if (closes !== null && Date.parse(closes) <= opens)
+  if (publishing && closes !== null && Date.parse(closes) <= now)
+    return 'Voting must close in the future.';
+  if ((publishing || form.opensMode === 'at') && closes !== null && Date.parse(closes) <= opens)
     return 'Voting must close after participation opens.';
   if (form.entryMode === 'nominations' && nominations !== null) {
-    if (Date.parse(nominations) <= opens)
+    if ((publishing || form.opensMode === 'at') && Date.parse(nominations) <= opens)
       return 'Nominations must close after participation opens.';
     if (closes !== null && Date.parse(nominations) > Date.parse(closes))
       return 'Nominations must close no later than voting.';
   }
   return null;
 };
-const publishBlocker = computed(scheduleProblem);
+const publishBlocker = computed(() => scheduleProblem());
+const draftSchedule = (): DraftScheduleDto => ({
+  opensAt: form.opensMode === 'now' ? null : fromLocalInput(form.opensAt),
+  nominationsCloseAt:
+    form.entryMode === 'nominations' ? fromLocalInput(form.nominationsCloseAt) : null,
+  closesAt: form.endMode === 'open-ended' ? null : fromLocalInput(form.closesAt),
+});
 const reviewDate = (value: string) => {
   const iso = fromLocalInput(value);
   return iso === null ? 'Not set' : formatDateTime(iso);
@@ -424,6 +423,10 @@ const save = async () => {
   }
   const input = validatedConfig();
   if (input === null) return;
+  if (!locked.value) {
+    setupError.value = scheduleProblem(false) ?? '';
+    if (setupError.value !== '') return;
+  }
   const removeNominationCap =
     existing.value.maxNominationsPerMember !== null && form.unlimitedNominations
       ? { maxNominationsPerMember: null }
@@ -435,7 +438,7 @@ const save = async () => {
         ...removeNominationCap,
         ...(itemSourceEditable.value ? { itemSource: input.itemSource } : {}),
       }
-    : input;
+    : { ...input, draftSchedule: draftSchedule() };
   const list = await run(
     () => api.put<ListDto>(`/api/lists/${existing.value?.id ?? ''}`, body),
     'Saved.',
@@ -465,7 +468,10 @@ const schedule = async () => {
   status.value = '';
   draftSavedForPublish.value = false;
   try {
-    const saved = await api.put<ListDto>(`/api/lists/${id}`, input);
+    const saved = await api.put<ListDto>(`/api/lists/${id}`, {
+      ...input,
+      draftSchedule: draftSchedule(),
+    });
     if (!saved.ok) {
       error.value = saved.error;
       return;
@@ -985,8 +991,8 @@ const importCsv = async () => {
         <legend>Schedule</legend>
         <p class="meta">Times are shown in {{ timeZone }}.</p>
         <p v-if="!locked" class="notice">
-          Dates are applied when publishing. Save draft does not save these dates to the site; they
-          are kept only in this browser tab until then.
+          Save draft shares these planned dates with other admins without publishing or opening
+          participation. Dates stay editable in draft and are checked again before publishing.
         </p>
 
         <fieldset class="stack" :disabled="locked">
@@ -1319,8 +1325,8 @@ const importCsv = async () => {
           Making scores private later cannot undo what people have already seen.
         </label>
         <p v-if="draftSavedForPublish && error !== null" class="notice">
-          Draft settings saved, but publishing was not confirmed. Your dates remain in this tab. If
-          another admin published this list, reload to check its current state before continuing.
+          Draft settings and planned dates saved, but publishing was not confirmed. If another admin
+          published this list, reload to check its current state before continuing.
         </p>
         <ErrorNotice :error="error" />
         <p v-if="setupError !== ''" class="notice notice--error" role="alert">{{ setupError }}</p>

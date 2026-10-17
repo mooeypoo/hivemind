@@ -156,8 +156,13 @@ describe('ListEditor', () => {
     editor.unmount();
   });
 
-  test('saving draft settings preserves planned dates in this tab, not in the API request', async () => {
-    const draft = openTmdbList({ lifecycle: 'draft', schedule: null });
+  test('saving draft shares dates and reload restores them without browser storage', async () => {
+    const plan = {
+      opensAt: new Date('2099-01-01T18:00').toISOString(),
+      nominationsCloseAt: null,
+      closesAt: null,
+    };
+    const draft = openTmdbList({ lifecycle: 'draft', schedule: null, draftSchedule: plan });
     const calls = stubApi({
       'GET /api/catalog/sources': sources,
       'GET /api/roles': roles,
@@ -170,8 +175,39 @@ describe('ListEditor', () => {
     await editor.get('form').trigger('submit');
     await flushPromises();
     expect((editor.get('#opens').element as HTMLInputElement).value).toBe('2099-01-01T18:00');
-    expect(calls.find((call) => call.method === 'PUT')?.body).not.toHaveProperty('opensAt');
-    expect(sessionStorage.getItem('draft:editor:best-sci-fi')).toContain('2099-01-01T18:00');
+    expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+      draftSchedule: plan,
+    });
+    editor.unmount();
+    sessionStorage.clear();
+    const reloaded = await mountAt('/admin/lists/best-sci-fi');
+    expect((reloaded.get('#opens').element as HTMLInputElement).value).toBe('2099-01-01T18:00');
+    expect(
+      (reloaded.get('input[name=end][value=open-ended]').element as HTMLInputElement).checked,
+    ).toBe(true);
+    reloaded.unmount();
+  });
+
+  test('an elapsed saved plan can remain a draft but cannot be published', async () => {
+    const plan = {
+      opensAt: '2020-01-01T18:00:00.000Z',
+      nominationsCloseAt: null,
+      closesAt: '2020-02-01T18:00:00.000Z',
+    };
+    const draft = openTmdbList({ lifecycle: 'draft', schedule: null, draftSchedule: plan });
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(draft),
+      'PUT /api/lists/list-1': () => Response.json(draft),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.get('[data-review-publish]').attributes('disabled')).toBeDefined();
+    expect(editor.text()).toContain('Voting must close in the future.');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(calls.some((call) => call.method === 'PUT')).toBe(true);
+    expect(calls.some((call) => call.url.endsWith('/schedule'))).toBe(false);
     editor.unmount();
   });
 
@@ -197,7 +233,9 @@ describe('ListEditor', () => {
     await dialog.get('[data-confirm-publish]').trigger('click');
     await flushPromises();
     expect(dialog.get('[role=alert]').text()).toContain('Please retry.');
-    expect(dialog.text()).toContain('Draft settings saved, but publishing was not confirmed');
+    expect(dialog.text()).toContain(
+      'Draft settings and planned dates saved, but publishing was not confirmed',
+    );
     expect(calls.filter((call) => call.url.endsWith('/schedule'))).toHaveLength(1);
     editor.unmount();
   });
