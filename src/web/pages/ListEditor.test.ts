@@ -653,7 +653,8 @@ describe('ListEditor', () => {
       editor
         .findAll('input[type=checkbox]')
         .find((box) => box.element.closest('label')?.textContent.includes(label));
-    await checkbox('Unlimited')?.setValue(true);
+    expect((editor.get('#unlimited').element as HTMLInputElement).checked).toBe(true);
+    expect(editor.get('.editor-next-step').text()).toContain('Next step: choose dates and publish');
     expect((editor.get('#cap').element as HTMLInputElement).disabled).toBe(true);
     await checkbox('Film Club')?.setValue(true);
     await editor.get('form').trigger('submit');

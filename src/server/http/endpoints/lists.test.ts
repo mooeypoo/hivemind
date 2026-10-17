@@ -615,6 +615,7 @@ describe('a TMDB movie list, end to end', () => {
       scale: { min: 1, max: 10 },
       entryMode: 'nominations',
       resultsVisibility: 'live',
+      maxNominationsPerMember: null,
       schedule: null,
     });
     expect((await call<ListsDto>(listLists, 'GET', '/api/lists', ada)).body).toEqual({ lists: [] });

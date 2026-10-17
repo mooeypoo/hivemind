@@ -18,6 +18,15 @@
   font-weight: 400;
 }
 
+.editor-next-step {
+  border-inline-start: 3px solid var(--accent);
+  font-size: 1.1rem;
+}
+
+.editor-next-step h2 {
+  margin-bottom: 0.5rem;
+}
+
 .entry-admin {
   margin-top: 1.5rem;
   padding: 1rem;

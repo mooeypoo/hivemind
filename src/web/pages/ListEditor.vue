@@ -80,7 +80,7 @@ const form = reactive<Form>({
   scaleMin: 1,
   scaleMax: 10,
   maxNominationsPerMember: 3,
-  unlimitedNominations: false,
+  unlimitedNominations: true,
   resultsVisibility: 'live',
   scoreVisibility: 'private',
   minVotes: 5,
@@ -1280,9 +1280,14 @@ const importCsv = async () => {
       <p class="visually-hidden" aria-live="polite">{{ status }}</p>
       <p v-if="status !== ''" class="notice notice--success">{{ status }}</p>
 
-      <p v-if="existing === null" class="meta">
-        You’ll choose when it opens, and whether voting ends, after creating the draft.
-      </p>
+      <section
+        v-if="existing === null"
+        class="notice editor-next-step"
+        aria-labelledby="next-step-heading"
+      >
+        <h2 id="next-step-heading">Next step: choose dates and publish</h2>
+        <p>You’ll choose when it opens, and whether voting ends, after creating the draft.</p>
+      </section>
       <p v-else-if="!locked && publishBlocker !== null" class="meta">{{ publishBlocker }}</p>
       <div class="actions editor-actions">
         <button

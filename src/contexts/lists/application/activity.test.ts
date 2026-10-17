@@ -117,13 +117,17 @@ test('history is admin-only, missing lists are not found, and ordinary DTOs omit
 });
 
 test('successful changes are recorded atomically and failed writes never create phantom events', async () => {
+  await makeEditList(deps)(admin, { list: id, edit: { maxNominationsPerMember: 3 } });
   const save = deps.lists.save.bind(deps.lists);
   const spy = vi.spyOn(deps.lists, 'save').mockResolvedValue(false);
   expect(
     (await makeEditList(deps)(admin, { list: id, edit: { description: 'Not saved' } })).ok,
   ).toBe(false);
   let result = await history();
-  expect(result.ok && result.value.map((event) => event.action)).toEqual(['created']);
+  expect(result.ok && result.value.map((event) => event.action)).toEqual([
+    'settings-edited',
+    'created',
+  ]);
   spy.mockImplementationOnce(() => Promise.resolve(false)).mockImplementation(save);
   expect(
     (
@@ -136,7 +140,7 @@ test('successful changes are recorded atomically and failed writes never create 
   result = await history();
   expect(
     result.ok && result.value.filter((event) => event.action === 'settings-edited'),
-  ).toHaveLength(1);
+  ).toHaveLength(2);
   const text = JSON.stringify(result);
   expect(text).not.toContain('New prose');
   expect(

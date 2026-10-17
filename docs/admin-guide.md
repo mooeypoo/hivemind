@@ -20,6 +20,9 @@ person votes. **Save draft** saves planned dates to the site too, so another adm
 review and continue the plan. It does not publish the list or start participation.
 Unsaved edits remain only in your browser tab.
 
+New lists allow **unlimited nominations per member** by default. Uncheck **Unlimited**
+and choose a limit if your community needs one. Existing lists keep their saved limits.
+
 ## Choose the right item type
 
 | Type               | What members do                                                          |

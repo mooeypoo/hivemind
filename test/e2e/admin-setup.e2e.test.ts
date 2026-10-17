@@ -6,6 +6,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`admin publishing in ${colorScheme} mode`, () => {
     test.use({ colorScheme });
     for (const width of [320, 375, 1280]) {
+      test(`new list controls and next step stay clear at ${String(width)}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 850 });
+        await fakeApi(page, admin);
+        await page.goto('/admin/lists/new');
+        const radios = page.locator('input[name="source"]');
+        const first = await radios.first().boundingBox();
+        const freeText = await page.locator('input[value="freeform"]').boundingBox();
+        expect(first).not.toBeNull();
+        expect(freeText).not.toBeNull();
+        expect(freeText?.width).toBe(first?.width);
+        expect(freeText?.width).toBeGreaterThanOrEqual(20);
+        await expect(page.getByLabel('Unlimited', { exact: true })).toBeChecked();
+        await expect(page.locator('.editor-next-step')).toBeVisible();
+        expect(
+          await page
+            .locator('.editor-next-step')
+            .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+        ).toBeGreaterThan(16);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+      });
+
       test(`admin activity history fits and stays separate at ${String(width)}px`, async ({
         page,
       }) => {

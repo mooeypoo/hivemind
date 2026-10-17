@@ -109,7 +109,7 @@ export const LIST_DEFAULTS = {
   description: '',
   entryMode: 'nominations',
   scale: DEFAULT_SCALE,
-  maxNominationsPerMember: 3,
+  maxNominationsPerMember: null,
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
