@@ -2,8 +2,7 @@
 import { ref, watch } from 'vue';
 import type { ListActivityDto } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
-import { activityField, activityLabel, activityValue } from '../lib/activity.ts';
-import { formatDateTime } from '../lib/datetime.ts';
+import ActivityEvent from './ActivityEvent.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 const props = defineProps<{ listId: string; settingsVersion: number | undefined }>();
@@ -51,6 +50,9 @@ watch(
         A shared record of list decisions, not a record of votes. Admin names are kept for one year,
         or until they delete their data. Older actions remain without a name.
       </p>
+      <RouterLink :to="{ name: 'activity', query: { list: listId } }">
+        Open full activity log
+      </RouterLink>
     </header>
     <button v-if="!open" type="button" class="button" @click="show">Show activity</button>
     <template v-else>
@@ -70,22 +72,7 @@ watch(
       </p>
       <ol v-if="events.length > 0" class="activity__timeline">
         <li v-for="event in events.slice(0, count)" :key="event.id" class="activity__event stack">
-          <p class="meta">
-            <strong>{{ event.adminName ?? 'Admin identity removed' }}</strong> ·
-            <time :datetime="event.at">{{ formatDateTime(event.at) }}</time>
-          </p>
-          <h3>{{ activityLabel[event.action] }}</h3>
-          <p v-if="event.entryTitle !== null">{{ event.entryTitle }}</p>
-          <ul v-if="event.changes.length > 0" class="activity__changes">
-            <li v-for="change in event.changes" :key="change.field">
-              <strong>{{ activityField[change.field] ?? change.field }}</strong
-              ><template v-if="change.before !== null || change.after !== null"
-                >: {{ activityValue(change.field, change.before) }} →
-                {{ activityValue(change.field, change.after) }}</template
-              >
-              <template v-else> changed</template>
-            </li>
-          </ul>
+          <ActivityEvent :event="event" />
         </li>
       </ol>
       <button v-if="events.length > count" type="button" class="button" @click="count += 20">

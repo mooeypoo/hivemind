@@ -166,6 +166,7 @@ input[type='search'],
 input[type='number'],
 input[type='datetime-local'],
 input[type='file'],
+select,
 textarea {
   width: 100%;
   min-height: 44px;
@@ -180,6 +181,7 @@ textarea {
 input[type='text']:focus-visible,
 input[type='search']:focus-visible,
 input[type='number']:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
   border-color: var(--focus);
 }
@@ -189,6 +191,7 @@ textarea {
 }
 
 input:disabled,
+select:disabled,
 textarea:disabled {
   background: var(--surface-2);
   color: var(--muted);

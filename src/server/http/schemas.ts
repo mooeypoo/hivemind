@@ -9,6 +9,27 @@ export const loginCallbackQuery = z.object({
 });
 
 const isoDate = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
+export const adminActivityQuery = z.strictObject({
+  list: z.string().min(1).max(200).optional(),
+  cursor: z
+    .string()
+    .max(4000)
+    .transform((value, ctx): unknown => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'must be a valid activity cursor' });
+        return z.NEVER;
+      }
+    })
+    .pipe(
+      z.strictObject({
+        at: z.iso.datetime(),
+        id: z.string().min(1).max(2000),
+      }),
+    )
+    .optional(),
+});
 const settingsVersion = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional();
 export const listActionBody = z.strictObject({ expectedSettingsVersion: settingsVersion });
 const roleId = z

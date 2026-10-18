@@ -14,6 +14,7 @@ const memberRoutes = [
   '/admin/lists/films',
   '/admin/roles',
   '/admin/backups',
+  '/admin/activity',
   '/about',
   '/privacy',
   '/no-such-page',

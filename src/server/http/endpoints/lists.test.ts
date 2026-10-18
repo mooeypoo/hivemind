@@ -6,6 +6,7 @@ import type {
   ListDetailDto,
   ListDto,
   ListActivityDto,
+  AdminActivityDto,
   ListsDto,
   MyDataExportDto,
   PresetImportedDto,
@@ -34,6 +35,7 @@ import {
   editList,
   getList,
   getListActivity,
+  getAdminActivity,
   setEntryAside,
   listLists,
   nominate,
@@ -106,6 +108,53 @@ const openList = async (body: Record<string, unknown>): Promise<ListDto> => {
 };
 
 describe('admin activity history', () => {
+  test('general activity is admin-only, validates cursors, filters lists and sends no-store responses', async () => {
+    const first = await openList({
+      title: 'First',
+      slug: 'first',
+      itemSource: { kind: 'freeform' },
+    });
+    await openList({ title: 'Second', slug: 'second', itemSource: { kind: 'freeform' } });
+    expect((await call(getAdminActivity, 'GET', '/api/admin/activity', null)).status).toBe(401);
+    expect((await call(getAdminActivity, 'GET', '/api/admin/activity', ada)).status).toBe(403);
+    const all = await call<AdminActivityDto>(getAdminActivity, 'GET', '/api/admin/activity', admin);
+    expect(all.status).toBe(200);
+    expect(all.body.events).toHaveLength(4);
+    expect(all.body.lists).toHaveLength(2);
+    expect(new Set(all.body.events.map((event) => event.id)).size).toBe(4);
+    expect(JSON.stringify(all.body)).not.toContain(SITE_ADMIN_ID);
+    const filtered = await call<AdminActivityDto>(
+      getAdminActivity,
+      'GET',
+      `/api/admin/activity?list=${first.id}`,
+      admin,
+    );
+    expect(filtered.body.events).toHaveLength(2);
+    expect(filtered.body.events.every((event) => event.list.id === first.id)).toBe(true);
+    expect(
+      (await call(getAdminActivity, 'GET', '/api/admin/activity?list=missing', admin)).status,
+    ).toBe(404);
+    for (const query of ['cursor=no', 'cursor=%7B%7D', 'cursor=null', 'extra=1', 'list=']) {
+      expect(
+        (await call(getAdminActivity, 'GET', `/api/admin/activity?${query}`, admin)).status,
+      ).toBe(422);
+    }
+    const response = await getAdminActivity(
+      request('GET', '/api/admin/activity', { cookies: { [SESSION_COOKIE]: admin } }),
+      h.app,
+    );
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const cursor = JSON.stringify({ at: '2000-01-01T00:00:00.000Z', id: 'end' });
+    const older = await call<AdminActivityDto>(
+      getAdminActivity,
+      'GET',
+      `/api/admin/activity?cursor=${encodeURIComponent(cursor)}`,
+      admin,
+    );
+    expect(older.body.events).toEqual([]);
+    expect(older.body.nextCursor).toBeNull();
+  });
+
   test('history and inline attribution are admin-only; export and erasure cover list and moderation events', async () => {
     const list = await openList({
       title: 'History',

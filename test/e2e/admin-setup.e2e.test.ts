@@ -330,28 +330,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
         });
         await page.goto('/admin/lists/films');
         await page.getByRole('button', { name: 'Edit setup', exact: true }).click();
-        await page.getByLabel('Description', { exact: true }).fill('My unsaved description');
+        const description = page.getByRole('textbox', { name: 'Description', exact: true });
+        await description.fill('My unsaved description');
         shared = { ...shared, settingsVersion: 1, description: `Other admin: ${'x'.repeat(180)}` };
         await page.getByRole('button', { name: 'Save draft', exact: true }).click();
         await expect(
-          page.getByRole('heading', { name: 'Compare before continuing' }),
+          page.getByRole('heading', { name: 'Review settings before saving', exact: true }),
         ).toBeFocused();
-        await expect(page.getByLabel('Description', { exact: true })).toHaveValue(
-          'My unsaved description',
-        );
+        await expect(description).toHaveValue('My unsaved description');
         await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: 'Compare latest settings', exact: true }).click();
-        const comparison = page.getByRole('region', { name: 'Compare before continuing' });
+        const comparison = page.getByRole('region', {
+          name: 'Review settings before saving',
+          exact: true,
+        });
         await expect(comparison).toContainText('Other admin:');
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           width,
         );
         await page.reload();
         await expect(comparison).toContainText('My unsaved description');
-        await expect(page.getByLabel('Description', { exact: true })).toHaveValue(
-          'My unsaved description',
-        );
-        await page.getByRole('button', { name: 'Keep my input after comparison' }).click();
+        await page.getByRole('button', { name: 'Edit setup', exact: true }).click();
+        await expect(description).toHaveValue('My unsaved description');
+        await page.getByRole('button', { name: 'Keep my unsaved edits', exact: true }).click();
         expect(saves).toBe(1);
         await page.getByRole('button', { name: 'Save draft', exact: true }).click();
         await expect(page.getByText('Saved.', { exact: true }).last()).toBeVisible();

@@ -10,7 +10,7 @@ import {
   InMemoryListRepository,
   InMemorySlugIndex,
 } from '../infrastructure/testing/in-memory-lists.ts';
-import { makeGetListActivity, makeAnonymiseActivity } from './activity.ts';
+import { makeGetListActivity, makeGetAdminActivity, makeAnonymiseActivity } from './activity.ts';
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
 import { makeArchiveList } from './archive-list.ts';
@@ -66,6 +66,114 @@ beforeEach(async () => {
   id = created.value.id;
 });
 const history = () => makeGetListActivity(deps)(admin, { list: id });
+test('combined activity authorizes before reading and includes draft, hidden and archived lists', async () => {
+  const read = vi.spyOn(deps.lists, 'all');
+  const get = makeGetAdminActivity(deps);
+  expect(await get(anonymous, {})).toMatchObject({ ok: false, error: { kind: 'unauthenticated' } });
+  expect(await get(member, {})).toMatchObject({ ok: false, error: { kind: 'forbidden' } });
+  expect(read).not.toHaveBeenCalled();
+  const hidden = await makeCreateList(deps)(admin, {
+    ...LIST_DEFAULTS,
+    title: 'Hidden',
+    slug: 'hidden',
+    itemSource: { kind: 'freeform' },
+  });
+  if (!hidden.ok) throw new Error('fixture');
+  await makeSetVisibility(deps)(admin, { list: hidden.value.id, visibility: 'hidden' });
+  await makeScheduleList(deps)(admin, {
+    list: hidden.value.id,
+    schedule: { opensAt: deps.clock.now(), nominationsCloseAt: null, closesAt: null },
+  });
+  await makeArchiveList(deps)(admin, { list: hidden.value.id });
+  const result = await get(admin, {});
+  expect(result.ok && result.value.lists.map((list) => list.id).sort()).toEqual(
+    [id, hidden.value.id].sort(),
+  );
+  expect(result.ok && new Set(result.value.events.map((event) => event.list.id)).size).toBe(2);
+});
+
+test('combined activity filters before paging, has unique stable IDs, and paginates equal timestamps without gaps', async () => {
+  for (let i = 0; i < 25; i++) {
+    await makeCreateList(deps)(admin, {
+      ...LIST_DEFAULTS,
+      title: `List ${String(i)}`,
+      slug: `list-${String(i)}`,
+      itemSource: { kind: 'freeform' },
+    });
+  }
+  const get = makeGetAdminActivity(deps);
+  const first = await get(admin, {});
+  if (!first.ok || first.value.nextCursor === null) throw new Error('fixture');
+  expect(first.value.events).toHaveLength(20);
+  const second = await get(admin, { cursor: first.value.nextCursor });
+  if (!second.ok) throw new Error('fixture');
+  expect(second.value.events).toHaveLength(6);
+  expect(second.value.nextCursor).toBeNull();
+  const ids = [...first.value.events, ...second.value.events].map((event) => event.id);
+  expect(new Set(ids).size).toBe(26);
+  const filtered = await get(admin, { list: id });
+  expect(filtered.ok && filtered.value.events).toHaveLength(1);
+  expect(filtered.ok && filtered.value.events[0]?.list).toEqual({
+    id,
+    title: 'Shared decisions',
+    slug: 'decisions',
+  });
+  expect(await get(admin, { list: 'missing' })).toMatchObject({
+    ok: false,
+    error: { kind: 'not-found' },
+  });
+});
+
+test('combined history reuses moderation projection, expires names, and preserves deletion safeguards', async () => {
+  await moderate();
+  const get = makeGetAdminActivity(deps);
+  const result = await get(admin, {});
+  expect(result.ok && result.value.events.some((event) => event.entryTitle === 'An item')).toBe(
+    true,
+  );
+  expect(JSON.stringify(result)).not.toContain('Do not copy');
+  expect(JSON.stringify(result)).not.toContain('memberId');
+  deps.clock.set(at('2027-01-01'));
+  const expired = await get(admin, {});
+  expect(expired.ok && expired.value.events.every((event) => event.adminName === null)).toBe(true);
+  const current = await deps.lists.get(id);
+  if (current === null) throw new Error('fixture');
+  await deps.lists.save({ ...current.value, deletionRequested: true }, current.version);
+  expect(await get(admin, { list: id })).toMatchObject({
+    ok: false,
+    error: { code: 'lists.deleting' },
+  });
+  expect(await get(admin, {})).toMatchObject({ ok: false, error: { code: 'lists.deleting' } });
+});
+
+test('multi-list reads are bounded and a list filter avoids unrelated entry reads', async () => {
+  for (let i = 0; i < 30; i++) {
+    await makeCreateList(deps)(admin, {
+      ...LIST_DEFAULTS,
+      title: `List ${String(i)}`,
+      slug: `load-${String(i)}`,
+      itemSource: { kind: 'freeform' },
+    });
+  }
+  let active = 0;
+  let peak = 0;
+  const forList = deps.entries.forList.bind(deps.entries);
+  const reads = vi.spyOn(deps.entries, 'forList').mockImplementation(async (listId) => {
+    active += 1;
+    peak = Math.max(peak, active);
+    await new Promise<void>((resolve) => setTimeout(resolve, 1));
+    const result = await forList(listId);
+    active -= 1;
+    return result;
+  });
+  const all = await makeGetAdminActivity(deps)(admin, {});
+  expect(all.ok && all.value.events).toHaveLength(20);
+  expect(reads).toHaveBeenCalledTimes(31);
+  expect(peak).toBe(4);
+  reads.mockClear();
+  await makeGetAdminActivity(deps)(admin, { list: id });
+  expect(reads).toHaveBeenCalledExactlyOnceWith(id);
+});
 const entries = async () => {
   expect(
     (

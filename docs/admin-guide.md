@@ -226,9 +226,20 @@ before replacing their choices.
 
 ### Admin-only activity
 
-Open **List activity → Show activity** in the list editor to see who created, imported,
+Open **Activity log** in the Admin menu to see decisions across every list, newest first.
+Use the **List** filter to focus on one list, including drafts, hidden and archived lists.
+The filter is kept in the page address, so you can bookmark or share that view with another
+admin. **Older activity** and **Newer activity** move through pages of 20 events;
+**Refresh activity** returns to the newest page with the same filter.
+
+Each event shows the action, the current list name (linking to its editor), the admin
+and the local date and time. **View changes** reveals the changed settings. Names shown
+for lists are their current names, not historical titles.
+
+You can also open **List activity → Show activity** in the list editor to see who created, imported,
 published or changed a list, changed its visibility, closed voting, archived it, or
 moderated an entry. Entries also show the last moderation attribution in **Admin tools**.
+**Open full activity log** opens the general log already filtered to that list.
 Ordinary members cannot see these identities or the activity history. Older lists have
 no retrospective history for actions taken before this feature was introduced.
 
@@ -240,6 +251,8 @@ my data**. Losing admin access does not erase earlier attribution.
 History records changed fields and old/new structured settings, such as nomination
 limits and dates. It does not keep old titles, addresses, descriptions or moderation
 explanations, or record scores. This is a collaboration aid, not a tamper-proof audit log.
+It does not include sign-ins, failed requests, or technical server errors. If deletion is
+in progress, finish or retry it from the list before refreshing activity.
 
 Deleting an entry removes its identifying history; only a generic entry-deletion event
 remains. Deleting a list removes its history. **Activity history is not included in list

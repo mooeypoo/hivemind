@@ -6,6 +6,7 @@ import type {
   ListDetailDto,
   ListDto,
   ListActivityDto,
+  AdminActivityDto,
   ListsDto,
   CatalogItemDto,
   RefreshMovieDetailsDto,
@@ -16,6 +17,7 @@ import { rejectForeignOrigin } from '../origin.ts';
 import { domainErrorResponse, json, noContent } from '../respond.ts';
 import {
   createListBody,
+  adminActivityQuery,
   deleteListBody,
   deleteEntryBody,
   editListBody,
@@ -33,6 +35,18 @@ import {
 
 const respond = <T>(result: Result<T, DomainError>, map: (value: T) => unknown, status = 200) =>
   result.ok ? json(map(result.value), status) : domainErrorResponse(result.error);
+
+export const getAdminActivity = async (request: Request, app: App): Promise<Response> => {
+  const query = parseWith(adminActivityQuery, queryOf(request));
+  if (!query.ok) return query.response;
+  return respond(
+    await app.lists.getAdminActivity(await actorOf(request, app), defined(query.data)),
+    (activity): AdminActivityDto => ({
+      ...activity,
+      nextCursor: activity.nextCursor === null ? null : JSON.stringify(activity.nextCursor),
+    }),
+  );
+};
 
 export const getListActivity = async (request: Request, app: App): Promise<Response> =>
   respond(
