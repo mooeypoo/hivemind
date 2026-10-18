@@ -96,16 +96,22 @@ test('overview explains scope, distinguishes people from ratings, and links to l
   await wrapper.get('details summary').trigger('click');
   expect(wrapper.text()).toContain('not lifetime activity');
   expect(wrapper.findAll('.insights-method__section h3').map((heading) => heading.text())).toEqual([
-    'What we count',
-    'Which lists are included',
+    'What the metrics mean',
+    'Included and excluded',
     'Why numbers can change',
-    'Privacy, by design',
+    'Privacy and retention',
   ]);
   expect(wrapper.findAll('.insights-method__definitions dt').map((term) => term.text())).toEqual([
     'Voters',
     'Nominators',
     'Entry coverage',
   ]);
+  expect(wrapper.get('.insights-method__note strong').text()).toBe(
+    'People can appear in both groups.',
+  );
+  expect(wrapper.get('.insights-method__section--privacy').text()).toContain(
+    'Small aggregate counts can still allow inference from other knowledge.',
+  );
   wrapper.unmount();
 });
 test('per-list view displays count distribution and no fake zeros for an embargoed list', async () => {

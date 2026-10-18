@@ -18,10 +18,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.getByLabel('Order by').selectOption('coverage');
         await page.getByText('How these numbers work', { exact: true }).click();
         await expect(
-          page.getByRole('heading', { name: 'What we count', exact: true }),
+          page.getByRole('heading', { name: 'What the metrics mean', exact: true }),
         ).toBeVisible();
         await expect(
-          page.getByRole('heading', { name: 'Privacy, by design', exact: true }),
+          page.getByRole('heading', { name: 'Privacy and retention', exact: true }),
         ).toBeVisible();
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
