@@ -269,6 +269,10 @@ describe('every page passes automated accessibility checks', () => {
         'loaded',
         state,
       );
+      if (state !== 'error') {
+        await wrapper.get('.insights-method summary').trigger('click');
+        expect(wrapper.findAll('.insights-method__section h3')).toHaveLength(4);
+      }
       await expectAccessible(document.body);
       wrapper.unmount();
     },

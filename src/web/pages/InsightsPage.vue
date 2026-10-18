@@ -257,34 +257,88 @@ const revealDate = (value: string) => new Date(value).toLocaleString();
       </section>
       <details class="insights-method card stack">
         <summary>How these numbers work</summary>
-        <p>
-          These numbers describe current state, not lifetime activity. Reads happen across several
-          records, so participation during a refresh can briefly make counts differ.
-        </p>
-        <p>
-          A voter has at least one rating on a current entry. Empty ballots and ratings on withdrawn
-          entries do not count. Set-aside entries still count because members can rate them.
-        </p>
-        <p>
-          Nominators are distinct members still attributed to current nominations. Seeded entries do
-          not create nominators. Voters and nominators can overlap: adding them does not give a
-          contributor total.
-        </p>
-        <p>
-          Site-wide people counts deduplicate across included lists. Hidden and draft lists may be
-          included for admins. After-close lists are excluded until voting ends; lists undergoing
-          permanent deletion are also excluded.
-        </p>
-        <p>
-          Erasure, withdrawal and permanent deletion can reduce these numbers, even on finished
-          lists. Restored lists describe restored content, not new activity. Entry coverage is not
-          the percentage of the Discord community participating.
-        </p>
-        <p>
-          No names, individual scores, tracking identifiers or participation history are collected
-          for insights. Nothing new is retained; each refresh reads the data already needed to run
-          lists.
-        </p>
+        <div class="insights-method__body">
+          <h2 class="insights-method__intro">
+            A picture of <strong>current participation</strong>, not lifetime activity.
+          </h2>
+          <div class="insights-method__grid">
+            <section class="insights-method__section" aria-labelledby="method-counts">
+              <h3 id="method-counts">What we count</h3>
+              <dl class="insights-method__definitions">
+                <div>
+                  <dt>Voters</dt>
+                  <dd>
+                    Members with at least one rating on a current entry. Empty ballots and ratings
+                    on withdrawn entries do not count. Set-aside entries still count because members
+                    can rate them.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Nominators</dt>
+                  <dd>
+                    Distinct members still attributed to current nominations. Seeded entries do not
+                    create nominators.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Entry coverage</dt>
+                  <dd>
+                    The share of current entries with a rating, not the percentage of the Discord
+                    community participating.
+                  </dd>
+                </div>
+              </dl>
+              <p class="insights-method__note">
+                Voters and nominators can overlap. <strong>Do not add them</strong> as a contributor
+                total.
+              </p>
+            </section>
+            <section class="insights-method__section" aria-labelledby="method-scope">
+              <h3 id="method-scope">Which lists are included</h3>
+              <ul class="insights-method__list">
+                <li>
+                  <strong>Counted once:</strong> site-wide people counts deduplicate across included
+                  lists.
+                </li>
+                <li><strong>Admin scope:</strong> hidden and draft lists may be included.</li>
+                <li><strong>After-close lists:</strong> excluded until voting ends.</li>
+                <li><strong>Permanent deletion:</strong> lists undergoing cleanup are excluded.</li>
+              </ul>
+            </section>
+            <section class="insights-method__section" aria-labelledby="method-changes">
+              <h3 id="method-changes">Why numbers can change</h3>
+              <ul class="insights-method__list">
+                <li>
+                  <strong>Removed contributions:</strong> erasure, withdrawal and permanent deletion
+                  can reduce counts, even on finished lists.
+                </li>
+                <li>
+                  <strong>Restored lists:</strong> numbers describe restored content, not new
+                  activity.
+                </li>
+                <li>
+                  <strong>During a refresh:</strong> reads span several records, so participation in
+                  progress can briefly make counts differ.
+                </li>
+              </ul>
+            </section>
+            <section
+              class="insights-method__section insights-method__section--privacy"
+              aria-labelledby="method-privacy"
+            >
+              <p class="eyebrow">Only what is already needed</p>
+              <h3 id="method-privacy">Privacy, by design</h3>
+              <p>
+                No names, individual scores, tracking identifiers or participation history are
+                collected for insights.
+              </p>
+              <p>
+                <strong>Nothing new is retained.</strong> Each refresh reads the data already needed
+                to run lists.
+              </p>
+            </section>
+          </div>
+        </div>
       </details>
     </template>
   </div>

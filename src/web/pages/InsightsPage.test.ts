@@ -95,6 +95,17 @@ test('overview explains scope, distinguishes people from ratings, and links to l
   expect(wrapper.findAll('svg rect').every((rect) => !rect.attributes('style'))).toBe(true);
   await wrapper.get('details summary').trigger('click');
   expect(wrapper.text()).toContain('not lifetime activity');
+  expect(wrapper.findAll('.insights-method__section h3').map((heading) => heading.text())).toEqual([
+    'What we count',
+    'Which lists are included',
+    'Why numbers can change',
+    'Privacy, by design',
+  ]);
+  expect(wrapper.findAll('.insights-method__definitions dt').map((term) => term.text())).toEqual([
+    'Voters',
+    'Nominators',
+    'Entry coverage',
+  ]);
   wrapper.unmount();
 });
 test('per-list view displays count distribution and no fake zeros for an embargoed list', async () => {

@@ -16,6 +16,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(page.getByText('75%', { exact: true })).toBeVisible();
         await expect(page.locator('.insights-hero__number')).toHaveText('17');
         await page.getByLabel('Order by').selectOption('coverage');
+        await page.getByText('How these numbers work', { exact: true }).click();
+        await expect(
+          page.getByRole('heading', { name: 'What we count', exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole('heading', { name: 'Privacy, by design', exact: true }),
+        ).toBeVisible();
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         ).toBe(true);
@@ -25,6 +32,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           page.getByRole('heading', { name: 'Ratings per entry', exact: true }),
         ).toBeVisible();
         await expect(page.getByRole('table')).toBeVisible();
+        await page.getByText('How these numbers work', { exact: true }).click();
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         ).toBe(true);
