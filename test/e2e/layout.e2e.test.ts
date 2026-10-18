@@ -230,6 +230,18 @@ for (const colorScheme of ['light', 'dark'] as const) {
           name: width < 640 ? 'Menu' : 'Admin',
           exact: true,
         });
+        const adminNavigation = width < 640 ? dialog.locator('.menu__admin') : dialog;
+        await expect(
+          adminNavigation.locator('h3, h4').filter({ hasNotText: /^Admin$/ }),
+        ).toHaveText(['Lists', 'Community', 'Administration', 'Help']);
+        await expect(adminNavigation.getByRole('link')).toHaveText([
+          'New list',
+          'Community insights',
+          'Activity log',
+          'Roles',
+          'Backups',
+          'Admin guide and FAQ (opens in a new tab)',
+        ]);
         await expect(dialog.getByRole('link', { name: 'Admin guide and FAQ' })).toBeVisible();
         await expectNoSidewaysScroll(page);
         await dialog.getByRole('link', { name: 'Roles', exact: true }).click();

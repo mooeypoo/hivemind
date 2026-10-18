@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTheme, type ThemeChoice } from '../composables/theme.ts';
-import { adminGuideUrl, adminLinks, primaryLinks } from '../lib/navigation.ts';
+import { primaryLinks } from '../lib/navigation.ts';
 import { api, loginUrl, navigation, type ApiError } from '../services/api.ts';
 import { session, signOut } from '../state/session.ts';
 import { site } from '../state/site.ts';
+import AdminMenuLinks from './AdminMenuLinks.vue';
 import CommunityBadge from './CommunityBadge.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 import AppDialog from './ui/AppDialog.vue';
-import ExternalLink from './ui/ExternalLink.vue';
 
 const siteName = import.meta.env.VITE_SITE_NAME;
 const theme = useTheme();
@@ -123,18 +123,7 @@ const deleteMyData = async () => {
 
       <div v-if="session.me?.isAdmin === true" class="menu__admin">
         <h3 class="menu__heading">Admin</h3>
-        <ul class="menu__group">
-          <li v-for="link in adminLinks" :key="link.route">
-            <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeMenu">
-              {{ link.label }}
-            </RouterLink>
-          </li>
-          <li>
-            <ExternalLink class="menu__item" :href="adminGuideUrl" @click="closeMenu"
-              >Admin guide and FAQ</ExternalLink
-            >
-          </li>
-        </ul>
+        <AdminMenuLinks heading="h4" @navigate="closeMenu" />
       </div>
 
       <h3 class="menu__heading">{{ session.me === null ? 'Privacy' : 'Your data' }}</h3>
@@ -193,18 +182,7 @@ const deleteMyData = async () => {
     @close="closeAdminMenu"
   >
     <nav aria-label="Admin">
-      <ul class="menu__group">
-        <li v-for="link in adminLinks" :key="link.route">
-          <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeAdminMenu">
-            {{ link.label }}
-          </RouterLink>
-        </li>
-        <li>
-          <ExternalLink class="menu__item" :href="adminGuideUrl" @click="closeAdminMenu"
-            >Admin guide and FAQ</ExternalLink
-          >
-        </li>
-      </ul>
+      <AdminMenuLinks @navigate="closeAdminMenu" />
     </nav>
     <template #actions>
       <button type="button" class="button" @click="closeAdminMenu">Close</button>

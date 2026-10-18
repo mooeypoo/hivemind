@@ -611,14 +611,20 @@ describe('the menu', () => {
       'Lists',
       'About',
       'New list',
-      'Roles',
       'Community insights',
       'Activity log',
+      'Roles',
       'Backups',
       'Admin guide and FAQ (opens in a new tab)',
       'Privacy',
       'Download my data',
       'Delete my data',
+    ]);
+    expect(wrapper.findAll('.menu__admin h4').map((heading) => heading.text())).toEqual([
+      'Lists',
+      'Community',
+      'Administration',
+      'Help',
     ]);
     expect(menuDialog()?.textContent).toContain('Appearance');
     expect(menuDialog()?.textContent).toContain('Sign out');
@@ -640,11 +646,17 @@ describe('the menu', () => {
     expect(dialog.text()).toContain('Admin guide and FAQ');
     expect(dialog.findAll('nav a').map((link) => link.text())).toEqual([
       'New list',
-      'Roles',
       'Community insights',
       'Activity log',
+      'Roles',
       'Backups',
       'Admin guide and FAQ (opens in a new tab)',
+    ]);
+    expect(dialog.findAll('nav h3').map((heading) => heading.text())).toEqual([
+      'Lists',
+      'Community',
+      'Administration',
+      'Help',
     ]);
     expect(trigger.attributes('aria-expanded')).toBe('true');
     await expectAccessible(document.body);
@@ -686,7 +698,9 @@ describe('the menu', () => {
     await wrapper.get('nav.menu a[href="/about"]').trigger('click');
     await flushPromises();
     expect(menuDialog()?.open).toBe(false);
-    expect(document.querySelector('main h1')?.textContent).toContain('About');
+    await vi.waitFor(() => {
+      expect(document.querySelector('main h1')?.textContent).toContain('About');
+    });
     wrapper.unmount();
   });
 

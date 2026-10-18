@@ -5,6 +5,10 @@ to understand the site's code or hosting. Sign in with Discord and choose **Admi
 in the top navigation; its links open directly beneath the button. On mobile, open
 your account menu and look for **Admin** there.
 
+The Admin menu groups its links into **Lists** (New list), **Community** (Community
+insights and Activity log), **Administration** (Roles and Backups), and **Help**
+(this guide). The order is the same on desktop and mobile.
+
 ## Community insights
 
 Choose **Community insights** from the Admin menu for a site-wide overview. Select a list
