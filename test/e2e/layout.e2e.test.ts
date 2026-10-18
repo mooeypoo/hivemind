@@ -195,6 +195,18 @@ for (const colorScheme of ['light', 'dark'] as const) {
           await page.keyboard.press('Enter');
           const dialog = page.getByRole('dialog', { name: 'Admin', exact: true });
           await expect(dialog).toBeVisible();
+          await expect
+            .poll(async () => {
+              const buttonBox = await trigger.boundingBox();
+              const panelBox = await dialog.boundingBox();
+              if (buttonBox === null || panelBox === null) return false;
+              const expectedLeft = Math.min(buttonBox.x, width - panelBox.width - 12);
+              return (
+                Math.abs(panelBox.x - expectedLeft) <= 1 &&
+                Math.abs(panelBox.y - (buttonBox.y + buttonBox.height + 8)) <= 1
+              );
+            })
+            .toBe(true);
           await expectNoSidewaysScroll(page);
           await page.keyboard.press('Escape');
           await expect(dialog).not.toBeVisible();

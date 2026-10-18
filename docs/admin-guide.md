@@ -2,7 +2,8 @@
 
 This guide is for community moderators who create and manage lists. You do not need
 to understand the site's code or hosting. Sign in with Discord and choose **Admin**
-in the top navigation. On mobile, open your account menu and look for **Admin** there.
+in the top navigation; its links open directly beneath the button. On mobile, open
+your account menu and look for **Admin** there.
 
 ## Community insights
 

@@ -98,6 +98,10 @@
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
+.site-nav__admin {
+  anchor-name: --admin-navigation;
+}
+
 .site-header__sign-in {
   white-space: nowrap;
 }
@@ -221,6 +225,12 @@
 
   .dialog--sheet::backdrop {
     background: transparent;
+  }
+
+  .admin-menu {
+    position-anchor: --admin-navigation;
+    inset: anchor(bottom) auto auto clamp(0.75rem, anchor(left), calc(100% - 20rem - 0.75rem));
+    margin: 0.5rem 0 0;
   }
 }
 

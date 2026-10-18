@@ -69,7 +69,7 @@ const deleteMyData = async () => {
       <button
         v-if="session.me?.isAdmin === true"
         type="button"
-        class="site-nav__link"
+        class="site-nav__link site-nav__admin"
         aria-haspopup="dialog"
         :aria-expanded="adminMenuOpen"
         @click="adminMenuOpen = true"
@@ -189,6 +189,7 @@ const deleteMyData = async () => {
     :open="adminMenuOpen"
     title="Admin"
     variant="sheet"
+    class="admin-menu"
     @close="closeAdminMenu"
   >
     <nav aria-label="Admin">
