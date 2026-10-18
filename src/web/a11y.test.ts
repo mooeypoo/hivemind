@@ -604,21 +604,27 @@ describe('the menu', () => {
       item.textContent.trim(),
     );
 
-  test('is one menu: site links, Admin tools, your data, appearance and sign out', async () => {
+  test('keeps site links, mobile Admin tools, your data, appearance and sign out', async () => {
     const wrapper = await renderAt('/', true);
     expect(document.querySelectorAll('details')).toHaveLength(0);
     expect(menuLinks()).toEqual([
       'Lists',
       'About',
       'New list',
-      'Roles',
       'Community insights',
       'Activity log',
+      'Roles',
       'Backups',
       'Admin guide and FAQ (opens in a new tab)',
       'Privacy',
       'Download my data',
       'Delete my data',
+    ]);
+    expect(wrapper.findAll('.menu__admin h4').map((heading) => heading.text())).toEqual([
+      'Lists',
+      'Community',
+      'Administration',
+      'Help',
     ]);
     expect(menuDialog()?.textContent).toContain('Appearance');
     expect(menuDialog()?.textContent).toContain('Sign out');
@@ -626,6 +632,54 @@ describe('the menu', () => {
     expect(guide?.textContent).toContain('Admin guide and FAQ');
     expect(guide?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(guide?.querySelector('.external-link-icon')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  test('opens accessible Admin navigation from the header and closes after navigation', async () => {
+    const wrapper = await renderAt('/', true);
+    const trigger = wrapper.get('.site-nav button');
+    expect(trigger.text()).toBe('Admin');
+    expect(trigger.attributes('aria-expanded')).toBe('false');
+    await trigger.trigger('click');
+    await flushPromises();
+    const dialog = wrapper.get('dialog[open]');
+    expect(dialog.text()).toContain('Admin guide and FAQ');
+    expect(dialog.findAll('nav a').map((link) => link.text())).toEqual([
+      'New list',
+      'Community insights',
+      'Activity log',
+      'Roles',
+      'Backups',
+      'Admin guide and FAQ (opens in a new tab)',
+    ]);
+    expect(dialog.findAll('nav h3').map((heading) => heading.text())).toEqual([
+      'Lists',
+      'Community',
+      'Administration',
+      'Help',
+    ]);
+    expect(trigger.attributes('aria-expanded')).toBe('true');
+    await expectAccessible(document.body);
+    await dialog.get('a[href="/admin/roles"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('dialog[open]').exists()).toBe(false);
+    expect(trigger.attributes('aria-expanded')).toBe('false');
+    await vi.waitFor(() => {
+      expect(document.querySelector('main h1')?.textContent).toContain('Roles');
+    });
+    wrapper.unmount();
+  });
+
+  test('members and signed-out visitors have no Admin navigation', async () => {
+    const wrapper = await renderAt('/', true);
+    session.me = { ...me, isAdmin: false };
+    await flushPromises();
+    expect(wrapper.find('.site-nav button').exists()).toBe(false);
+    expect(menuLinks()).not.toContain('Backups');
+    session.me = null;
+    await flushPromises();
+    expect(wrapper.find('.site-nav button').exists()).toBe(false);
+    expect(menuLinks()).not.toContain('Backups');
     wrapper.unmount();
   });
 
@@ -644,7 +698,9 @@ describe('the menu', () => {
     await wrapper.get('nav.menu a[href="/about"]').trigger('click');
     await flushPromises();
     expect(menuDialog()?.open).toBe(false);
-    expect(document.querySelector('main h1')?.textContent).toContain('About');
+    await vi.waitFor(() => {
+      expect(document.querySelector('main h1')?.textContent).toContain('About');
+    });
     wrapper.unmount();
   });
 

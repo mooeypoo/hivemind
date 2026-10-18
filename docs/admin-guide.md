@@ -1,8 +1,13 @@
 # Admin guide and FAQ
 
 This guide is for community moderators who create and manage lists. You do not need
-to understand the site's code or hosting. Sign in with Discord, open your account
-menu and look for **Admin**.
+to understand the site's code or hosting. Sign in with Discord and choose **Admin**
+in the top navigation; its links open directly beneath the button. On mobile, open
+your account menu and look for **Admin** there.
+
+The Admin menu groups its links into **Lists** (New list), **Community** (Community
+insights and Activity log), **Administration** (Roles and Backups), and **Help**
+(this guide). The order is the same on desktop and mobile.
 
 ## Community insights
 

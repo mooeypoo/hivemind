@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTheme, type ThemeChoice } from '../composables/theme.ts';
-import { adminGuideUrl, adminLinks, primaryLinks } from '../lib/navigation.ts';
+import { primaryLinks } from '../lib/navigation.ts';
 import { api, loginUrl, navigation, type ApiError } from '../services/api.ts';
 import { session, signOut } from '../state/session.ts';
 import { site } from '../state/site.ts';
+import AdminMenuLinks from './AdminMenuLinks.vue';
 import CommunityBadge from './CommunityBadge.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 import AppDialog from './ui/AppDialog.vue';
-import ExternalLink from './ui/ExternalLink.vue';
 
 const siteName = import.meta.env.VITE_SITE_NAME;
 const theme = useTheme();
@@ -22,6 +22,10 @@ const themeChoices: readonly { value: ThemeChoice; label: string }[] = [
 const menuOpen = ref(false);
 const closeMenu = () => {
   menuOpen.value = false;
+};
+const adminMenuOpen = ref(false);
+const closeAdminMenu = () => {
+  adminMenuOpen.value = false;
 };
 
 const confirmingDelete = ref(false);
@@ -62,6 +66,16 @@ const deleteMyData = async () => {
       >
         {{ link.label }}
       </RouterLink>
+      <button
+        v-if="session.me?.isAdmin === true"
+        type="button"
+        class="site-nav__link site-nav__admin"
+        aria-haspopup="dialog"
+        :aria-expanded="adminMenuOpen"
+        @click="adminMenuOpen = true"
+      >
+        Admin
+      </button>
     </nav>
 
     <div class="site-header__end">
@@ -99,7 +113,7 @@ const deleteMyData = async () => {
     </div>
 
     <nav class="menu" aria-label="Site">
-      <ul class="menu__group">
+      <ul class="menu__group menu__primary">
         <li v-for="link in primaryLinks" :key="link.route">
           <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeMenu">
             {{ link.label }}
@@ -107,21 +121,10 @@ const deleteMyData = async () => {
         </li>
       </ul>
 
-      <template v-if="session.me?.isAdmin === true">
+      <div v-if="session.me?.isAdmin === true" class="menu__admin">
         <h3 class="menu__heading">Admin</h3>
-        <ul class="menu__group">
-          <li v-for="link in adminLinks" :key="link.route">
-            <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeMenu">
-              {{ link.label }}
-            </RouterLink>
-          </li>
-          <li>
-            <ExternalLink class="menu__item" :href="adminGuideUrl" @click="closeMenu"
-              >Admin guide and FAQ</ExternalLink
-            >
-          </li>
-        </ul>
-      </template>
+        <AdminMenuLinks heading="h4" @navigate="closeMenu" />
+      </div>
 
       <h3 class="menu__heading">{{ session.me === null ? 'Privacy' : 'Your data' }}</h3>
       <ul class="menu__group">
@@ -167,6 +170,22 @@ const deleteMyData = async () => {
         Sign in with Discord
       </a>
       <button type="button" class="button" @click="closeMenu">Close</button>
+    </template>
+  </AppDialog>
+
+  <AppDialog
+    v-if="session.me?.isAdmin === true"
+    :open="adminMenuOpen"
+    title="Admin"
+    variant="sheet"
+    class="admin-menu"
+    @close="closeAdminMenu"
+  >
+    <nav aria-label="Admin">
+      <AdminMenuLinks @navigate="closeAdminMenu" />
+    </nav>
+    <template #actions>
+      <button type="button" class="button" @click="closeAdminMenu">Close</button>
     </template>
   </AppDialog>
 
