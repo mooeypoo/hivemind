@@ -35,6 +35,41 @@ for (const colorScheme of ['light', 'dark'] as const) {
           page.getByRole('heading', { name: 'Activity log', exact: true }),
         ).toBeVisible();
         await expect(page.locator('.activity__list')).toHaveText(list.title);
+        const filter = page.getByLabel('List', { exact: true });
+        const controlStyles = await filter.evaluate((element) => {
+          const reference = document.createElement('input');
+          reference.type = 'text';
+          element.parentElement?.append(reference);
+          const properties = [
+            'backgroundColor',
+            'color',
+            'borderColor',
+            'borderRadius',
+            'fontFamily',
+            'fontSize',
+            'minHeight',
+            'paddingTop',
+            'paddingBottom',
+          ] as const;
+          const selectStyle = getComputedStyle(element);
+          const inputStyle = getComputedStyle(reference);
+          const actual = properties.map((property) => selectStyle[property]);
+          const expected = properties.map((property) => inputStyle[property]);
+          reference.remove();
+          return { actual, expected };
+        });
+        expect(controlStyles.actual).toEqual(controlStyles.expected);
+        await filter.focus();
+        const focusStyles = await filter.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            border: style.borderColor,
+            outline: style.outlineColor,
+            width: style.outlineWidth,
+          };
+        });
+        expect(focusStyles.border).toBe(focusStyles.outline);
+        expect(focusStyles.width).toBe('3px');
         await page.getByText('View changes', { exact: true }).click();
         await expect(page.locator('.activity__changes')).toBeVisible();
         await expect(page.locator('.activity__changes')).toContainText('3 → Unlimited');
