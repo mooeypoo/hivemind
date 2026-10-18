@@ -170,6 +170,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/');
         await page.getByRole('button', { name: /^Menu/ }).click();
         const menu = page.getByRole('dialog', { name: 'Menu' });
+        for (const name of ['Lists', 'About']) {
+          const headerLink = page
+            .getByRole('navigation', { name: 'Main', exact: true })
+            .getByRole('link', { name, exact: true });
+          const menuLink = menu.getByRole('link', { name, exact: true });
+          if (width < 640) {
+            await expect(headerLink).not.toBeVisible();
+            await expect(menuLink).toBeVisible();
+          } else {
+            await expect(headerLink).toBeVisible();
+            await expect(menuLink).not.toBeVisible();
+          }
+        }
         const backups = menu.getByRole('link', { name: 'Backups' });
         if (width < 640) await expect(backups).toBeVisible();
         else await expect(backups).not.toBeVisible();

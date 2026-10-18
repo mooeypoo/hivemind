@@ -113,7 +113,7 @@ const deleteMyData = async () => {
     </div>
 
     <nav class="menu" aria-label="Site">
-      <ul class="menu__group">
+      <ul class="menu__group menu__primary">
         <li v-for="link in primaryLinks" :key="link.route">
           <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeMenu">
             {{ link.label }}

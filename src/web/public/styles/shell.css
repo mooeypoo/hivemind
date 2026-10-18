@@ -65,7 +65,8 @@
     margin-left: 1.25rem;
   }
 
-  .menu__admin {
+  .menu__admin,
+  .menu__primary {
     display: none;
   }
 }

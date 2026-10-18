@@ -6,7 +6,7 @@ export interface NavLink {
 
 export const adminGuideUrl = `${import.meta.env.VITE_SOURCE_URL.replace(/\/$/, '')}/blob/HEAD/docs/admin-guide.md`;
 
-/** Shown in the header on wide screens and at the top of the menu everywhere. */
+/** Shown in the header on wide screens and at the top of the menu on narrow screens. */
 export const primaryLinks: readonly NavLink[] = [
   { label: 'Lists', route: 'lists' },
   { label: 'About', route: 'about' },
