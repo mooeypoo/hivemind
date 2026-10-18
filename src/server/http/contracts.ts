@@ -210,6 +210,15 @@ export interface ListActivityDto {
   }[];
 }
 
+/** `GET /api/admin/activity` */
+export interface AdminActivityDto {
+  readonly events: readonly (ListActivityDto['events'][number] & {
+    readonly list: { readonly id: string; readonly title: string; readonly slug: string };
+  })[];
+  readonly lists: readonly { readonly id: string; readonly title: string; readonly slug: string }[];
+  readonly nextCursor: string | null;
+}
+
 /** `GET /api/lists/:list` (id or slug) */
 export interface ListDetailDto extends ListDto {
   /** Admin-only management of retained withdrawals, never included in rankings. */

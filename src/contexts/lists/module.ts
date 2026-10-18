@@ -1,7 +1,11 @@
 import type { Store } from '@netlify/blobs';
 import type { Clock, IdGenerator } from '../../shared/kernel/index.ts';
 import { makeArchiveList } from './application/archive-list.ts';
-import { makeGetListActivity, makeAnonymiseActivity } from './application/activity.ts';
+import {
+  makeGetListActivity,
+  makeGetAdminActivity,
+  makeAnonymiseActivity,
+} from './application/activity.ts';
 import { makeCloseVoting, makeSetVisibility } from './application/close-voting.ts';
 import { makeSetScoreVisibility } from './application/score-visibility.ts';
 import { makeCreateList } from './application/create-list.ts';
@@ -81,6 +85,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     refreshMovieDetails: makeRefreshMovieDetails(shared),
     personalData: makeListsPersonalData(shared),
     getListActivity: makeGetListActivity(shared),
+    getAdminActivity: makeGetAdminActivity(shared),
     anonymiseExpiredActivity: makeAnonymiseActivity(shared),
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),

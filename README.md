@@ -58,7 +58,9 @@ deployment knowledge. The editor and Admin menu link to the guide in the configu
 Saving a draft also saves its planned dates for other admins to review; it does not publish
 the list or start participation. Publishing checks deadlines again.
 
-The editor's **List activity** records admin decisions. Attribution lasts one calendar year
+The Admin menu's **Activity log** shows admin decisions across all lists, with a list
+filter and pages of older activity. The editor's **List activity** also links to this
+view filtered to that list. Attribution lasts one calendar year
 or until the admin erases their data; unnamed events stay with the list. Activity is
 excluded from backups, and imported copies start with a new import event. The daily
 retention job removes expired admin IDs and names. See the guide for scope and deletion.

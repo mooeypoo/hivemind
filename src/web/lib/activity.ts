@@ -4,18 +4,27 @@ import { sourceLabel } from './labels.ts';
 
 type Event = ListActivityDto['events'][number];
 export const activityLabel: Record<Event['action'], string> = {
-  created: 'Created this list',
-  imported: 'Imported this list from a backup',
+  created: 'Created list',
+  imported: 'Imported list from a backup',
   'settings-edited': 'Updated list settings',
-  published: 'Published this list',
-  archived: 'Archived this list',
+  published: 'Published list',
+  archived: 'Archived list',
   'voting-closed': 'Closed voting',
-  'visibility-changed': 'Changed who can see this list',
+  'visibility-changed': 'Changed who can see the list',
   'score-privacy-changed': 'Changed individual score privacy',
   'entry-set-aside': 'Set an entry aside',
   'entry-returned': 'Returned an entry to the main ranking',
   'explanation-edited': 'Updated a set-aside explanation',
   'entry-deleted': 'Permanently deleted an entry',
+};
+
+export const activityDay = (iso: string, now: Date): string => {
+  const date = new Date(iso);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === now.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(date);
 };
 export const activityField: Record<string, string> = {
   title: 'Title',

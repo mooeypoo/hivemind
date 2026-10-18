@@ -105,6 +105,30 @@ const responses = (me: MeDto | null): Record<string, unknown> => ({
   'GET /api/catalog/sources': {
     sources: ['tmdb-movie', 'tvdb-series', 'igdb-game', 'freeform', 'preset'],
   },
+  'GET /api/admin/activity': {
+    lists: [{ id: list.id, title: list.title, slug: list.slug }],
+    events: [
+      {
+        id: 'global-1',
+        action: 'settings-edited',
+        at: '2026-01-02T12:00:00Z',
+        adminName: admin.displayName,
+        entryTitle: null,
+        changes: [{ field: 'maxNominationsPerMember', before: '3', after: 'null' }],
+        list: { id: list.id, title: list.title, slug: list.slug },
+      },
+      {
+        id: 'global-2',
+        action: 'entry-set-aside',
+        at: '2025-01-01T12:00:00Z',
+        adminName: null,
+        entryTitle: 'AnEntryTitleWithoutSpaces'.repeat(8),
+        changes: [],
+        list: { id: list.id, title: list.title, slug: list.slug },
+      },
+    ],
+    nextCursor: 'older',
+  },
 });
 
 /** Serves every `/api/` request from the fake API; `me: null` is a signed-out visitor. */

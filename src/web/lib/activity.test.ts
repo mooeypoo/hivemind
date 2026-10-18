@@ -1,5 +1,15 @@
 import { expect, test } from 'vitest';
-import { activityValue } from './activity.ts';
+import { activityDay, activityValue } from './activity.ts';
+
+test('day labels use local calendar days across month and year boundaries', () => {
+  const now = new Date(2026, 0, 1, 0, 15);
+  expect(activityDay(now.toISOString(), now)).toBe('Today');
+  expect(activityDay(new Date(2025, 11, 31, 23, 59).toISOString(), now)).toBe('Yesterday');
+  const older = new Date(2025, 11, 30, 12);
+  expect(activityDay(older.toISOString(), now)).toBe(
+    new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(older),
+  );
+});
 
 test('structured activity settings are rendered in plain language', () => {
   expect(activityValue('showNominators', 'true')).toBe('Visible');

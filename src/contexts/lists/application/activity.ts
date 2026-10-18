@@ -32,6 +32,26 @@ export interface ActivityView {
   readonly entryTitle: string | null;
   readonly changes: ActivityEvent['changes'];
 }
+export interface ActivityCursor {
+  readonly at: string;
+  readonly id: string;
+}
+export interface ActivityList {
+  readonly id: string;
+  readonly title: string;
+  readonly slug: string;
+}
+export interface AdminActivityView {
+  readonly events: readonly (ActivityView & { readonly list: ActivityList })[];
+  readonly lists: readonly ActivityList[];
+  readonly nextCursor: ActivityCursor | null;
+}
+
+const compareActivity = (a: ActivityCursor, b: ActivityCursor): number =>
+  b.at.localeCompare(a.at) ||
+  b.id.localeCompare(a.id, 'en', { numeric: true }) ||
+  b.id.localeCompare(a.id, 'en');
+
 const view = (event: ActivityEvent, entryTitle: string | null): ActivityView => ({
   id: event.id,
   action: event.action,
@@ -62,12 +82,59 @@ export const makeGetListActivity =
         ),
       );
     }
-    return ok(
-      events.sort(
-        (a, b) =>
-          b.at.localeCompare(a.at) || b.id.localeCompare(a.id, undefined, { numeric: true }),
-      ),
-    );
+    return ok(events.sort(compareActivity));
+  };
+
+/** Query the existing records, never a second store of retained identities. */
+export const makeGetAdminActivity =
+  (deps: Deps & { readonly slugs: SlugIndex }) =>
+  async (
+    actor: Actor,
+    input: { readonly list?: string; readonly cursor?: ActivityCursor },
+  ): Promise<Result<AdminActivityView, DomainError>> => {
+    const admin = requireAdmin(actor);
+    if (!admin.ok) return admin;
+    const lists = (await deps.lists.all())
+      .map((list) => ({ id: list.id, title: list.config.title, slug: list.config.slug }))
+      .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+    const match =
+      lists.find((list) => list.id === input.list) ??
+      lists.find((list) => list.slug === input.list);
+    const selected = input.list === undefined ? lists : match === undefined ? [] : [match];
+    if (input.list !== undefined && selected.length === 0) return err(listsErrors.notFound);
+    const events: (ActivityView & { readonly list: ActivityList })[] = [];
+    const getActivity = makeGetListActivity(deps);
+    // Bound cross-list fan-out; a filtered query never reads other lists' entries.
+    for (let offset = 0; offset < selected.length; offset += 4) {
+      const batch = await Promise.all(
+        selected.slice(offset, offset + 4).map(async (list) => ({
+          list,
+          result: await getActivity(admin.value, { list: list.id }),
+        })),
+      );
+      for (const { list, result } of batch) {
+        if (!result.ok) return result;
+        events.push(
+          ...result.value.map((event) => ({
+            ...event,
+            id: JSON.stringify([list.id, event.id]),
+            list,
+          })),
+        );
+      }
+    }
+    events.sort(compareActivity);
+    const cursor = input.cursor;
+    const matching =
+      cursor === undefined ? events : events.filter((event) => compareActivity(event, cursor) > 0);
+    const page = matching.slice(0, 20);
+    const last = page.at(-1);
+    return ok({
+      events: page,
+      lists,
+      nextCursor:
+        matching.length > page.length && last !== undefined ? { at: last.at, id: last.id } : null,
+    });
   };
 
 /** CAS keeps retention and erasure from overwriting concurrent settings or moderation. */

@@ -15,5 +15,6 @@ export const primaryLinks: readonly NavLink[] = [
 export const adminLinks: readonly NavLink[] = [
   { label: 'New list', route: 'new-list' },
   { label: 'Roles', route: 'roles' },
+  { label: 'Activity log', route: 'activity' },
   { label: 'Backups', route: 'backups' },
 ];

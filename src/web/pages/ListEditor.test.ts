@@ -16,6 +16,7 @@ const mountAt = async (path: string) => {
       { path: '/admin/lists/:slug', name: 'edit-list', component: ListEditor },
       { path: '/lists/:slug', name: 'list', component: Blank },
       { path: '/admin/roles', name: 'roles', component: Blank },
+      { path: '/admin/activity', name: 'activity', component: Blank },
     ],
   });
   await router.push(path);

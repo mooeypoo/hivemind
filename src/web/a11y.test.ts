@@ -76,6 +76,7 @@ const renderAt = async (
   unusedList = false,
   deletingList = false,
   entryState: 'deleting' | 'withdrawn' | 'set-aside' | null = null,
+  activityState: 'loaded' | 'empty' | 'error' = 'loaded',
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -190,6 +191,39 @@ const renderAt = async (
           },
         ],
       }),
+    'GET /api/admin/activity': () =>
+      activityState === 'error'
+        ? Response.json(
+            { error: { code: 'http.unavailable', message: 'Activity could not be loaded.' } },
+            { status: 503 },
+          )
+        : Response.json({
+            lists: [{ id: 'list-1', title: 'Best Sci-Fi Movies', slug: 'best-sci-fi' }],
+            events:
+              activityState === 'empty'
+                ? []
+                : [
+                    {
+                      id: 'global-1',
+                      action: 'settings-edited',
+                      at: '2026-01-02T12:00:00Z',
+                      adminName: 'Alex',
+                      entryTitle: null,
+                      changes: [{ field: 'maxNominationsPerMember', before: '3', after: 'null' }],
+                      list: { id: 'list-1', title: 'Best Sci-Fi Movies', slug: 'best-sci-fi' },
+                    },
+                    {
+                      id: 'global-2',
+                      action: 'created',
+                      at: '2025-01-01T12:00:00Z',
+                      adminName: null,
+                      entryTitle: null,
+                      changes: [],
+                      list: { id: 'list-1', title: 'Best Sci-Fi Movies', slug: 'best-sci-fi' },
+                    },
+                  ],
+            nextCursor: activityState === 'loaded' ? 'next' : null,
+          }),
   });
   const { createAppRouter } = await import('./router.ts');
   const router = createAppRouter(createMemoryHistory());
@@ -210,6 +244,30 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test.each(['loaded', 'empty', 'error'] as const)(
+    'general activity log is accessible (%s)',
+    async (state) => {
+      const wrapper = await renderAt(
+        '/admin/activity?list=list-1',
+        true,
+        false,
+        false,
+        false,
+        null,
+        false,
+        false,
+        null,
+        state,
+      );
+      if (state === 'loaded') {
+        await wrapper.get('details.activity__details summary').trigger('click');
+        expect(wrapper.text()).toContain('Admin identity removed');
+        expect(wrapper.text()).toContain('3 → Unlimited');
+      }
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
   test('admin activity history is accessible with named and anonymised decisions', async () => {
     const wrapper = await renderAt('/admin/lists/best-sci-fi', true);
     await wrapper
@@ -440,6 +498,7 @@ describe('every page passes automated accessibility checks', () => {
     ['the editor of a draft (schedule choices)', '/admin/lists/draft', true],
     ['the roles page', '/admin/roles', true],
     ['the backups page', '/admin/backups', true],
+    ['the activity log', '/admin/activity', true],
     ['the privacy page', '/privacy', false],
     ['the About page', '/about', false],
     ['not found', '/nope', false],
@@ -519,6 +578,7 @@ describe('the menu', () => {
       'About',
       'New list',
       'Roles',
+      'Activity log',
       'Backups',
       'Admin guide and FAQ (opens in a new tab)',
       'Privacy',

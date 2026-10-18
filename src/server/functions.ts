@@ -27,6 +27,7 @@ export {
   editList,
   getList,
   getListActivity,
+  getAdminActivity,
   listLists,
   nominate,
   resolveItemForList,
