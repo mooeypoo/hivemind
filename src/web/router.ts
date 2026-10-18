@@ -48,6 +48,12 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
         meta: { member: true, admin: true },
       },
       {
+        path: '/admin/insights',
+        name: 'insights',
+        component: () => import('./pages/InsightsPage.vue'),
+        meta: { member: true, admin: true },
+      },
+      {
         path: '/admin/activity',
         name: 'activity',
         component: () => import('./pages/ActivityPage.vue'),

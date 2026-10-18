@@ -1,6 +1,7 @@
 import { createBackupModule, type BackupModule } from '../contexts/backup/index.ts';
 import { createCatalogModule, type CatalogModule } from '../contexts/catalog/index.ts';
 import { createIdentityModule, type IdentityModule } from '../contexts/identity/index.ts';
+import { createInsightsModule, type InsightsModule } from '../contexts/insights/index.ts';
 import { createListsModule, type ListsModule } from '../contexts/lists/index.ts';
 import { createRankingModule, type RankingModule } from '../contexts/ranking/index.ts';
 import { createVotingModule, type VotingModule } from '../contexts/voting/index.ts';
@@ -18,6 +19,7 @@ export interface App {
   readonly lists: ListsModule;
   readonly voting: VotingModule;
   readonly ranking: RankingModule;
+  readonly insights: InsightsModule;
   readonly backup: BackupModule;
   readonly deleteList: ReturnType<typeof makeDeleteList>;
   readonly deleteEntry: ReturnType<typeof makeDeleteEntry>;
@@ -65,6 +67,7 @@ export const createApp = (
   });
 
   const ranking = createRankingModule({ store: platform.store('ranking'), clock, lists, voting });
+  const insights = createInsightsModule({ clock, lists, voting });
 
   const identity = createIdentityModule({
     store: platform.store('identity'),
@@ -100,6 +103,7 @@ export const createApp = (
     lists,
     voting,
     ranking,
+    insights,
     backup,
     deleteList: makeDeleteList({ lists, voting, ranking }),
     deleteEntry: makeDeleteEntry({ lists, voting, ranking }),

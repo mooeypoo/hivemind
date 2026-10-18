@@ -4,6 +4,38 @@ This guide is for community moderators who create and manage lists. You do not n
 to understand the site's code or hosting. Sign in with Discord, open your account
 menu and look for **Admin**.
 
+## Community insights
+
+Choose **Community insights** from the Admin menu for a site-wide overview. Select a list
+there, or use **Admin · Insights** on a list, to see its participation and ratings-per-entry
+distribution. Insights are admin-only; they never show individual scores or member identities.
+They are not visitor analytics and add no tracking.
+
+- **Voters** have at least one rating on a current, non-withdrawn entry. Empty ballots do
+  not count. Each person counts once across the included lists.
+- **Ratings** are currently stored scores, not the number of times people pressed a button.
+- **Nominators** are distinct members still attributed to current entries. Seeded entries
+  do not create nominators. Voters and nominators overlap; do not add them as a people total.
+- **Entry coverage** is the share of current entries with at least one rating, not the
+  share of your Discord server participating.
+- **Ranking threshold** measures how many entries have enough ratings to qualify for a
+  rank. Entries with no ratings never qualify, even when the configured minimum is zero.
+
+Set-aside entries remain rateable and count in participation. Withdrawn entries and their
+retained scores do not. Re-nominating a withdrawn item restores its retained ratings.
+Erasure, cleared ratings and permanent deletion can reduce counts, including for finished
+lists. Imported lists contribute their restored content, not a reconstructed history.
+
+Hidden and draft lists can appear for admins. After-close lists contribute no participation
+statistics until voting ends, including in site totals. Lists undergoing permanent entry or
+list deletion are excluded during cleanup. Excluded lists show an explanation, not zeroes.
+Totals and site-wide unique counts cover included lists only.
+
+Use **Refresh insights** to read current data. There is no automatic polling, historical
+snapshot, new analytics store or participation event log. Reads span multiple records, so
+changes during a refresh can briefly make numbers differ. Small counts can still let an
+admin infer participation from other knowledge: aggregate counts do not guarantee anonymity.
+
 ## Create your first list
 
 1. Choose **New list** from the Admin menu.

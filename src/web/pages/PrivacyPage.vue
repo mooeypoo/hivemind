@@ -72,8 +72,26 @@ const siteName = import.meta.env.VITE_SITE_NAME;
         in the server; we revoke it right after.
       </li>
       <li>Which servers you’re in, other than this community’s.</li>
-      <li>Analytics, tracking, advertising, or your IP address.</li>
+      <li>Visitor tracking, advertising profiles, or your IP address.</li>
     </ul>
+
+    <h2>Community insights</h2>
+    <p>
+      Admins can see current participation counts, such as entries, ratings, voters and nominators.
+      These are calculated from the list and ballot records already needed to run the site. Insights
+      collect no additional personal data and retain no snapshots or participation history.
+      Responses contain no member identifiers, names or individual scores. Small counts may still
+      allow an admin to infer participation from what they already know; aggregate does not
+      guarantee anonymity.
+    </p>
+    <p>
+      Voters count only while they have a rating on a current entry; nominators count only while
+      attributed to a current nomination. Withdrawing nominations, clearing ratings, deleting your
+      data or permanently deleting content can reduce counts. Seeded entries do not count as member
+      nominations. After-close lists contribute no participation statistics until voting ends, even
+      for admins or in site totals. Lists undergoing permanent deletion are excluded during cleanup.
+      Ordinary members and signed-out visitors cannot access insights.
+    </p>
 
     <h2>Setting entries aside</h2>
     <p>

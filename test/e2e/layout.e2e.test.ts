@@ -15,6 +15,8 @@ const memberRoutes = [
   '/admin/roles',
   '/admin/backups',
   '/admin/activity',
+  '/admin/insights',
+  '/admin/insights?list=films',
   '/about',
   '/privacy',
   '/no-such-page',
