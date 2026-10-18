@@ -233,7 +233,9 @@ describe('every page passes automated accessibility checks', () => {
     );
     try {
       const wrapper = await renderAt('/admin/lists/draft', true);
-      expect(wrapper.get('#settings-conflict-heading').text()).toBe('Compare before continuing');
+      expect(wrapper.get('#settings-conflict-heading').text()).toBe(
+        'Review settings before saving',
+      );
       expect(wrapper.get('.settings-conflict').text()).toContain('My unsaved description');
       await expectAccessible(document.body);
       wrapper.unmount();

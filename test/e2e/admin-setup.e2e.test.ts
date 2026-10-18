@@ -6,6 +6,100 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`admin publishing in ${colorScheme} mode`, () => {
     test.use({ colorScheme });
     for (const width of [320, 375, 1280]) {
+      test(`recovered published edits have styled conflict choices at ${String(width)}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 850 });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await fakeApi(page, admin);
+        await page.route('**/api/lists/films', (route) =>
+          route.fulfill({ json: { ...list, settingsVersion: 1 } }),
+        );
+        await page.addInitScript(() => {
+          sessionStorage.setItem(
+            'draft:editor:films',
+            JSON.stringify({
+              form: {
+                description: `My recovered description\n${'LongText'.repeat(30)}`,
+                unlimitedNominations: true,
+              },
+              lifecycle: 'open',
+              settingsVersion: 0,
+            }),
+          );
+        });
+        await page.goto('/admin/lists/films');
+        const conflict = page.getByRole('region', { name: 'Review settings before saving' });
+        await expect(conflict).toBeVisible();
+        await expect(conflict).toContainText('My recovered description');
+        await expect(conflict.locator('.settings-change')).toHaveCount(2);
+        const comparison = conflict.getByRole('region', { name: 'Description', exact: true });
+        await expect(comparison).toBeVisible();
+        await expect(comparison.locator('.settings-version--saved')).toContainText(
+          'This is the version members see now.',
+        );
+        await expect(comparison.locator('.settings-version').last()).toContainText(
+          'Only in this browser tab. Members cannot see these edits.',
+        );
+        const nominationComparison = conflict.getByRole('region', {
+          name: 'Nomination limit',
+        });
+        await expect(nominationComparison.locator('.settings-version--saved')).toContainText(
+          'This is the version members see now.',
+        );
+        await expect(nominationComparison.locator('.settings-version__value')).toHaveText([
+          '3',
+          'Unlimited',
+        ]);
+        const cells = comparison.locator('.settings-version__value');
+        await expect(cells.first()).toHaveText(list.description);
+        await expect(cells.last()).toContainText('My recovered description');
+        const savedBox = await cells.first().boundingBox();
+        const unsavedBox = await cells.last().boundingBox();
+        if (savedBox === null || unsavedBox === null)
+          throw new Error('Comparison values are not visible');
+        if (width >= 768) {
+          expect(Math.abs(savedBox.y - unsavedBox.y)).toBeLessThan(1);
+          expect(unsavedBox.x).toBeGreaterThan(savedBox.x);
+        } else {
+          expect(unsavedBox.y).toBeGreaterThan(savedBox.y + savedBox.height);
+          expect(Math.abs(savedBox.x - unsavedBox.x)).toBeLessThan(1);
+        }
+        const header = comparison.locator('.settings-version__header').first();
+        const titleBox = await header.getByRole('heading').boundingBox();
+        const explanationBox = await header.locator('p').boundingBox();
+        if (titleBox === null || explanationBox === null) throw new Error('Missing version label');
+        expect(explanationBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height);
+        expect(await conflict.evaluate((el) => getComputedStyle(el).borderInlineStartWidth)).toBe(
+          '5px',
+        );
+        await expect(conflict.getByRole('button', { name: 'Compare latest settings' })).toHaveCount(
+          0,
+        );
+        for (const button of await conflict.getByRole('button').all()) {
+          await expect(button).toHaveClass(/\bbutton\b/);
+          const styles = await button.evaluate((el) => {
+            const style = getComputedStyle(el);
+            return {
+              minHeight: parseFloat(style.minHeight),
+              radius: parseFloat(style.borderRadius),
+            };
+          });
+          expect(styles.minHeight).toBeGreaterThanOrEqual(44);
+          expect(styles.radius).toBeGreaterThan(0);
+        }
+        const keep = conflict.getByRole('button', { name: 'Keep my unsaved edits', exact: true });
+        await expect(keep).toHaveClass(/button--primary/);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await keep.click();
+        await expect(conflict).toHaveCount(0);
+        await expect(page.getByLabel('Description', { exact: true })).toHaveValue(
+          `My recovered description\n${'LongText'.repeat(30)}`,
+        );
+      });
+
       test(`published settings separate fixed and editable controls at ${String(width)}px`, async ({
         page,
       }) => {

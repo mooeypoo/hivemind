@@ -20,6 +20,33 @@ person votes. **Save draft** saves planned dates to the site too, so another adm
 review and continue the plan. It does not publish the list or start participation.
 Unsaved edits remain only in your browser tab.
 
+### Recovered edits and changed settings
+
+Your browser keeps changes you make without saving and restores them after a reload
+or sign-in. The settings saved on the site may have changed in the meantime.
+**Review settings before saving** shows any differences so you can choose which to
+keep. Matching input needs no warning.
+The **Review needed** panel is separate from the form. Each changed setting has its
+own bordered comparison: **Currently on the site**, marked in green, and **Your unsaved
+edits**, with an explanation beneath each heading. They appear side by side on larger
+screens and one above the other on phones. Published, visible lists label the saved
+version as what members see now; drafts and hidden lists are labeled separately.
+Your choice applies to all the recovered edits, not just one setting.
+
+If settings change while the editor is open, a save is refused rather than overwriting
+them. **Compare latest settings** loads the saved version and shows its differences
+from your form. If they already match, the warning clears and you can continue editing.
+
+Choose **Discard my edits and load saved settings** to replace your form with the
+settings saved on the site, or **Keep my unsaved edits** to keep your form and review
+it before saving again. Keeping edits does not save them.
+If the list's status has changed, load the saved settings so the editor can apply
+the current editing restrictions.
+
+This protection applies to both drafts and published lists: published descriptions
+and deadlines can still be edited. It compares settings, not entries or scores;
+ordinary nominations and voting do not trigger it.
+
 After creating a draft, the editor moves to **Choose timing** and summarizes your setup.
 Choose **Edit setup** or **1. Set up** to go back and change earlier choices, then
 **Continue to timing** to return. Your unsaved settings and dates stay in the form

@@ -37,6 +37,137 @@ afterEach(() => {
 });
 
 describe('ListEditor', () => {
+  test.each([
+    ['draft', 'public', 'Current saved draft — not published'],
+    ['open', 'hidden', 'Current saved version — hidden from members'],
+    ['open', 'public', 'This is the version members see now.'],
+  ] as const)(
+    'comparison labels saved %s/%s settings accurately',
+    async (lifecycle, visibility, label) => {
+      sessionStorage.setItem(
+        'draft:editor:best-sci-fi',
+        JSON.stringify({
+          form: { description: 'Unfinished description' },
+          settingsVersion: 0,
+          lifecycle,
+        }),
+      );
+      stubApi({
+        'GET /api/catalog/sources': sources,
+        'GET /api/roles': roles,
+        'GET /api/lists/best-sci-fi': () =>
+          Response.json(openTmdbList({ lifecycle, visibility, settingsVersion: 1 })),
+      });
+      const editor = await mountAt('/admin/lists/best-sci-fi');
+      const comparison = editor.get('.settings-comparison');
+      expect(editor.get('.settings-change h3').text()).toBe('Description');
+      expect(comparison.get('.settings-version--saved').text()).toContain(label);
+      expect(comparison.findAll('.settings-version__value').at(1)?.text()).toBe(
+        'Unfinished description',
+      );
+      expect(comparison.text()).toContain(
+        'Only in this browser tab. Members cannot see these edits.',
+      );
+      editor.unmount();
+    },
+  );
+
+  test.each([undefined, 0])(
+    'matching restored settings on a busy published list need no comparison (cached version: %s)',
+    async (settingsVersion) => {
+      sessionStorage.setItem(
+        'draft:editor:best-sci-fi',
+        JSON.stringify({
+          form: { description: 'Saved description' },
+          settingsVersion,
+          lifecycle: 'open',
+        }),
+      );
+      const calls = stubApi({
+        'GET /api/catalog/sources': sources,
+        'GET /api/roles': roles,
+        'GET /api/lists/best-sci-fi': () =>
+          Response.json(openTmdbList({ settingsVersion: 2, description: 'Saved description' })),
+        'PUT /api/lists/list-1': () =>
+          Response.json(openTmdbList({ settingsVersion: 3, description: 'Updated description' })),
+      });
+      const editor = await mountAt('/admin/lists/best-sci-fi');
+      expect(editor.find('.settings-conflict').exists()).toBe(false);
+      await editor.get('#description').setValue('Updated description');
+      await editor.get('form').trigger('submit');
+      await flushPromises();
+      expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+        expectedSettingsVersion: 2,
+        description: 'Updated description',
+      });
+      editor.unmount();
+    },
+  );
+
+  test('different restored edits on a published list explain recovery and show styled choices immediately', async () => {
+    sessionStorage.setItem(
+      'draft:editor:best-sci-fi',
+      JSON.stringify({
+        form: { description: 'My unsaved description' },
+        settingsVersion: 0,
+        lifecycle: 'open',
+      }),
+    );
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(openTmdbList({ settingsVersion: 1, description: 'Saved description' })),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    const conflict = editor.get('.settings-conflict');
+    expect(conflict.text()).toContain('Your browser recovered edits you didn’t save.');
+    expect(conflict.text()).toContain('Nominations and votes are not part of this comparison.');
+    expect(conflict.text()).toContain('My unsaved description');
+    expect(conflict.text()).toContain('Saved description');
+    expect(conflict.findAll('button').map((button) => button.text())).toEqual([
+      'Discard my edits and load saved settings',
+      'Keep my unsaved edits',
+    ]);
+    expect(conflict.findAll('button').every((button) => button.classes().includes('button'))).toBe(
+      true,
+    );
+    await conflict.get('button').trigger('click');
+    expect(editor.find('.settings-conflict').exists()).toBe(false);
+    expect(sessionStorage.getItem('draft:editor:best-sci-fi')).toBeNull();
+    editor.unmount();
+  });
+
+  test('comparing a rejected save with identical settings resumes editing with explicit feedback', async () => {
+    const calls = stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList()),
+      'GET /api/lists/list-1': () =>
+        Response.json(openTmdbList({ settingsVersion: 1, description: 'My edit' })),
+      'PUT /api/lists/list-1': () =>
+        Response.json(
+          { error: { code: 'lists.settings-changed', message: 'Settings changed' } },
+          { status: 409 },
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    await editor.get('#description').setValue('My edit');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+    expect(editor.get('.settings-conflict').text()).toContain(
+      'The settings saved on the site changed while you were editing.',
+    );
+    const compare = editor.get('.settings-conflict button');
+    expect(compare.classes()).toContain('button');
+    await compare.trigger('click');
+    await flushPromises();
+    expect(editor.find('.settings-conflict').exists()).toBe(false);
+    expect(editor.text()).toContain('Your form already matches the latest saved settings');
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+    editor.unmount();
+  });
+
   test('free text warns admins about unfiltered submissions when choosing and reviewing', async () => {
     stubApi({
       'GET /api/catalog/sources': sources,
@@ -101,7 +232,7 @@ describe('ListEditor', () => {
     expect(
       editor
         .findAll('button')
-        .find((button) => button.text() === 'Keep my input after comparison')
+        .find((button) => button.text() === 'Keep my unsaved edits')
         ?.attributes('disabled'),
     ).toBeDefined();
     editor.unmount();
@@ -131,7 +262,7 @@ describe('ListEditor', () => {
     version = 1;
     await editor.get('form').trigger('submit');
     await flushPromises();
-    expect(editor.text()).toContain('Compare before continuing');
+    expect(editor.text()).toContain('Review settings before saving');
     expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
       'My unsaved description',
     );
@@ -146,7 +277,7 @@ describe('ListEditor', () => {
     expect(editor.text()).toContain('My unsaved description');
     await editor
       .findAll('button')
-      .find((button) => button.text() === 'Keep my input after comparison')
+      .find((button) => button.text() === 'Keep my unsaved edits')
       ?.trigger('click');
     expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
     await editor.get('form').trigger('submit');
@@ -181,13 +312,13 @@ describe('ListEditor', () => {
     expect((restored.get('#description').element as HTMLTextAreaElement).value).toBe(
       'Keep across reload',
     );
-    expect(restored.text()).toContain('Compare before continuing');
+    expect(restored.text()).toContain('Review settings before saving');
     expect(restored.text()).toContain('Other admin');
     await restored.get('form').trigger('submit');
     expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
     await restored
       .findAll('button')
-      .find((button) => button.text() === 'Replace my input with latest settings')
+      .find((button) => button.text() === 'Discard my edits and load saved settings')
       ?.trigger('click');
     expect((restored.get('#description').element as HTMLTextAreaElement).value).toBe('Other admin');
     restored.unmount();
@@ -220,7 +351,7 @@ describe('ListEditor', () => {
       expectedSettingsVersion: 4,
     });
     expect(editor.find('dialog[open]').exists()).toBe(false);
-    expect(editor.text()).toContain('Compare before continuing');
+    expect(editor.text()).toContain('Review settings before saving');
     expect((editor.get('#description').element as HTMLTextAreaElement).value).toBe(
       'Reviewed description',
     );

@@ -136,6 +136,7 @@ const revealInvalidField = async (event: Event) => {
 const baseSettingsVersion = ref<number | undefined>();
 const baseLifecycle = ref<ListDto['lifecycle'] | undefined>();
 const settingsConflict = ref(false);
+const restoredSettingsConflict = ref(false);
 const latestSettings = ref<ListDetailDto | null>(null);
 const conflictHeading = ref<HTMLHeadingElement | null>(null);
 const sourcePermission = ref(false);
@@ -309,7 +310,9 @@ const load = async () => {
     baseSettingsVersion.value = cachedVersion;
     if (cachedVersion === undefined || cachedVersion !== existing.value.settingsVersion) {
       settingsConflict.value = true;
+      restoredSettingsConflict.value = true;
       latestSettings.value = loaded;
+      if (comparison.value.length === 0) resolveSettingsConflict(false);
     }
   }
   if (route.query.created === '1') {
@@ -532,6 +535,7 @@ const expectation = () =>
 const noteSettingsConflict = (failure: ApiError) => {
   if (failure.code !== 'lists.settings-changed') return;
   settingsConflict.value = true;
+  restoredSettingsConflict.value = false;
   latestSettings.value = null;
   reviewing.value = false;
   confirming.value = null;
@@ -550,6 +554,10 @@ const compareLatest = async () => {
   }
   latestSettings.value = result.data;
   error.value = null;
+  if (comparison.value.length === 0) {
+    resolveSettingsConflict(false);
+    status.value = 'Your form already matches the latest saved settings. You can continue editing.';
+  }
 };
 const comparison = computed(() => {
   if (latestSettings.value === null || existing.value === null || form.sourceKind === null)
@@ -596,9 +604,12 @@ const resolveSettingsConflict = (keepInput: boolean) => {
   error.value = null;
   locksAccepted.value = false;
   namedScoresAccepted.value = false;
-  cacheForm();
+  if (keepInput) cacheForm();
+  else clearDraft(draftKey.value);
   status.value = keepInput
-    ? 'Your edits are kept. Review them, then save or review publication again. Nothing has been saved yet.'
+    ? latest.lifecycle === 'draft'
+      ? 'Your edits are kept but not saved. Review them, then save or review publication again.'
+      : 'Your edits are kept but not saved. Review them, then save when ready.'
     : 'Latest saved settings loaded. Your previous unsaved input has been replaced.';
 };
 
@@ -857,7 +868,11 @@ const importCsv = async () => {
     <p v-if="!ready && error === null" role="status">Loading list settings…</p>
     <ErrorNotice v-if="!ready" :error="error" />
     <p class="meta">
-      Save a draft, review the member experience, then publish.
+      {{
+        locked
+          ? 'Manage this published list’s editable settings and admin controls.'
+          : 'Save a draft, review the member experience, then publish.'
+      }}
       <ExternalLink :href="adminGuideUrl">Admin guide and FAQ</ExternalLink>
     </p>
     <p v-if="existing?.createdBy != null" class="meta">
@@ -892,27 +907,67 @@ const importCsv = async () => {
       class="card stack settings-conflict"
       aria-labelledby="settings-conflict-heading"
     >
+      <p class="eyebrow">Review needed · Unsaved changes</p>
       <h2 id="settings-conflict-heading" ref="conflictHeading" tabindex="-1">
-        Compare before continuing
+        Review settings before saving
       </h2>
       <p role="alert">
-        This list may have changed since you started editing. Your input is still in the form; it
-        has not overwritten the saved settings. Compare the latest version before continuing.
+        {{
+          restoredSettingsConflict
+            ? 'Your browser recovered edits you didn’t save. The site may have changed since you made them.'
+            : 'The settings saved on the site changed while you were editing. Your edits are still here, but have not been saved, so they do not replace those changes.'
+        }}
+        Compare the current site settings with your recovered edits below. Nothing you choose here
+        changes the site until you save.
       </p>
-      <button type="button" :disabled="busy" @click="compareLatest">Compare latest settings</button>
+      <button
+        v-if="latestSettings === null"
+        type="button"
+        class="button button--primary"
+        :disabled="busy"
+        @click="compareLatest"
+      >
+        {{ busy ? 'Loading saved settings…' : 'Compare latest settings' }}
+      </button>
       <template v-if="latestSettings !== null">
         <p>
-          Differences between the latest saved settings and your form (times in {{ timeZone }}):
+          Only settings that differ are shown. Nominations and votes are not part of this
+          comparison. Times are shown in {{ timeZone }}.
         </p>
-        <div v-for="row in comparison" :key="row.label" class="stack">
-          <h3>{{ row.label }}</h3>
-          <dl class="review-summary">
-            <dt>Latest saved</dt>
-            <dd>{{ row.latest }}</dd>
-            <dt>Your form</dt>
-            <dd>{{ row.yours }}</dd>
-          </dl>
-        </div>
+        <section
+          v-for="(row, index) in comparison"
+          :key="row.label"
+          class="settings-change"
+          :aria-labelledby="`comparison-field-${index}`"
+        >
+          <h3 :id="`comparison-field-${index}`">{{ row.label }}</h3>
+          <div class="settings-comparison">
+            <div class="settings-version settings-version--saved">
+              <div class="settings-version__header">
+                <h4>Currently on the site</h4>
+                <p class="settings-comparison__explanation">
+                  {{
+                    latestSettings.lifecycle === 'draft'
+                      ? 'Current saved draft — not published'
+                      : latestSettings.visibility === 'hidden'
+                        ? 'Current saved version — hidden from members'
+                        : 'This is the version members see now.'
+                  }}
+                </p>
+              </div>
+              <p class="settings-version__value">{{ row.latest }}</p>
+            </div>
+            <div class="settings-version">
+              <div class="settings-version__header">
+                <h4>Your unsaved edits</h4>
+                <p class="settings-comparison__explanation">
+                  Only in this browser tab. Members cannot see these edits.
+                </p>
+              </div>
+              <p class="settings-version__value">{{ row.yours }}</p>
+            </div>
+          </div>
+        </section>
         <p v-if="comparison.length === 0">
           The settings shown in your form match the latest saved settings.
         </p>
@@ -920,20 +975,27 @@ const importCsv = async () => {
           The list’s status has changed. Load the latest settings to see what can still be edited.
         </p>
         <div class="actions">
-          <button type="button" :disabled="busy" @click="resolveSettingsConflict(false)">
-            Replace my input with latest settings
+          <button
+            type="button"
+            class="button"
+            :disabled="busy"
+            @click="resolveSettingsConflict(false)"
+          >
+            Discard my edits and load saved settings
           </button>
           <button
             type="button"
+            class="button button--primary"
             :disabled="busy || latestSettings.lifecycle !== baseLifecycle"
             @click="resolveSettingsConflict(true)"
           >
-            Keep my input after comparison
+            Keep my unsaved edits
           </button>
         </div>
         <p class="meta">
-          Keeping your input does not save or publish it. Save again only after reviewing these
-          differences.
+          Your choice applies to all recovered edits above and affects this form only. Discarding
+          loads the current site settings. Keeping your edits does not save them to the site; saving
+          later may overwrite the current settings.
         </p>
       </template>
     </section>

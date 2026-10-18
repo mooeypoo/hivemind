@@ -228,10 +228,91 @@
   background: var(--surface-2);
 }
 
-.settings-conflict dd {
+.settings-conflict {
+  border: 2px solid var(--control-border);
+  border-inline-start: 5px solid var(--accent);
+  background: var(--surface-2);
+}
+
+.settings-change {
+  min-width: 0;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.settings-change h3 {
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--control-border);
+}
+
+.settings-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--surface);
+}
+
+.settings-version {
   min-width: 0;
   overflow-wrap: anywhere;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.settings-version__header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--control-border);
+}
+
+.settings-version__header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.settings-version + .settings-version {
+  border-top: 2px solid var(--control-border);
+  background: var(--surface-2);
+}
+
+.settings-version--saved h4 {
+  color: var(--success);
+}
+
+.settings-version--saved .settings-version__header {
+  border-top: 3px solid var(--success);
+}
+
+.settings-comparison__explanation {
+  margin: 0.4rem 0 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.settings-version__value {
+  margin: 0;
+  padding: 1rem;
   white-space: pre-wrap;
+}
+
+@media (min-width: 48rem) {
+  .settings-comparison {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
+  }
+
+  .settings-version {
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+  }
+
+  .settings-version + .settings-version {
+    border-top: 0;
+    border-inline-start: 2px solid var(--control-border);
+  }
 }
 
 /* Section links, sticky under the header like the list tabs. */
