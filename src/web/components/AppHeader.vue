@@ -23,6 +23,10 @@ const menuOpen = ref(false);
 const closeMenu = () => {
   menuOpen.value = false;
 };
+const adminMenuOpen = ref(false);
+const closeAdminMenu = () => {
+  adminMenuOpen.value = false;
+};
 
 const confirmingDelete = ref(false);
 const deleteError = ref<ApiError | null>(null);
@@ -62,6 +66,16 @@ const deleteMyData = async () => {
       >
         {{ link.label }}
       </RouterLink>
+      <button
+        v-if="session.me?.isAdmin === true"
+        type="button"
+        class="site-nav__link"
+        aria-haspopup="dialog"
+        :aria-expanded="adminMenuOpen"
+        @click="adminMenuOpen = true"
+      >
+        Admin
+      </button>
     </nav>
 
     <div class="site-header__end">
@@ -107,7 +121,7 @@ const deleteMyData = async () => {
         </li>
       </ul>
 
-      <template v-if="session.me?.isAdmin === true">
+      <div v-if="session.me?.isAdmin === true" class="menu__admin">
         <h3 class="menu__heading">Admin</h3>
         <ul class="menu__group">
           <li v-for="link in adminLinks" :key="link.route">
@@ -121,7 +135,7 @@ const deleteMyData = async () => {
             >
           </li>
         </ul>
-      </template>
+      </div>
 
       <h3 class="menu__heading">{{ session.me === null ? 'Privacy' : 'Your data' }}</h3>
       <ul class="menu__group">
@@ -167,6 +181,32 @@ const deleteMyData = async () => {
         Sign in with Discord
       </a>
       <button type="button" class="button" @click="closeMenu">Close</button>
+    </template>
+  </AppDialog>
+
+  <AppDialog
+    v-if="session.me?.isAdmin === true"
+    :open="adminMenuOpen"
+    title="Admin"
+    variant="sheet"
+    @close="closeAdminMenu"
+  >
+    <nav aria-label="Admin">
+      <ul class="menu__group">
+        <li v-for="link in adminLinks" :key="link.route">
+          <RouterLink class="menu__item" :to="{ name: link.route }" @click="closeAdminMenu">
+            {{ link.label }}
+          </RouterLink>
+        </li>
+        <li>
+          <ExternalLink class="menu__item" :href="adminGuideUrl" @click="closeAdminMenu"
+            >Admin guide and FAQ</ExternalLink
+          >
+        </li>
+      </ul>
+    </nav>
+    <template #actions>
+      <button type="button" class="button" @click="closeAdminMenu">Close</button>
     </template>
   </AppDialog>
 

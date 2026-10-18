@@ -604,7 +604,7 @@ describe('the menu', () => {
       item.textContent.trim(),
     );
 
-  test('is one menu: site links, Admin tools, your data, appearance and sign out', async () => {
+  test('keeps site links, mobile Admin tools, your data, appearance and sign out', async () => {
     const wrapper = await renderAt('/', true);
     expect(document.querySelectorAll('details')).toHaveLength(0);
     expect(menuLinks()).toEqual([
@@ -626,6 +626,48 @@ describe('the menu', () => {
     expect(guide?.textContent).toContain('Admin guide and FAQ');
     expect(guide?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(guide?.querySelector('.external-link-icon')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  test('opens accessible Admin navigation from the header and closes after navigation', async () => {
+    const wrapper = await renderAt('/', true);
+    const trigger = wrapper.get('.site-nav button');
+    expect(trigger.text()).toBe('Admin');
+    expect(trigger.attributes('aria-expanded')).toBe('false');
+    await trigger.trigger('click');
+    await flushPromises();
+    const dialog = wrapper.get('dialog[open]');
+    expect(dialog.text()).toContain('Admin guide and FAQ');
+    expect(dialog.findAll('nav a').map((link) => link.text())).toEqual([
+      'New list',
+      'Roles',
+      'Community insights',
+      'Activity log',
+      'Backups',
+      'Admin guide and FAQ (opens in a new tab)',
+    ]);
+    expect(trigger.attributes('aria-expanded')).toBe('true');
+    await expectAccessible(document.body);
+    await dialog.get('a[href="/admin/roles"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('dialog[open]').exists()).toBe(false);
+    expect(trigger.attributes('aria-expanded')).toBe('false');
+    await vi.waitFor(() => {
+      expect(document.querySelector('main h1')?.textContent).toContain('Roles');
+    });
+    wrapper.unmount();
+  });
+
+  test('members and signed-out visitors have no Admin navigation', async () => {
+    const wrapper = await renderAt('/', true);
+    session.me = { ...me, isAdmin: false };
+    await flushPromises();
+    expect(wrapper.find('.site-nav button').exists()).toBe(false);
+    expect(menuLinks()).not.toContain('Backups');
+    session.me = null;
+    await flushPromises();
+    expect(wrapper.find('.site-nav button').exists()).toBe(false);
+    expect(menuLinks()).not.toContain('Backups');
     wrapper.unmount();
   });
 

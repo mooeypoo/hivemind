@@ -5,7 +5,7 @@ import { admin, fakeApi, list } from './fake-api.ts';
  * Real-browser layout checks that happy-dom can't make: no page scrolls sideways, down to the
  * 320 px minimum in AGENTS.md, in either colour scheme.
  */
-const widths = [320, 375, 1280];
+const widths = [320, 375, 640, 1280];
 const memberRoutes = [
   '/',
   '/lists/films',
@@ -170,11 +170,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/');
         await page.getByRole('button', { name: /^Menu/ }).click();
         const menu = page.getByRole('dialog', { name: 'Menu' });
-        await expect(menu.getByRole('link', { name: 'Backups' })).toBeVisible();
+        const backups = menu.getByRole('link', { name: 'Backups' });
+        if (width < 640) await expect(backups).toBeVisible();
+        else await expect(backups).not.toBeVisible();
         const box = await menu.boundingBox();
         expect(box).not.toBeNull();
         expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
         await expectNoSidewaysScroll(page);
+      });
+
+      test(`Admin navigation at ${String(width)} px follows the header breakpoint`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await fakeApi(page, admin);
+        await page.goto('/');
+        const trigger = page.getByRole('button', { name: 'Admin', exact: true });
+        if (width < 640) {
+          await expect(trigger).not.toBeVisible();
+          await page.getByRole('button', { name: /^Menu/ }).click();
+        } else {
+          await expect(trigger).toBeVisible();
+          await trigger.focus();
+          await page.keyboard.press('Enter');
+          const dialog = page.getByRole('dialog', { name: 'Admin', exact: true });
+          await expect(dialog).toBeVisible();
+          await expectNoSidewaysScroll(page);
+          await page.keyboard.press('Escape');
+          await expect(dialog).not.toBeVisible();
+          await expect(trigger).toBeFocused();
+          await trigger.click();
+        }
+        const dialog = page.getByRole('dialog', {
+          name: width < 640 ? 'Menu' : 'Admin',
+          exact: true,
+        });
+        await expect(dialog.getByRole('link', { name: 'Admin guide and FAQ' })).toBeVisible();
+        await expectNoSidewaysScroll(page);
+        await dialog.getByRole('link', { name: 'Roles', exact: true }).click();
+        await expect(page).toHaveURL('/admin/roles');
+        await expect(dialog).not.toBeVisible();
       });
 
       test(`list dialogs at ${String(width)} px fit on screen`, async ({ page }) => {
