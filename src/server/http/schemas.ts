@@ -9,6 +9,7 @@ export const loginCallbackQuery = z.object({
 });
 
 const isoDate = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
+export const insightsQuery = z.strictObject({ list: z.string().min(1).max(200).optional() });
 export const adminActivityQuery = z.strictObject({
   list: z.string().min(1).max(200).optional(),
   cursor: z

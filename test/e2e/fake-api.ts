@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { insightsFixture } from '../web/insights.ts';
 import type {
   EntryDto,
   ErrorDto,
@@ -89,6 +90,7 @@ const notFound: ErrorDto = { error: { code: 'http.not-found', message: 'Not foun
 
 const responses = (me: MeDto | null): Record<string, unknown> => ({
   'GET /api/site': site,
+  'GET /api/admin/insights': insightsFixture(),
   'GET /api/me': me,
   'GET /api/lists': { lists: [list, { ...list, id: 'list-2', slug: 'draft', lifecycle: 'draft' }] },
   'GET /api/lists/films': list,
@@ -275,6 +277,20 @@ export const fakeApi = async (
   }
   await page.route('**/api/**', (route: Route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === '/api/admin/insights' && url.searchParams.has('list')) {
+      const data = insightsFixture();
+      const selected = data.lists.filter((item) => item.slug === url.searchParams.get('list'));
+      const available = selected.find((item) => item.status === 'available');
+      return route.fulfill({
+        json: {
+          ...data,
+          lists: selected,
+          includedLists: available === undefined ? 0 : 1,
+          excludedLists: selected.length - (available === undefined ? 0 : 1),
+          totals: available?.metrics ?? insightsFixture('empty').totals,
+        },
+      });
+    }
     if (
       route.request().method() === 'POST' &&
       url.pathname === '/api/lists/films/entries/withdraw'

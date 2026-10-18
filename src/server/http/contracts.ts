@@ -40,6 +40,47 @@ export type LoginOutcomeCode =
   | 'identity.discord-unavailable'
   | 'identity.member-conflict';
 
+// ---- Insights (Admin only; current state, no score values or member identifiers) ----
+
+export interface ParticipationMetricsDto {
+  readonly entries: number;
+  readonly withdrawnEntries: number;
+  readonly setAsideEntries: number;
+  readonly nominators: number;
+  readonly ratings: number;
+  readonly voters: number;
+  readonly ratedEntries: number;
+  readonly readyEntries: number;
+}
+
+export type ListInsightDto = {
+  readonly id: string;
+  readonly title: string;
+  readonly slug: string;
+  readonly lifecycle: Lifecycle;
+  readonly visibility: Visibility;
+  readonly source: string;
+  readonly entryMode: 'nominations' | 'seeded';
+} & (
+  | { readonly status: 'after-close'; readonly revealsAt: string | null }
+  | { readonly status: 'paused' }
+  | {
+      readonly status: 'available';
+      readonly metrics: ParticipationMetricsDto;
+      readonly minVotes: number;
+      readonly distribution: readonly { readonly ratings: number; readonly entries: number }[];
+    }
+);
+
+/** `GET /api/admin/insights[?list=<id or slug>]`. Totals include available lists only. */
+export interface InsightsDto {
+  readonly computedAt: string;
+  readonly includedLists: number;
+  readonly excludedLists: number;
+  readonly totals: ParticipationMetricsDto;
+  readonly lists: readonly ListInsightDto[];
+}
+
 // ---- Catalog ----
 
 export type ItemSourceKind = 'tmdb-movie' | 'tvdb-series' | 'igdb-game' | 'freeform' | 'preset';

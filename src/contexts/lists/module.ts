@@ -1,6 +1,7 @@
 import type { Store } from '@netlify/blobs';
 import type { Clock, IdGenerator } from '../../shared/kernel/index.ts';
 import { makeArchiveList } from './application/archive-list.ts';
+import { makeParticipationScope } from './application/participation.ts';
 import {
   makeGetListActivity,
   makeGetAdminActivity,
@@ -87,6 +88,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     getListActivity: makeGetListActivity(shared),
     getAdminActivity: makeGetAdminActivity(shared),
     anonymiseExpiredActivity: makeAnonymiseActivity(shared),
+    participationScope: makeParticipationScope(shared),
     // Services for downstream contexts (voting, ranking).
     rulesForVoting: makeRulesForVoting(shared),
     entryExists: makeEntryExists(repositories),

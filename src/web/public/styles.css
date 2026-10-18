@@ -15,4 +15,5 @@
 @import url('styles/standings.css') layer(pages);
 @import url('styles/index.css') layer(pages);
 @import url('styles/admin.css') layer(pages);
+@import url('styles/insights.css') layer(pages);
 @import url('styles/content.css') layer(pages);

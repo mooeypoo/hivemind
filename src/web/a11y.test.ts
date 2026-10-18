@@ -8,6 +8,7 @@ import { session } from './state/session.ts';
 import { site } from './state/site.ts';
 import { expectAccessible } from './testing/axe.ts';
 import { openTmdbList, stubApi } from './testing/fixtures.ts';
+import { insightsFixture } from '../../test/web/insights.ts';
 
 const entry = (id: string, title: string, imageUrl: string | null = null) => ({
   id,
@@ -77,12 +78,20 @@ const renderAt = async (
   deletingList = false,
   entryState: 'deleting' | 'withdrawn' | 'set-aside' | null = null,
   activityState: 'loaded' | 'empty' | 'error' = 'loaded',
+  insightsState: 'loaded' | 'empty' | 'error' | 'after-close' | 'paused' | 'zero' = 'loaded',
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
   site.info = { ...siteInfo, demo };
   stubApi({
     'GET /api/site': () => Response.json({ ...siteInfo, demo }),
+    'GET /api/admin/insights': () =>
+      insightsState === 'error'
+        ? Response.json(
+            { error: { code: 'insights.unavailable', message: 'Insights could not be loaded.' } },
+            { status: 503 },
+          )
+        : Response.json(insightsFixture(insightsState)),
     'POST /api/auth/demo': () => new Response(null, { status: 204 }),
     'GET /api/me': () => (signedIn ? Response.json(me) : Response.json({}, { status: 401 })),
     'GET /api/lists': () =>
@@ -244,6 +253,26 @@ afterEach(() => {
 });
 
 describe('every page passes automated accessibility checks', () => {
+  test.each(['loaded', 'empty', 'error', 'after-close', 'paused', 'zero'] as const)(
+    'community insights is accessible (%s)',
+    async (state) => {
+      const wrapper = await renderAt(
+        '/admin/insights',
+        true,
+        false,
+        false,
+        false,
+        null,
+        false,
+        false,
+        null,
+        'loaded',
+        state,
+      );
+      await expectAccessible(document.body);
+      wrapper.unmount();
+    },
+  );
   test.each(['loaded', 'empty', 'error'] as const)(
     'general activity log is accessible (%s)',
     async (state) => {
@@ -499,6 +528,7 @@ describe('every page passes automated accessibility checks', () => {
     ['the roles page', '/admin/roles', true],
     ['the backups page', '/admin/backups', true],
     ['the activity log', '/admin/activity', true],
+    ['per-list insights', '/admin/insights?list=films', true],
     ['the privacy page', '/privacy', false],
     ['the About page', '/about', false],
     ['not found', '/nope', false],
@@ -578,6 +608,7 @@ describe('the menu', () => {
       'About',
       'New list',
       'Roles',
+      'Community insights',
       'Activity log',
       'Backups',
       'Admin guide and FAQ (opens in a new tab)',
@@ -869,6 +900,7 @@ describe('site-wide content', () => {
     expect(headings).toEqual([
       'What we store about you',
       'What we never store',
+      'Community insights',
       'Setting entries aside',
       'Admin activity history',
       'Withdrawing a nomination',

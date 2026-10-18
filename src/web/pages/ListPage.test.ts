@@ -43,6 +43,7 @@ const mountWith = async (
       { path: '/lists/:slug', name: 'list', component: ListPage },
       { path: '/lists/:slug/results', name: 'list-results', component: Blank },
       { path: '/admin/lists/:slug', name: 'edit-list', component: Blank },
+      { path: '/admin/insights', name: 'insights', component: Blank },
     ],
   });
   await router.push('/lists/games');

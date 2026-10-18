@@ -195,6 +195,13 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
           >
             Admin · Manage list
           </RouterLink>
+          <RouterLink
+            v-if="session.me?.isAdmin === true"
+            :to="{ name: 'insights', query: { list: list.slug } }"
+            class="button button--quiet"
+          >
+            Admin · Insights
+          </RouterLink>
         </div>
       </div>
     </header>
