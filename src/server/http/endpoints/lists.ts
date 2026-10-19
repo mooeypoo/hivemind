@@ -28,7 +28,7 @@ import {
   scheduleBody,
   searchQuery,
   scoreVisibilityBody,
-  visibilityBody,
+  accessBody,
   withdrawNominationBody,
   setEntryAsideBody,
 } from '../schemas.ts';
@@ -257,16 +257,16 @@ export const closeVoting = async (request: Request, app: App): Promise<Response>
   );
 };
 
-/** `PUT /api/lists/:list/visibility` */
-export const setVisibility = async (request: Request, app: App): Promise<Response> => {
+/** `PUT /api/lists/:list/access` */
+export const changeAccess = async (request: Request, app: App): Promise<Response> => {
   const rejected = rejectForeignOrigin(request, app.siteOrigin(request));
   if (rejected !== null) return rejected;
-  const body = await readJson(request, visibilityBody);
+  const body = await readJson(request, accessBody);
   if (!body.ok) return body.response;
   return respond(
-    await app.lists.setVisibility(await actorOf(request, app), {
+    await app.lists.changeAccess(await actorOf(request, app), {
       list: listParam(request),
-      visibility: body.data.visibility,
+      access: body.data.access,
       ...defined({ expectedSettingsVersion: body.data.expectedSettingsVersion }),
     }),
     (view): ListDto => listDto(view),

@@ -65,6 +65,11 @@ export const listsErrors = {
     'lists.not-published',
     'Only a published list can be archived.',
   ),
+  publicScoresViewers: domainError(
+    'invalid',
+    'lists.public-scores-viewers',
+    'Named scores on this list were given for its current viewers. Make scores private before letting more people view it.',
+  ),
   scoresPrivateOnly: domainError(
     'invalid',
     'lists.scores-private-only',

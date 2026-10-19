@@ -1,9 +1,11 @@
 import type { MemberActor } from '../../../shared/kernel/index.ts';
 import { retainActivityIdentity } from '../domain/activity.ts';
 import { nominationToken, type Entry, type EntryId, type ItemSnapshot } from '../domain/entry.ts';
+import type { AccessAction, Audience } from '../domain/access.ts';
 import {
+  allowedFor,
+  hiddenFromMembers,
   lifecycleOf,
-  mayParticipate,
   nominationsOpen,
   underNominationCap,
   type Lifecycle,
@@ -12,8 +14,18 @@ import {
   type ListId,
   type Schedule,
   type DraftSchedule,
-  type Visibility,
+  viaSiteAdmin,
 } from '../domain/list.ts';
+
+/** Who may view, at a glance: every member, members with certain roles, or only site admins. */
+export type Viewers = 'everyone' | 'roles' | 'site-admins';
+
+export const viewersOf = (list: List): Viewers =>
+  hiddenFromMembers(list)
+    ? 'site-admins'
+    : list.config.access.view.kind === 'everyone'
+      ? 'everyone'
+      : 'roles';
 
 export interface ListView extends ListConfig {
   readonly createdBy?: string | null;
@@ -25,12 +37,21 @@ export interface ListView extends ListConfig {
   readonly lifecycle: Lifecycle;
   readonly schedule: Schedule | null;
   readonly draftSchedule?: DraftSchedule | null;
-  readonly visibility: Visibility;
+  readonly viewers: Viewers;
+  /** Site admins only: who could view before the list was limited to site admins. */
+  readonly previousView?: Audience | null;
+  /** Site admins only: an older version of the app changed access; see the repository. */
+  readonly accessNeedsReview?: boolean;
   /** What the caller may do here. */
   readonly viewer: {
-    readonly canParticipate: boolean;
+    /** What the list's access allows the caller, whatever its lifecycle. */
+    readonly allowed: { readonly nominate: boolean; readonly rate: boolean };
+    /** Allowed to rate, and the list isn't paused. Lifecycle still decides whether it is open. */
+    readonly canRate: boolean;
     readonly canNominate: boolean;
     readonly nominationsUsed: number;
+    /** What a site admin may do here only as a site admin. Empty for everyone else. */
+    readonly viaSiteAdmin: readonly AccessAction[];
   };
 }
 
@@ -62,10 +83,8 @@ export const toListView = (
   now: Date,
   nominationsUsed: number,
 ): ListView => {
-  const canParticipate =
-    list.deletionRequested !== true &&
-    list.entryDeletion == null &&
-    mayParticipate(list, actor.roleIds);
+  const allowed = allowedFor(list, actor);
+  const active = list.deletionRequested !== true && list.entryDeletion == null;
   return {
     ...list.config,
     ...(actor.isAdmin
@@ -86,12 +105,23 @@ export const toListView = (
     ...(actor.isAdmin && list.phase === 'draft'
       ? { draftSchedule: list.draftSchedule ?? null }
       : {}),
-    visibility: list.visibility,
+    viewers: viewersOf(list),
+    ...(actor.isAdmin
+      ? {
+          previousView: list.previousView ?? null,
+          accessNeedsReview: list.accessNeedsReview === true,
+        }
+      : {}),
     viewer: {
-      canParticipate,
+      allowed: { nominate: allowed.nominate, rate: allowed.rate },
+      canRate: active && allowed.rate,
       canNominate:
-        canParticipate && nominationsOpen(list, now) && underNominationCap(list, nominationsUsed),
+        active &&
+        allowed.nominate &&
+        nominationsOpen(list, now) &&
+        underNominationCap(list, nominationsUsed),
       nominationsUsed,
+      viaSiteAdmin: viaSiteAdmin(list, actor),
     },
   };
 };

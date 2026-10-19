@@ -8,7 +8,7 @@ import {
 } from '../../../shared/kernel/index.ts';
 import type { ItemSnapshot } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
-import { mayParticipate, nominationsOpen } from '../domain/list.ts';
+import { mayNominate, nominationsOpen } from '../domain/list.ts';
 import { findList } from './find-list.ts';
 import type { Catalog, ListRepository, SlugIndex } from './ports.ts';
 
@@ -29,7 +29,7 @@ export const makeSearchForList =
     const found = await findList(deps, member.value, input.list);
     if (!found.ok) return found;
     const list = found.value.value;
-    if (!mayParticipate(list, member.value.roleIds)) return err(listsErrors.roleRequired);
+    if (!mayNominate(list, member.value)) return err(listsErrors.roleRequired);
     if (!nominationsOpen(list, deps.clock.now())) return err(listsErrors.nominationsClosed);
     return deps.catalog.search(list.config.itemSource, input.query);
   };
@@ -51,7 +51,7 @@ export const makeResolveItemForList =
     const found = await findList(deps, member.value, input.list);
     if (!found.ok) return found;
     const list = found.value.value;
-    if (!mayParticipate(list, member.value.roleIds)) return err(listsErrors.roleRequired);
+    if (!mayNominate(list, member.value)) return err(listsErrors.roleRequired);
     if (!nominationsOpen(list, deps.clock.now())) return err(listsErrors.nominationsClosed);
     return deps.catalog.resolve(list.config.itemSource, input.externalId);
   };

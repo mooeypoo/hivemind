@@ -13,7 +13,7 @@ import {
 import { entryIdFor, isActiveEntry, type Entry, type EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
 import { emptyLedger, release, reserve, type NominationLedger } from '../domain/ledger.ts';
-import { mayParticipate, nominationsOpen, visibleTo, type List } from '../domain/list.ts';
+import { mayNominate, mayView, nominationsOpen, type List } from '../domain/list.ts';
 import { findList } from './find-list.ts';
 import type {
   Catalog,
@@ -55,7 +55,7 @@ export const makeNominate =
     if (!found.ok) return found;
     const list = found.value.value;
     const now = deps.clock.now();
-    if (!mayParticipate(list, member.value.roleIds)) return err(listsErrors.roleRequired);
+    if (!mayNominate(list, member.value)) return err(listsErrors.roleRequired);
     if (!nominationsOpen(list, now)) return err(listsErrors.nominationsClosed);
 
     const item = await deps.catalog.resolve(list.config.itemSource, input.key);
@@ -74,8 +74,8 @@ export const makeNominate =
     return withEntryWrite(deps.lists, list, deps.ids.next(), async (currentList) => {
       const list = currentList.value;
       const now = deps.clock.now();
-      if (!visibleTo(list, member.value.isAdmin)) return err(listsErrors.notFound);
-      if (!mayParticipate(list, member.value.roleIds)) return err(listsErrors.roleRequired);
+      if (!mayView(list, member.value)) return err(listsErrors.notFound);
+      if (!mayNominate(list, member.value)) return err(listsErrors.roleRequired);
       if (!nominationsOpen(list, now)) return err(listsErrors.nominationsClosed);
       const reserved = await withConflictRetry(() =>
         updateLedger(deps, member.value, list, (ledger) =>

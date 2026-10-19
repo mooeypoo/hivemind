@@ -78,7 +78,7 @@ export const makeGetInsights =
         title: list.title,
         slug: list.slug,
         lifecycle: list.lifecycle,
-        visibility: list.visibility,
+        viewers: list.viewers,
         source: list.source,
         entryMode: list.entryMode,
         status: 'available',

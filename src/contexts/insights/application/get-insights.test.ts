@@ -23,7 +23,7 @@ const base = {
   title: 'One',
   slug: 'one',
   lifecycle: 'open',
-  visibility: 'public',
+  viewers: 'everyone',
   source: 'freeform',
   entryMode: 'nominations',
 } as const;

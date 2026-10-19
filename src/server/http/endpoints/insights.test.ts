@@ -134,7 +134,7 @@ test('after-close participation never enters site totals and is revealed on clos
       title: 'secret',
       slug: 'secret',
       lifecycle: 'open',
-      visibility: 'public',
+      viewers: 'everyone',
       source: 'freeform',
       entryMode: 'nominations',
       status: 'after-close',

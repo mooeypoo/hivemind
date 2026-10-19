@@ -27,16 +27,28 @@ import {
   type ListConfig,
   type ListId,
   type Phase,
-  type Visibility,
 } from '../domain/list.ts';
+import {
+  accessFromLegacy,
+  legacyFromAccess,
+  onlySiteAdmins,
+  SITE_ADMINS_ONLY,
+  type Audience,
+  type ListAccess,
+} from '../domain/access.ts';
 import type { EntryRepository, LedgerRepository, ListRepository, SlugIndex } from './ports.ts';
 import { listsErrors } from '../domain/errors.ts';
 
 /** A list as stored in a backup file: plain JSON, dates as ISO strings. */
 export interface ListBackup {
   readonly list: {
-    readonly config: Omit<ListConfig, 'requiredRoleIds'> & {
-      readonly requiredRoleIds: readonly string[];
+    /**
+     * `access` is absent from files made before per-action access. `requiredRoleIds` and
+     * `visibility` are still written, fail-closed, for older versions of the app to import.
+     */
+    readonly config: Omit<ListConfig, 'access'> & {
+      readonly access?: ListAccess;
+      readonly requiredRoleIds?: readonly string[];
     };
     readonly schedule: {
       readonly opensAt: string;
@@ -49,7 +61,7 @@ export interface ListBackup {
       readonly closesAt: string | null;
     } | null;
     readonly phase: Phase;
-    readonly visibility: Visibility;
+    readonly visibility?: 'public' | 'hidden';
     readonly createdAt: string;
     readonly archivedAt: string | null;
   };
@@ -93,9 +105,10 @@ const toBackup = async (deps: BackupDeps, list: List): Promise<ListBackup> => {
     deps.entries.forList(list.id),
     deps.ledgers.forList(list.id),
   ]);
+  const legacy = legacyFromAccess(list.config.access, list.config.entryMode === 'seeded');
   return {
     list: {
-      config: list.config,
+      config: { ...list.config, requiredRoleIds: legacy.requiredRoleIds },
       draftSchedule:
         list.phase !== 'draft' || list.draftSchedule == null
           ? null
@@ -113,7 +126,7 @@ const toBackup = async (deps: BackupDeps, list: List): Promise<ListBackup> => {
               closesAt: iso(list.schedule.closesAt),
             },
       phase: list.phase,
-      visibility: list.visibility,
+      visibility: legacy.hidden ? 'hidden' : 'public',
       createdAt: list.createdAt.toISOString(),
       archivedAt: iso(list.archivedAt),
     },
@@ -208,9 +221,13 @@ export const makeRestoreFromBackup =
       readonly keepMember: (memberId: string) => Promise<boolean>;
     },
   ): Promise<Result<RestoredList, DomainError>> => {
+    const { requiredRoleIds, access: savedAccess, ...savedConfig } = backup.list.config;
+    const fileAccess =
+      savedAccess ??
+      accessFromLegacy((requiredRoleIds ?? []) as RoleId[], backup.list.visibility === 'hidden');
     const config = validateConfig({
-      ...backup.list.config,
-      requiredRoleIds: backup.list.config.requiredRoleIds as RoleId[],
+      ...savedConfig,
+      access: fileAccess,
       ...(options.itemSource === undefined ? {} : { itemSource: options.itemSource }),
     });
     if (!config.ok) return err(invalidBackup(config.error.details ?? [config.error.message]));
@@ -241,9 +258,18 @@ export const makeRestoreFromBackup =
     if (slug === null) return err(invalidBackup(['no free address for this list']));
     const renamed = slug !== config.value.slug;
     const schedule = backup.list.schedule;
+    // A copy under a new address, or one limited to roles (which may mean something else on
+    // this server), arrives viewable by site admins only, for review.
+    const hide = renamed || (fileAccess.view.kind === 'roles' && !onlySiteAdmins(fileAccess.view));
+    const access: ListAccess = hide
+      ? { ...config.value.access, view: SITE_ADMINS_ONLY }
+      : config.value.access;
+    const previousView: Audience | null =
+      onlySiteAdmins(access.view) && !onlySiteAdmins(fileAccess.view) ? fileAccess.view : null;
     const restored: List = {
       id,
-      config: { ...config.value, slug },
+      config: { ...config.value, slug, access },
+      previousView,
       draftSchedule: backup.list.phase === 'draft' ? draftSchedule : null,
       schedule:
         schedule === null
@@ -255,7 +281,6 @@ export const makeRestoreFromBackup =
               closesAt: schedule.closesAt === null ? null : new Date(schedule.closesAt),
             },
       phase: backup.list.phase,
-      visibility: renamed ? 'hidden' : backup.list.visibility,
       createdAt: new Date(backup.list.createdAt),
       archivedAt: backup.list.archivedAt === null ? null : new Date(backup.list.archivedAt),
     };
@@ -321,7 +346,7 @@ export const makeRestoreFromBackup =
         title: list.config.title,
         slug,
         renamed,
-        hidden: list.visibility === 'hidden',
+        hidden: onlySiteAdmins(list.config.access.view),
         entries: entryIds.size,
         membersLeftOut: [...kept].filter(([, isKept]) => !isKept).map(([memberId]) => memberId),
       });

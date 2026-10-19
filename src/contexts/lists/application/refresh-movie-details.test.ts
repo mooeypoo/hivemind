@@ -1,3 +1,4 @@
+import { OPEN_ACCESS } from '../domain/access.ts';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   domainError,
@@ -39,7 +40,7 @@ const config: ListConfig = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 3 },
   showNominators: true,
-  requiredRoleIds: [],
+  access: OPEN_ACCESS,
   scoreVisibility: 'private',
 };
 
@@ -98,7 +99,6 @@ const setUp = async (phase: List['phase'] = 'published') => {
       phase,
       createdAt: now,
       archivedAt: phase === 'archived' ? now : null,
-      visibility: 'public',
     },
     null,
   );
@@ -168,7 +168,6 @@ describe('refresh missing TMDB movie details', () => {
         phase: 'draft',
         createdAt: now,
         archivedAt: null,
-        visibility: 'public',
       },
       (await lists.get('list-1' as ListId))?.version ?? null,
     );

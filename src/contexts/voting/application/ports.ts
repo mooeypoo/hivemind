@@ -6,7 +6,8 @@ export interface ListVotingRules {
   readonly listId: BallotListId;
   readonly isOpen: boolean;
   readonly scale: Scale;
-  readonly requiredRoleIds: readonly RoleId[];
+  /** The list lets this viewer rate (its access, not its lifecycle). Lists decide. */
+  readonly mayRate: boolean;
   /** Public scores may be shown now (the list's scores are public and its results visible). */
   readonly scoresPublic: boolean;
   /** The list's scores are public at all: keep voters' names with their scores. */
@@ -20,10 +21,10 @@ export interface ListReader {
     work: () => Promise<Result<T, DomainError>>,
     revision?: string | null,
   ): Promise<Result<T, DomainError>>;
-  /** By list id or slug. Not found for drafts and hidden lists, unless the viewer is an Admin. */
+  /** By list id or slug, for this viewer. Not found for lists the viewer may not view. */
   rulesFor(
     list: string,
-    viewer: { readonly isAdmin: boolean },
+    viewer: { readonly isAdmin: boolean; readonly roleIds: readonly RoleId[] },
   ): Promise<Result<ListVotingRules, DomainError>>;
   entryExists(listId: BallotListId, entryId: BallotEntryId): Promise<boolean>;
 }

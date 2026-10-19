@@ -7,7 +7,8 @@ import {
   makeGetAdminActivity,
   makeAnonymiseActivity,
 } from './application/activity.ts';
-import { makeCloseVoting, makeSetVisibility } from './application/close-voting.ts';
+import { makeCloseVoting } from './application/close-voting.ts';
+import { makeChangeAccess } from './application/change-access.ts';
 import { makeSetScoreVisibility } from './application/score-visibility.ts';
 import { makeCreateList } from './application/create-list.ts';
 import { makeEditList } from './application/edit-list.ts';
@@ -73,7 +74,7 @@ export const createListsModule = (deps: ListsModuleDeps) => {
     scheduleList: makeScheduleList({ ...shared, ids: deps.ids }),
     archiveList: makeArchiveList(shared),
     closeVoting: makeCloseVoting(shared),
-    setVisibility: makeSetVisibility(shared),
+    changeAccess: makeChangeAccess(shared),
     setScoreVisibility: makeSetScoreVisibility(shared),
     listLists: makeListLists(shared),
     getList: makeGetList(shared),

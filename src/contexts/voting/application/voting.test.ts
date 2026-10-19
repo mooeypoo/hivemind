@@ -69,8 +69,9 @@ describe('scoring', () => {
     expect(!result.ok && result.error.kind).toBe('unauthenticated');
   });
 
-  test('needs any one of the required roles, when the list has some', async () => {
-    lists.add('club', { requiredRoleIds: ['r1' as RoleId, 'r2' as RoleId] });
+  test('needs the list to let the member rate', async () => {
+    lists.add('club');
+    lists.raterRoles.set('club', ['r1', 'r2']);
     const denied = await score(ada, 'e1', 5, 'club');
     expect(!denied.ok && denied.error.code).toBe('voting.role-required');
     expect((await score(member('cy', ['r2']), 'e1', 5, 'club')).ok).toBe(true);

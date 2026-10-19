@@ -1,4 +1,4 @@
-import type { DomainError, Result } from '../../../shared/kernel/index.ts';
+import type { DomainError, Result, RoleId } from '../../../shared/kernel/index.ts';
 import type { ItemSnapshot, Leaderboard } from '../domain/leaderboard.ts';
 
 export interface RankingContext {
@@ -27,7 +27,7 @@ export interface ListSource {
   /** Not found for drafts and hidden lists, unless the viewer is an Admin. */
   context(
     list: string,
-    viewer: { readonly isAdmin: boolean },
+    viewer: { readonly isAdmin: boolean; readonly roleIds: readonly RoleId[] },
   ): Promise<Result<RankingContext, DomainError>>;
   entries(listId: string): Promise<readonly { readonly id: string; readonly item: ItemSnapshot }[]>;
 }

@@ -38,16 +38,11 @@ export const settingsChanges = (before: List, after: List): readonly ActivityCha
       after: prose ? null : JSON.stringify(after.config[field]),
     });
   }
-  for (const field of ['schedule', 'draftSchedule', 'visibility'] as const) {
-    if (JSON.stringify(before[field] ?? null) === JSON.stringify(after[field] ?? null)) continue;
-    if (field === 'visibility')
-      changes.push({ field, before: before.visibility, after: after.visibility });
-    else {
-      for (const date of ['opensAt', 'nominationsCloseAt', 'closesAt'] as const) {
-        const old = before[field]?.[date]?.toISOString() ?? null;
-        const next = after[field]?.[date]?.toISOString() ?? null;
-        if (old !== next) changes.push({ field: `${field}.${date}`, before: old, after: next });
-      }
+  for (const field of ['schedule', 'draftSchedule'] as const) {
+    for (const date of ['opensAt', 'nominationsCloseAt', 'closesAt'] as const) {
+      const old = before[field]?.[date]?.toISOString() ?? null;
+      const next = after[field]?.[date]?.toISOString() ?? null;
+      if (old !== next) changes.push({ field: `${field}.${date}`, before: old, after: next });
     }
   }
   return changes;

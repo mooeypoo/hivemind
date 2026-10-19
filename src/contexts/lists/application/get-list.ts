@@ -7,7 +7,7 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { findList } from './find-list.ts';
-import { archivedSince, lifecycleOf, visibleTo, type ListId } from '../domain/list.ts';
+import { archivedSince, lifecycleOf, mayView, type ListId } from '../domain/list.ts';
 import type {
   Catalog,
   EntryRepository,
@@ -34,7 +34,8 @@ export const makeGetSharePreview =
     const byId = await deps.lists.get(input.list as ListId);
     const id = byId === null ? await deps.slugs.lookup(input.list) : null;
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
-    if (found === null || !visibleTo(found.value, false)) return null;
+    // Only lists every member of the server may view: a role-limited title stays private.
+    if (found === null || !mayView(found.value, { isAdmin: false, roleIds: [] })) return null;
     return { title: found.value.config.title, slug: found.value.config.slug };
   };
 

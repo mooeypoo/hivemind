@@ -65,7 +65,7 @@ export class FakeListReader implements ListReader {
       listId: list as BallotListId,
       isOpen: true,
       scale: { min: 1, max: 10 },
-      requiredRoleIds: [],
+      mayRate: true,
       scoresPublic: false,
       namesWithScores: false,
       ...rules,
@@ -76,12 +76,21 @@ export class FakeListReader implements ListReader {
   /** Lists marked hidden here are not found unless the viewer is an Admin. */
   readonly hidden = new Set<string>();
 
-  rulesFor(list: string, viewer: { readonly isAdmin: boolean }) {
+  /** Members holding none of these roles (per list) may not rate. */
+  readonly raterRoles = new Map<string, readonly string[]>();
+
+  rulesFor(
+    list: string,
+    viewer: { readonly isAdmin: boolean; readonly roleIds: readonly string[] },
+  ) {
+    const roles = this.raterRoles.get(list);
+    const mayRate =
+      viewer.isAdmin || roles === undefined || roles.some((r) => viewer.roleIds.includes(r));
     const found = this.lists.get(list);
     return Promise.resolve(
       found === undefined || (this.hidden.has(list) && !viewer.isAdmin)
         ? err(domainError('not-found', 'lists.not-found', 'Not found'))
-        : ok(found),
+        : ok({ ...found, mayRate: found.mayRate && mayRate }),
     );
   }
 

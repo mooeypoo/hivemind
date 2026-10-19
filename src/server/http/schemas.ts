@@ -38,6 +38,13 @@ const roleId = z
   .regex(/^\d{5,25}$/, 'must be a Discord role ID')
   .transform((id) => id as RoleId);
 
+/** No roles: only site admins. The domain limits how many roles. */
+const audience = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('everyone') }),
+  z.strictObject({ kind: z.literal('roles'), roleIds: z.array(roleId).max(100) }),
+]);
+const listAccess = z.strictObject({ view: audience, nominate: audience, rate: audience });
+
 const itemSource = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('tmdb-movie') }),
   z.strictObject({ kind: z.literal('tvdb-series') }),
@@ -59,7 +66,7 @@ const listConfigFields = {
   resultsVisibility: z.enum(['live', 'after-close']),
   ranking: z.strictObject({ strategy: z.literal('bayesian'), minVotes: z.number().int() }),
   showNominators: z.boolean(),
-  requiredRoleIds: z.array(roleId).max(100),
+  access: listAccess,
   scoreVisibility: z.enum(['private', 'public']),
 };
 
@@ -74,7 +81,11 @@ export const createListBody = z.strictObject({
   resultsVisibility: listConfigFields.resultsVisibility.default(LIST_DEFAULTS.resultsVisibility),
   ranking: listConfigFields.ranking.default(LIST_DEFAULTS.ranking),
   showNominators: listConfigFields.showNominators.default(LIST_DEFAULTS.showNominators),
-  requiredRoleIds: listConfigFields.requiredRoleIds.default([]),
+  access: listConfigFields.access.default({
+    view: { kind: 'everyone' },
+    nominate: { kind: 'everyone' },
+    rate: { kind: 'everyone' },
+  }),
   scoreVisibility: listConfigFields.scoreVisibility.default(LIST_DEFAULTS.scoreVisibility),
 });
 
@@ -102,8 +113,8 @@ export const scheduleBody = z.strictObject({
   closesAt: isoDate.nullable(),
 });
 
-export const visibilityBody = z.strictObject({
-  visibility: z.enum(['public', 'hidden']),
+export const accessBody = z.strictObject({
+  access: listAccess,
   expectedSettingsVersion: settingsVersion,
 });
 export const deleteListBody = z.strictObject({ confirmation: z.string().min(1).max(60) });
@@ -174,9 +185,12 @@ const backupListPart = z.object({
       .nullable()
       .optional(),
     // Backups made before score visibility existed had private scores.
+    // Files made before per-action access have only `requiredRoleIds` and `visibility`.
     config: z.object({
       ...listConfigFields,
       scoreVisibility: listConfigFields.scoreVisibility.default('private'),
+      access: listAccess.optional(),
+      requiredRoleIds: z.array(roleId).max(100).optional(),
     }),
     schedule: z
       .object({
@@ -186,7 +200,7 @@ const backupListPart = z.object({
       })
       .nullable(),
     phase: z.enum(['draft', 'published', 'archived']),
-    visibility: z.enum(['public', 'hidden']),
+    visibility: z.enum(['public', 'hidden']).optional(),
     createdAt: isoString,
     archivedAt: isoString.nullable(),
   }),

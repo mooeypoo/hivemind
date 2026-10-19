@@ -4,7 +4,8 @@ export type { ListsModule, ListsModuleDeps } from './module.ts';
 export type { NominateInput } from './application/nominate.ts';
 export type { ActivityView, AdminActivityView } from './application/activity.ts';
 export type { RefreshMovieDetailsResult } from './application/refresh-movie-details.ts';
-export type { EntryView, ListDetail, ListView } from './application/views.ts';
+export type { EntryView, ListDetail, ListView, Viewers } from './application/views.ts';
+export type { AccessAction, Audience, ListAccess } from './domain/access.ts';
 export type { VotingRules } from './application/voting-rules.ts';
 export type { RankingContextView } from './application/ranking-services.ts';
 export type { ListBackup, RestoredList } from './application/backup.ts';
@@ -18,5 +19,4 @@ export type {
   ResultsVisibility,
   Schedule,
   DraftSchedule,
-  Visibility,
 } from './domain/list.ts';

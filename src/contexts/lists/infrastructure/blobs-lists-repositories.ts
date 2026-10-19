@@ -10,7 +10,16 @@ import type {
 } from '../application/ports.ts';
 import { isActiveEntry, type Entry, type EntryId } from '../domain/entry.ts';
 import type { NominationLedger } from '../domain/ledger.ts';
-import type { List, ListConfig, ListId, Phase, Schedule, Visibility } from '../domain/list.ts';
+import type { List, ListConfig, ListId, Phase, Schedule } from '../domain/list.ts';
+import {
+  accessFromLegacy,
+  EVERYONE,
+  legacyFromAccess,
+  onlySiteAdmins,
+  SITE_ADMINS_ONLY,
+  type Audience,
+  type ListAccess,
+} from '../domain/access.ts';
 
 /*
  * Store: `lists`. Lists are written as v2 and read from v1 or v2. Keys:
@@ -19,6 +28,12 @@ import type { List, ListConfig, ListId, Phase, Schedule, Visibility } from '../d
  *   entry/{listId}/{entryId}       entries; the id derives from the item, so creation dedupes
  *   nominator/{memberId}/{listId}  a member's nominations per list (cap, export, erasure)
  * Records are versioned (`v: 1`); domain objects are never stored directly.
+ *
+ * Access: lists stay v2 so a rollback can still read them. `config.access` is the source of truth;
+ * versions before it pass unknown config keys through untouched. Every write also sets the old
+ * `visibility` and `config.requiredRoleIds` to the closest access that never allows more
+ * (`legacyFromAccess`), so older code fails closed. If those fields no longer match `access`
+ * when read, older code changed them: the list is limited to site admins for review.
  */
 
 interface ActivityRecord {
@@ -56,9 +71,21 @@ interface ScheduleRecord {
   readonly closesAt: string | null;
 }
 
-type ConfigRecord = Omit<ListConfig, 'requiredRoleIds' | 'scoreVisibility'> & {
-  readonly requiredRoleIds: readonly string[];
+type AudienceRecord =
+  { readonly kind: 'everyone' } | { readonly kind: 'roles'; readonly roleIds: readonly string[] };
+
+interface AccessRecord {
+  readonly view: AudienceRecord;
+  readonly nominate: AudienceRecord;
+  readonly rate: AudienceRecord;
+}
+
+type ConfigRecord = Omit<ListConfig, 'access' | 'scoreVisibility'> & {
+  /** Older versions' participation roles, kept in step with `access` for rollbacks. */
+  readonly requiredRoleIds?: readonly string[];
   readonly scoreVisibility?: ListConfig['scoreVisibility'];
+  /** Absent on lists last saved before per-action access. */
+  readonly access?: AccessRecord;
 };
 
 /** v2: several required roles and an optional nomination cap. */
@@ -78,8 +105,10 @@ interface ListRecordV2 {
   readonly createdAt: string;
   /** Added after v2 shipped; absent on lists archived before it existed. */
   readonly archivedAt?: string | null;
-  /** Added after v2 shipped; absent means public. */
-  readonly visibility?: Visibility;
+  /** Older versions' visibility, kept in step with `access` for rollbacks; absent means public. */
+  readonly visibility?: 'public' | 'hidden';
+  readonly previousView?: AudienceRecord | null;
+  readonly accessNeedsReview?: boolean;
   readonly entryWriteToken?: string;
   readonly deletionRequested?: boolean;
   readonly entryDeletion?: List['entryDeletion'];
@@ -142,32 +171,71 @@ const scheduleFromRecord = (record: ScheduleRecord | null): Schedule | null =>
         closesAt: record.closesAt === null ? null : new Date(record.closesAt),
       };
 
-const listToRecord = (list: List): ListRecordV2 => ({
-  v: 2,
-  settingsVersion: list.settingsVersion ?? 0,
-  ...(list.activity === undefined ? {} : { activity: list.activity.map(activityToRecord) }),
-  id: list.id,
-  config: list.config,
-  schedule: scheduleToRecord(list.schedule),
-  draftSchedule:
-    list.draftSchedule == null
-      ? null
-      : {
-          opensAt: list.draftSchedule.opensAt?.toISOString() ?? null,
-          nominationsCloseAt: list.draftSchedule.nominationsCloseAt?.toISOString() ?? null,
-          closesAt: list.draftSchedule.closesAt?.toISOString() ?? null,
-        },
-  phase: list.phase,
-  createdAt: list.createdAt.toISOString(),
-  archivedAt: list.archivedAt?.toISOString() ?? null,
-  visibility: list.visibility,
-  ...(list.entryWriteToken === undefined ? {} : { entryWriteToken: list.entryWriteToken }),
-  ...(list.deletionRequested === undefined ? {} : { deletionRequested: list.deletionRequested }),
-  ...(list.entryDeletion === undefined ? {} : { entryDeletion: list.entryDeletion }),
-  ...(list.entryDeletionRevision === undefined
-    ? {}
-    : { entryDeletionRevision: list.entryDeletionRevision }),
-});
+const listToRecord = (list: List): ListRecordV2 => {
+  const { access, ...config } = list.config;
+  const legacy = legacyFromAccess(access, config.entryMode === 'seeded');
+  return {
+    v: 2,
+    settingsVersion: list.settingsVersion ?? 0,
+    ...(list.activity === undefined ? {} : { activity: list.activity.map(activityToRecord) }),
+    id: list.id,
+    config: { ...config, requiredRoleIds: legacy.requiredRoleIds, access },
+    schedule: scheduleToRecord(list.schedule),
+    draftSchedule:
+      list.draftSchedule == null
+        ? null
+        : {
+            opensAt: list.draftSchedule.opensAt?.toISOString() ?? null,
+            nominationsCloseAt: list.draftSchedule.nominationsCloseAt?.toISOString() ?? null,
+            closesAt: list.draftSchedule.closesAt?.toISOString() ?? null,
+          },
+    phase: list.phase,
+    createdAt: list.createdAt.toISOString(),
+    archivedAt: list.archivedAt?.toISOString() ?? null,
+    visibility: legacy.hidden ? 'hidden' : 'public',
+    previousView: list.previousView ?? null,
+    ...(list.accessNeedsReview === true ? { accessNeedsReview: true } : {}),
+    ...(list.entryWriteToken === undefined ? {} : { entryWriteToken: list.entryWriteToken }),
+    ...(list.deletionRequested === undefined ? {} : { deletionRequested: list.deletionRequested }),
+    ...(list.entryDeletion === undefined ? {} : { entryDeletion: list.entryDeletion }),
+    ...(list.entryDeletionRevision === undefined
+      ? {}
+      : { entryDeletionRevision: list.entryDeletionRevision }),
+  };
+};
+
+const sameRoles = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((role) => b.includes(role));
+
+/** Access as stored, or as an older version left it. See the store note at the top. */
+const accessFromRecord = (
+  record: ListRecordV2,
+): {
+  readonly access: ListAccess;
+  readonly previousView: Audience | null;
+  readonly accessNeedsReview: boolean;
+} => {
+  const hidden = record.visibility === 'hidden';
+  const requiredRoleIds = (record.config.requiredRoleIds ?? []) as RoleId[];
+  const previousView = (record.previousView ?? null) as Audience | null;
+  const stored = record.config.access as ListAccess | undefined;
+  if (stored === undefined) {
+    return {
+      access: accessFromLegacy(requiredRoleIds, hidden),
+      previousView: previousView ?? (hidden ? EVERYONE : null),
+      accessNeedsReview: false,
+    };
+  }
+  const expected = legacyFromAccess(stored, record.config.entryMode === 'seeded');
+  if (expected.hidden === hidden && sameRoles(expected.requiredRoleIds, requiredRoleIds)) {
+    return { access: stored, previousView, accessNeedsReview: record.accessNeedsReview === true };
+  }
+  return {
+    access: { ...stored, view: SITE_ADMINS_ONLY },
+    previousView: onlySiteAdmins(stored.view) ? previousView : stored.view,
+    accessNeedsReview: true,
+  };
+};
 
 const upgradeList = (data: unknown): ListRecordV2 => {
   const version = (data as { v?: unknown } | null)?.v;
@@ -184,13 +252,18 @@ const upgradeList = (data: unknown): ListRecordV2 => {
 
 const listFromRecord = (data: unknown): List => {
   const record = upgradeList(data);
+  const { access, previousView, accessNeedsReview } = accessFromRecord(record);
+  // Spread, not picked: config keys from newer versions survive a rollback to this one.
+  const config = Object.fromEntries(
+    Object.entries(record.config).filter(([key]) => key !== 'requiredRoleIds' && key !== 'access'),
+  ) as Omit<ConfigRecord, 'requiredRoleIds' | 'access'>;
   return {
     id: record.id as ListId,
     settingsVersion: record.settingsVersion ?? 0,
     ...(record.activity === undefined ? {} : { activity: record.activity.map(activityFromRecord) }),
     config: {
-      ...record.config,
-      requiredRoleIds: record.config.requiredRoleIds as RoleId[],
+      ...config,
+      access,
       // Added after v2 shipped: lists stored before it had private scores.
       scoreVisibility: record.config.scoreVisibility ?? 'private',
     },
@@ -212,7 +285,8 @@ const listFromRecord = (data: unknown): List => {
           },
     phase: record.phase,
     createdAt: new Date(record.createdAt),
-    visibility: record.visibility ?? 'public',
+    previousView,
+    accessNeedsReview,
     archivedAt: record.archivedAt == null ? null : new Date(record.archivedAt),
     ...(record.entryWriteToken === undefined ? {} : { entryWriteToken: record.entryWriteToken }),
     ...(record.deletionRequested === undefined

@@ -1,15 +1,20 @@
 import { describe, expect, test } from 'vitest';
 import type { RoleId } from '../../../shared/kernel/index.ts';
 import {
-  archive,
   changeScoreVisibility,
   closeVoting,
   DEFAULT_SCALE,
   editList,
   LIST_DEFAULTS,
+  archive as archiveList,
+  changeAccess,
+  hiddenFromMembers,
   lifecycleOf,
-  mayParticipate,
+  mayNominate,
+  mayRate,
+  mayView,
   newList,
+  viaSiteAdmin,
   nominationsOpen,
   publish,
   validateConfig,
@@ -19,6 +24,7 @@ import {
   type ListId,
   type Schedule,
 } from './list.ts';
+import { EVERYONE, OPEN_ACCESS, SITE_ADMINS_ONLY, type ListAccess } from './access.ts';
 
 const t = (iso: string) => new Date(`2026-03-${iso}Z`);
 const config: ListConfig = {
@@ -32,7 +38,7 @@ const config: ListConfig = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 5 },
   showNominators: true,
-  requiredRoleIds: [],
+  access: OPEN_ACCESS,
   scoreVisibility: 'private',
 };
 const schedule: Schedule = {
@@ -71,13 +77,13 @@ describe('lifecycle', () => {
     ['open', '12T00:00:00'],
     ['closed', '21T00:00:00'],
   ])('a %s list can be archived, at any time, which ends it', (_, at) => {
-    const archived = archive(published(), t(at));
+    const archived = archiveList(published(), t(at));
     expect(archived.ok && lifecycleOf(archived.value, t(at))).toBe('archived');
     expect(archived.ok && archived.value.archivedAt).toEqual(t(at));
   });
 
   test('a draft cannot be archived', () => {
-    const result = archive(draft, t('01T00:00:00'));
+    const result = archiveList(draft, t('01T00:00:00'));
     expect(!result.ok && result.error.code).toBe('lists.not-published');
   });
 
@@ -209,15 +215,11 @@ describe('config', () => {
     expect(problems({ maxNominationsPerMember: null })).toEqual([]);
   });
 
-  test('allows up to 25 distinct required roles', () => {
-    const roles = (n: number) => Array.from({ length: n }, (_, i) => `r${String(i)}` as RoleId);
-    expect(problems({ requiredRoleIds: roles(25) })).toEqual([]);
-    expect(problems({ requiredRoleIds: roles(26) })).toEqual([
-      'requiredRoleIds must list at most 25 distinct roles',
-    ]);
-    expect(problems({ requiredRoleIds: ['r1' as RoleId, 'r1' as RoleId] })).toEqual([
-      'requiredRoleIds must list at most 25 distinct roles',
-    ]);
+  test('validates access roles', () => {
+    const roles = Array.from({ length: 26 }, (_, i) => `r${String(i)}` as RoleId);
+    expect(
+      problems({ access: { ...OPEN_ACCESS, view: { kind: 'roles', roleIds: roles } } }),
+    ).toEqual(['access.view must list at most 25 distinct roles']);
   });
 
   test('a seeded list does not need a nomination cap', () => {
@@ -335,22 +337,138 @@ describe('nominations window', () => {
   });
 });
 
-describe('participation', () => {
-  test('is open to every member when no roles are required', () => {
-    expect(mayParticipate(draft, [])).toBe(true);
+const member = (...roles: string[]) => ({ isAdmin: false, roleIds: roles as RoleId[] });
+const siteAdmin = (...roles: string[]) => ({ isAdmin: true, roleIds: roles as RoleId[] });
+const withAccess = (access: ListAccess, list: List = published()): List => ({
+  ...list,
+  config: { ...list.config, access },
+});
+const film: ListAccess['view'] = { kind: 'roles', roleIds: ['film' as RoleId] };
+
+describe('access', () => {
+  test('a new list is open to everyone on the server, roles or not', () => {
+    expect(LIST_DEFAULTS.access).toEqual(OPEN_ACCESS);
+    const list = published();
+    expect(mayView(list, member())).toBe(true);
+    expect(mayNominate(list, member())).toBe(true);
+    expect(mayRate(list, member())).toBe(true);
   });
 
-  test('otherwise needs any one of the required roles', () => {
-    const gated = newList(
-      'l3' as ListId,
-      { ...config, requiredRoleIds: ['r1' as RoleId, 'r2' as RoleId] },
+  test('drafts and lists being deleted exist only for site admins', () => {
+    expect(mayView(draft, member())).toBe(false);
+    expect(mayView(draft, siteAdmin())).toBe(true);
+    expect(mayView({ ...published(), deletionRequested: true }, member())).toBe(false);
+  });
+
+  test('viewing, nominating and rating follow their own roles', () => {
+    const list = withAccess({ view: EVERYONE, nominate: film, rate: EVERYONE });
+    expect(mayView(list, member())).toBe(true);
+    expect(mayNominate(list, member())).toBe(false);
+    expect(mayNominate(list, member('film'))).toBe(true);
+    expect(mayRate(list, member())).toBe(true);
+  });
+
+  test('site admins may always view, nominate and rate', () => {
+    const list = withAccess({
+      view: SITE_ADMINS_ONLY,
+      nominate: SITE_ADMINS_ONLY,
+      rate: SITE_ADMINS_ONLY,
+    });
+    expect(hiddenFromMembers(list)).toBe(true);
+    expect(mayView(list, siteAdmin())).toBe(true);
+    expect(mayNominate(list, siteAdmin())).toBe(true);
+    expect(mayRate(list, siteAdmin())).toBe(true);
+    expect(mayView(list, member('film'))).toBe(false);
+  });
+
+  test('tells a site admin what they may do only as a site admin', () => {
+    const list = withAccess({ view: film, nominate: film, rate: EVERYONE });
+    expect(viaSiteAdmin(list, siteAdmin())).toEqual(['view', 'nominate', 'rate']);
+    expect(viaSiteAdmin(list, siteAdmin('film'))).toEqual([]);
+    expect(viaSiteAdmin(list, member())).toEqual([]);
+  });
+
+  test('can change in any lifecycle, keeping everything else', () => {
+    const access: ListAccess = { view: film, nominate: film, rate: film };
+    for (const list of [draft, published(), archivedList()]) {
+      const result = changeAccess(list, access, t('21T00:00:00'));
+      expect(result.ok && result.value.config.access).toEqual(access);
+      expect(result.ok && result.value.settingsVersion).toBe((list.settingsVersion ?? 0) + 1);
+    }
+  });
+
+  test('hiding remembers who could view, so they can be restored', () => {
+    const limited = withAccess({ ...OPEN_ACCESS, view: film });
+    const hidden = changeAccess(
+      limited,
+      { ...OPEN_ACCESS, view: SITE_ADMINS_ONLY },
+      t('12T00:00:00'),
+    );
+    expect(hidden.ok && hidden.value.previousView).toEqual(film);
+    const again = hidden.ok
+      ? changeAccess(hidden.value, { ...OPEN_ACCESS, view: SITE_ADMINS_ONLY }, t('12T00:00:00'))
+      : hidden;
+    expect(again.ok && again.value.previousView).toEqual(film);
+  });
+
+  test('settles a review after a rollback', () => {
+    const flagged: List = { ...published(), accessNeedsReview: true };
+    const result = changeAccess(flagged, OPEN_ACCESS, t('12T00:00:00'));
+    expect(result.ok && result.value.accessNeedsReview).toBe(false);
+  });
+
+  test('a published list with named scores cannot gain viewers', () => {
+    const named = withAccess(
+      { ...OPEN_ACCESS, view: film },
+      { ...published(), config: { ...published().config, scoreVisibility: 'public' } },
+    );
+    const wider = changeAccess(named, OPEN_ACCESS, t('12T00:00:00'));
+    expect(!wider.ok && wider.error.code).toBe('lists.public-scores-viewers');
+    const narrower = changeAccess(
+      named,
+      { ...OPEN_ACCESS, view: SITE_ADMINS_ONLY },
+      t('12T00:00:00'),
+    );
+    expect(narrower.ok).toBe(true);
+    const asDraft = changeAccess(
+      {
+        ...draft,
+        config: {
+          ...draft.config,
+          scoreVisibility: 'public',
+          access: { ...OPEN_ACCESS, view: film },
+        },
+      },
+      OPEN_ACCESS,
       t('01T00:00:00'),
     );
-    expect(mayParticipate(gated, [])).toBe(false);
-    expect(mayParticipate(gated, ['r9' as RoleId])).toBe(false);
-    expect(mayParticipate(gated, ['r2' as RoleId])).toBe(true);
+    expect(asDraft.ok).toBe(true);
+  });
+
+  test('a published list cannot change access through a settings edit', () => {
+    const result = editList(
+      published(),
+      { access: { ...OPEN_ACCESS, rate: film } },
+      t('12T00:00:00'),
+    );
+    expect(!result.ok && result.error.details).toEqual(['access']);
+  });
+
+  test('a draft edit to access remembers hidden viewers too', () => {
+    const result = editList(
+      draft,
+      { access: { ...OPEN_ACCESS, view: SITE_ADMINS_ONLY } },
+      t('01T00:00:00'),
+    );
+    expect(result.ok && result.value.previousView).toEqual(EVERYONE);
   });
 });
+
+const archivedList = (): List => {
+  const result = archiveList(published(), t('12T00:00:00'));
+  if (!result.ok) throw new Error(result.error.code);
+  return result.value;
+};
 
 describe('closing voting', () => {
   test('ends an open list now: scores become final', () => {
@@ -370,12 +488,6 @@ describe('closing voting', () => {
   ])('is only possible while open, not %s', (_, at) => {
     const result = closeVoting(published(), t(at));
     expect(!result.ok && result.error.code).toBe('lists.not-open');
-  });
-});
-
-describe('visibility', () => {
-  test('a new list is public', () => {
-    expect(draft.visibility).toBe('public');
   });
 });
 
