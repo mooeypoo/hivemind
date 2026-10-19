@@ -27,10 +27,12 @@ export const listDto = (view: ListView): ListDto => ({
   resultsVisibility: view.resultsVisibility,
   ranking: view.ranking,
   showNominators: view.showNominators,
-  requiredRoleIds: view.requiredRoleIds,
+  access: view.access,
   scoreVisibility: view.scoreVisibility,
   lifecycle: view.lifecycle,
-  visibility: view.visibility,
+  viewers: view.viewers,
+  ...(view.previousView === undefined ? {} : { previousView: view.previousView }),
+  ...(view.accessNeedsReview === undefined ? {} : { accessNeedsReview: view.accessNeedsReview }),
   schedule: scheduleDto(view.schedule),
   ...(view.draftSchedule === undefined
     ? {}

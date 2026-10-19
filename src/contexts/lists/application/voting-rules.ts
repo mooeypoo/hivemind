@@ -7,8 +7,14 @@ import {
 } from '../../../shared/kernel/index.ts';
 import { isActiveEntry, type EntryId } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
-import { lifecycleOf, visibleTo, type ListId, type Scale } from '../domain/list.ts';
-import type { RoleId } from '../../../shared/kernel/index.ts';
+import {
+  lifecycleOf,
+  mayRate,
+  mayView,
+  type ListId,
+  type Scale,
+  type Viewer,
+} from '../domain/list.ts';
 import type { EntryRepository, ListRepository, SlugIndex } from './ports.ts';
 
 export interface VotingRules {
@@ -17,7 +23,8 @@ export interface VotingRules {
   /** Scores can be set or cleared only while the list is open. */
   readonly isOpen: boolean;
   readonly scale: Scale;
-  readonly requiredRoleIds: readonly RoleId[];
+  /** Whether this viewer may set and clear scores here, list lifecycle aside. */
+  readonly mayRate: boolean;
   /** The list's scores are public, and results (so public scores) may be shown right now. */
   readonly scoresPublic: boolean;
   /** The list's scores are public at all: voters' names are kept with their scores. */
@@ -26,18 +33,15 @@ export interface VotingRules {
 
 /**
  * What voting needs to know about a list. A service for other contexts: the calling
- * use case authorizes. Drafts and hidden lists are not found unless the viewer is an Admin.
+ * use case authorizes. Lists the viewer may not view are not found.
  */
 export const makeRulesForVoting =
   (deps: { readonly lists: ListRepository; readonly slugs: SlugIndex; readonly clock: Clock }) =>
-  async (
-    idOrSlug: string,
-    viewer: { readonly isAdmin: boolean },
-  ): Promise<Result<VotingRules, DomainError>> => {
+  async (idOrSlug: string, viewer: Viewer): Promise<Result<VotingRules, DomainError>> => {
     const byId = await deps.lists.get(idOrSlug as ListId);
     const id = byId === null ? await deps.slugs.lookup(idOrSlug) : null;
     const found = byId ?? (id === null ? null : await deps.lists.get(id));
-    if (found === null || !visibleTo(found.value, viewer.isAdmin)) return err(listsErrors.notFound);
+    if (found === null || !mayView(found.value, viewer)) return err(listsErrors.notFound);
     const list = found.value;
     if (list.deletionRequested === true) return err(listsErrors.deleting);
     if (list.entryDeletion != null) return err(listsErrors.entryDeletionBusy);
@@ -54,7 +58,7 @@ export const makeRulesForVoting =
       scoresPublic: publicScores && resultsVisible,
       namesWithScores: publicScores,
       scale: list.config.scale,
-      requiredRoleIds: list.config.requiredRoleIds,
+      mayRate: mayRate(list, viewer),
     });
   };
 

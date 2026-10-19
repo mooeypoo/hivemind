@@ -1,9 +1,16 @@
+import {
+  EVERYONE,
+  OPEN_ACCESS,
+  SITE_ADMINS_ONLY,
+  type Audience,
+  type ListAccess,
+} from '../domain/access.ts';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   startLocalBlobs,
   type LocalBlobs,
 } from '../../../shared/infrastructure/testing/local-blobs.ts';
-import type { MemberId } from '../../../shared/kernel/index.ts';
+import type { MemberId, RoleId } from '../../../shared/kernel/index.ts';
 import { activityEvent } from '../domain/activity.ts';
 import { entryIdFor, type Entry } from '../domain/entry.ts';
 import { DEFAULT_SCALE, newList, publish, type ListId } from '../domain/list.ts';
@@ -36,7 +43,7 @@ const draft = newList(
     resultsVisibility: 'after-close',
     ranking: { strategy: 'bayesian', minVotes: 2 },
     showNominators: false,
-    requiredRoleIds: [],
+    access: OPEN_ACCESS,
     scoreVisibility: 'private',
   },
   new Date('2026-03-01T00:00:00Z'),
@@ -236,6 +243,7 @@ describe('Blobs lists repositories', () => {
       id: 'old',
       config: {
         ...draft.config,
+        access: undefined,
         requiredRoleIds: undefined,
         requiredRoleId,
       },
@@ -245,9 +253,115 @@ describe('Blobs lists repositories', () => {
     });
     await store.setJSON('list/old', record('123456'));
     const repo = createBlobsListRepository(store);
-    expect((await repo.get('old' as ListId))?.value.config.requiredRoleIds).toEqual(['123456']);
+    const roles = { kind: 'roles', roleIds: ['123456'] };
+    expect((await repo.get('old' as ListId))?.value.config.access).toEqual({
+      view: EVERYONE,
+      nominate: roles,
+      rate: roles,
+    });
     await store.setJSON('list/old', record(null));
-    expect((await repo.get('old' as ListId))?.value.config.requiredRoleIds).toEqual([]);
+    expect((await repo.get('old' as ListId))?.value.config.access).toEqual(OPEN_ACCESS);
+  });
+
+  describe('access, and rolling back to a version without it', () => {
+    const film: Audience = { kind: 'roles', roleIds: ['111111' as RoleId] };
+    const stored = (record: Record<string, unknown>, config: Record<string, unknown> = {}) => ({
+      v: 2,
+      id: 'old',
+      config: { ...draft.config, access: undefined, ...config },
+      schedule: { opensAt: '2026-03-10T00:00:00.000Z', nominationsCloseAt: null, closesAt: null },
+      phase: 'published',
+      createdAt: '2026-03-01T00:00:00.000Z',
+      ...record,
+    });
+
+    test.each([
+      ['every member', {}, { requiredRoleIds: [] }, OPEN_ACCESS, null],
+      [
+        'participation by role',
+        {},
+        { requiredRoleIds: ['111111'] },
+        { view: EVERYONE, nominate: film, rate: film },
+        null,
+      ],
+      [
+        'hidden',
+        { visibility: 'hidden' },
+        { requiredRoleIds: [] },
+        { view: SITE_ADMINS_ONLY, nominate: EVERYONE, rate: EVERYONE },
+        EVERYONE,
+      ],
+    ])(
+      'a list stored before access, open to %s, keeps exactly that',
+      async (_, record, config, access, previousView) => {
+        const store = blobs.store(`lists-legacy-${_}`);
+        await store.setJSON('list/old', stored(record, config));
+        const read = (await createBlobsListRepository(store).get('old' as ListId))?.value;
+        expect(read?.config.access).toEqual(access);
+        expect(read?.previousView).toEqual(previousView);
+        expect(read?.accessNeedsReview).toBe(false);
+      },
+    );
+
+    test('also writes the old fields, never allowing more than access', async () => {
+      const store = blobs.store('lists-legacy-fields');
+      const repo = createBlobsListRepository(store);
+      const write = async (access: ListAccess) => {
+        const current = await repo.get(listId);
+        await repo.save(
+          { ...draft, config: { ...draft.config, access } },
+          current?.version ?? null,
+        );
+        return (await store.get(`list/${listId}`, { type: 'json' })) as {
+          visibility: string;
+          config: { requiredRoleIds: string[]; access: ListAccess };
+        };
+      };
+      expect(await write(OPEN_ACCESS)).toMatchObject({
+        visibility: 'public',
+        config: { requiredRoleIds: [], access: OPEN_ACCESS },
+      });
+      expect(await write({ view: EVERYONE, nominate: film, rate: EVERYONE })).toMatchObject({
+        visibility: 'public',
+        config: { requiredRoleIds: ['111111'] },
+      });
+      expect(await write({ view: film, nominate: film, rate: film })).toMatchObject({
+        visibility: 'hidden',
+        config: { requiredRoleIds: [] },
+      });
+    });
+
+    test('a list an older version changed is hidden from members for review', async () => {
+      const store = blobs.store('lists-rolled-back');
+      const access = { view: film, nominate: film, rate: film };
+      // Written by this version (hidden for older code), then made public by older code.
+      await store.setJSON(
+        'list/old',
+        stored({ visibility: 'public' }, { access, requiredRoleIds: [] }),
+      );
+      const read = (await createBlobsListRepository(store).get('old' as ListId))?.value;
+      expect(read?.config.access).toEqual({ ...access, view: SITE_ADMINS_ONLY });
+      expect(read?.previousView).toEqual(film);
+      expect(read?.accessNeedsReview).toBe(true);
+    });
+
+    test('old fields that still match access, roles in any order, need no review', async () => {
+      const store = blobs.store('lists-in-step');
+      const both: Audience = { kind: 'roles', roleIds: ['111111', '222222'] as RoleId[] };
+      await store.setJSON(
+        'list/old',
+        stored(
+          { visibility: 'public' },
+          {
+            access: { view: EVERYONE, nominate: both, rate: both },
+            requiredRoleIds: ['222222', '111111'],
+          },
+        ),
+      );
+      const read = (await createBlobsListRepository(store).get('old' as ListId))?.value;
+      expect(read?.config.access.view).toEqual(EVERYONE);
+      expect(read?.accessNeedsReview).toBe(false);
+    });
   });
 
   test('reads v2 lists stored before visibility existed, and open-ended schedules', async () => {
@@ -261,7 +375,7 @@ describe('Blobs lists repositories', () => {
       createdAt: '2026-03-01T00:00:00.000Z',
     });
     const read = (await createBlobsListRepository(store).get('old' as ListId))?.value;
-    expect(read?.visibility).toBe('public');
+    expect(read?.config.access).toEqual(OPEN_ACCESS);
     expect(read?.schedule?.closesAt).toBeNull();
     expect(read?.archivedAt).toBeNull();
   });

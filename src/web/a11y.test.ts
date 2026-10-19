@@ -79,6 +79,7 @@ const renderAt = async (
   entryState: 'deleting' | 'withdrawn' | 'set-aside' | null = null,
   activityState: 'loaded' | 'empty' | 'error' = 'loaded',
   insightsState: 'loaded' | 'empty' | 'error' | 'after-close' | 'paused' | 'zero' = 'loaded',
+  accessState: 'open' | 'review' | 'limited' = 'open',
 ) => {
   session.loaded = true;
   session.me = signedIn ? me : null;
@@ -130,7 +131,42 @@ const renderAt = async (
             ? {
                 participationPaused: true,
                 entryDeletion: { entryId: 'a', token: 'entry-a', title: 'Blade Runner' },
-                viewer: { canParticipate: false, canNominate: false, nominationsUsed: 1 },
+                viewer: {
+                  allowed: { nominate: false, rate: false },
+                  canRate: false,
+                  canNominate: false,
+                  nominationsUsed: 1,
+                  viaSiteAdmin: [],
+                },
+              }
+            : {}),
+          ...(accessState === 'review'
+            ? {
+                access: {
+                  view: { kind: 'roles', roleIds: [] },
+                  nominate: { kind: 'everyone' },
+                  rate: { kind: 'everyone' },
+                },
+                viewers: 'site-admins',
+                accessNeedsReview: true,
+                previousView: { kind: 'everyone' },
+              }
+            : {}),
+          ...(accessState === 'limited'
+            ? {
+                access: {
+                  view: { kind: 'roles', roleIds: ['900000000000000077'] },
+                  nominate: { kind: 'roles', roleIds: ['900000000000000077'] },
+                  rate: { kind: 'roles', roleIds: ['900000000000000077'] },
+                },
+                viewers: 'roles',
+                viewer: {
+                  allowed: { nominate: true, rate: true },
+                  canRate: true,
+                  canNominate: true,
+                  nominationsUsed: 0,
+                  viaSiteAdmin: ['view', 'nominate', 'rate'],
+                },
               }
             : {}),
           ...(entryState === 'withdrawn'
@@ -816,6 +852,47 @@ describe('archiving', () => {
     expect(archive).toContain('This can’t be undone.');
     expect(archive).toContain('can never be edited, reopened or un-archived');
     expect(archive).toContain('Type best-sci-fi to confirm');
+    wrapper.unmount();
+  });
+});
+
+describe('list access', () => {
+  const at = (path: string, state: 'review' | 'limited') =>
+    renderAt(path, true, false, false, false, null, false, false, null, 'loaded', 'loaded', state);
+
+  test('the access table and its change confirmation are accessible', async () => {
+    const wrapper = await at('/admin/lists/best-sci-fi', 'limited');
+    expect(document.querySelector('#editor-access table')).not.toBeNull();
+    await expectAccessible(document.body);
+    const everyone = document.querySelector<HTMLInputElement>(
+      '#editor-access input[type=checkbox]',
+    );
+    everyone?.click();
+    await flushPromises();
+    [...document.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent.trim() === 'Save access')
+      ?.click();
+    await flushPromises();
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('Save access');
+    await expectAccessible(document.body);
+    wrapper.unmount();
+  });
+
+  test('an access review notice is accessible in the editor and on the list', async () => {
+    const editor = await at('/admin/lists/best-sci-fi', 'review');
+    expect(document.querySelector('main')?.textContent).toContain('Restore previous viewers');
+    await expectAccessible(document.body);
+    editor.unmount();
+    const page = await at('/lists/best-sci-fi', 'review');
+    expect(document.querySelector('.badge--review')).not.toBeNull();
+    await expectAccessible(document.body);
+    page.unmount();
+  });
+
+  test('a site admin is told when they act only as a site admin', async () => {
+    const wrapper = await at('/lists/best-sci-fi', 'limited');
+    expect(document.querySelector('main')?.textContent).toContain('because you are a site admin');
+    await expectAccessible(document.body);
     wrapper.unmount();
   });
 });

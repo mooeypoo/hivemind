@@ -23,7 +23,6 @@ const list = (id: string, overrides: Partial<List> = {}): List => ({
   config: { ...LIST_DEFAULTS, title: id, slug: id, itemSource: { kind: 'freeform' } },
   phase: 'published',
   schedule: { opensAt: new Date('2026-01-01'), nominationsCloseAt: null, closesAt: null },
-  visibility: 'public',
   createdAt: now,
   archivedAt: null,
   ...overrides,
@@ -65,7 +64,7 @@ test('authorizes before reading any participation data', async () => {
 
 test('counts active attributed nominators, deduplicates across lists, and never exports identities', async () => {
   const one = list('one');
-  const two = list('two', { visibility: 'hidden', phase: 'draft', schedule: null });
+  const two = list('two', { phase: 'draft', schedule: null });
   const deps = await setup(one, two);
   await deps.entries.create(entry(one.id, 'a', 'same'));
   await deps.entries.create({ ...entry(one.id, 'b', 'same'), setAsideReason: 'Outside criteria' });

@@ -6,12 +6,12 @@ import {
   type DomainError,
   type Result,
 } from '../../../shared/kernel/index.ts';
-import { visibleTo } from '../domain/list.ts';
+import { mayView } from '../domain/list.ts';
 import type { EntryRepository, LedgerRepository, ListRepository } from './ports.ts';
 import { activeLedger } from './nomination-ledger.ts';
 import { toListView, type ListView } from './views.ts';
 
-/** Every list the caller may see, newest first. Drafts and hidden lists only for Admins. */
+/** Every list the caller may see, newest first. Lists they may not view aren't mentioned. */
 export const makeListLists =
   (deps: {
     readonly lists: ListRepository;
@@ -31,7 +31,7 @@ export const makeListLists =
     const used = new Map(active.map((ledger) => [ledger.listId, ledger.entryIds.length]));
     return ok(
       lists
-        .filter((list) => visibleTo(list, member.value.isAdmin))
+        .filter((list) => mayView(list, member.value))
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .map((list) => toListView(list, member.value, now, used.get(list.id) ?? 0)),
     );

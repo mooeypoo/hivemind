@@ -164,7 +164,8 @@ const revealDate = (value: string) => new Date(value).toLocaleString();
             <div class="stack">
               <p class="meta">
                 {{ lifecycleLabel[list.lifecycle]
-                }}<template v-if="list.visibility === 'hidden'"> · Hidden</template>
+                }}<template v-if="list.viewers === 'site-admins'"> · Hidden</template
+                ><template v-else-if="list.viewers === 'roles'"> · Some roles</template>
               </p>
               <h3>
                 <RouterLink :to="{ name: 'insights', query: { list: list.slug } }">{{

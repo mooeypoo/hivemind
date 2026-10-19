@@ -17,6 +17,8 @@ import ErrorNotice from './ErrorNotice.vue';
 
 const props = defineProps<{
   list: ListDetailDto;
+  /** Who may nominate, for members who may not: "the Film Club role". */
+  rolesText?: string;
   scoreState?:
     | ((entryId: string) => { value: number | null; saving: boolean; error: string | null })
     | undefined;
@@ -39,7 +41,9 @@ const inList = computed(
 /** Why the member can't nominate right now, or null if they can. */
 const blocked = computed((): string | null => {
   const { lifecycle, schedule, viewer } = props.list;
-  if (!viewer.canParticipate) return 'This list is open only to members with a particular role.';
+  if (!viewer.allowed.nominate) {
+    return `Nominating is open only to members with ${props.rolesText ?? 'a particular role'}.`;
+  }
   if (lifecycle === 'scheduled' && schedule !== null) {
     return `Nominations open ${formatDateTime(schedule.opensAt)}.`;
   }
@@ -197,10 +201,7 @@ const nominateSelected = async () => {
             </p>
           </div>
         </div>
-        <div
-          v-if="list.viewer.canParticipate && scoreState !== undefined"
-          class="just-nominated__rating"
-        >
+        <div v-if="list.viewer.canRate && scoreState !== undefined" class="just-nominated__rating">
           <div v-if="!ratingReady" class="just-nominated__loading" role="status">
             <span class="just-nominated__spinner" aria-hidden="true"></span>
             <span>Preparing rating…</span>

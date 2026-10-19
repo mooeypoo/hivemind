@@ -10,7 +10,8 @@ import {
 } from '../../../shared/kernel/index.ts';
 import { isActiveEntry } from '../domain/entry.ts';
 import { listsErrors } from '../domain/errors.ts';
-import { lifecycleOf, type Lifecycle, type Visibility } from '../domain/list.ts';
+import { lifecycleOf, type Lifecycle } from '../domain/list.ts';
+import { viewersOf, type Viewers } from './views.ts';
 import type { EntryRepository, ListRepository } from './ports.ts';
 
 interface ListSummary {
@@ -18,7 +19,7 @@ interface ListSummary {
   readonly title: string;
   readonly slug: string;
   readonly lifecycle: Lifecycle;
-  readonly visibility: Visibility;
+  readonly viewers: Viewers;
   readonly source: string;
   readonly entryMode: 'nominations' | 'seeded';
 }
@@ -76,7 +77,7 @@ export const makeParticipationScope =
             title: list.config.title,
             slug: list.config.slug,
             lifecycle,
-            visibility: list.visibility,
+            viewers: viewersOf(list),
             source: list.config.itemSource.kind,
             entryMode: list.config.entryMode,
           };

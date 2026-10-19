@@ -33,7 +33,6 @@ beforeEach(async () => {
       id: listId,
       config: { ...LIST_DEFAULTS, title: 'List', slug: 'list', itemSource: { kind: 'freeform' } },
       phase: 'published',
-      visibility: 'public',
       createdAt: deps.clock.now(),
       archivedAt: null,
       schedule: {

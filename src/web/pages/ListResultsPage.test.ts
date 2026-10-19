@@ -407,7 +407,15 @@ describe('ListResultsPage', () => {
     ['a closed list', games({ lifecycle: 'closed' }), false],
     [
       'an open list without the required role',
-      games({ viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 } }),
+      games({
+        viewer: {
+          allowed: { nominate: false, rate: false },
+          canRate: false,
+          canNominate: false,
+          nominationsUsed: 0,
+          viaSiteAdmin: [],
+        },
+      }),
       false,
     ],
   ])('offers a way back to rating on %s: %s', async (_, list, offered) => {
@@ -421,7 +429,15 @@ describe('ListResultsPage', () => {
     ['a list open for nominations', games(), true],
     [
       'a list whose nominations are closed or used up',
-      games({ viewer: { canParticipate: true, canNominate: false, nominationsUsed: 3 } }),
+      games({
+        viewer: {
+          allowed: { nominate: true, rate: true },
+          canRate: true,
+          canNominate: false,
+          nominationsUsed: 3,
+          viaSiteAdmin: [],
+        },
+      }),
       false,
     ],
     ['a seeded list', games({ entryMode: 'seeded' }), false],

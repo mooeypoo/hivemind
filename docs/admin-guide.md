@@ -145,13 +145,20 @@ in **Admin controls**. Closed and archived lists keep their settings read-only.
 
 These are independent settings:
 
-- **List visibility:** community members must sign in to view lists. Hidden lists are
-  admin-only. Drafts are always admin-only. A non-hidden published list is visible
-  before its participation opening time. Shared-link previews can show its title,
-  but never entries, member details or scores.
-- **Participation roles:** no roles selected means everyone may nominate and rate.
-  Otherwise members need any one selected role. This does not stop other members
-  viewing the list. Admin status does not bypass participation-role requirements.
+- **Who can see and take part:** a table with a column each for **View**,
+  **Nominate** and **Rate** (no Nominate column on seeded lists). Every column starts
+  at **Everyone on the server**, which includes members with no roles at all.
+  **All named roles** ticks every role named on the Roles page; members without one
+  of them are left out. A column with nothing ticked means only site admins.
+  Members need any one ticked role. Members who can't view a list never see it
+  anywhere, not even its title. **Hide from members** sets View to only site admins
+  and remembers who could view, so **Restore previous viewers** can undo it.
+  Drafts are always admin-only. A published list is visible before its participation
+  opening time to whoever can view it. Shared-link previews can show the title of a
+  list everyone on the server can view, but never entries, member details or scores.
+- **Site admins** (set by the site's configuration, not a Discord role called
+  "admin") can always view, nominate and rate, whatever the table says. The list
+  page tells you when you can act only because you are a site admin.
 - **Standings timing:** live standings are visible during voting. After-close
   standings stay hidden from everyone, including admins, until voting ends.
 - **Individual scores:** private by default. Members see their own scores; scores
@@ -184,6 +191,21 @@ Choosing after-close standings with no end date means results wait until an admi
 
 Hiding a list does **not** pause its clock.
 
+### Changing access on a published list
+
+Access can change at any time, even with entries and scores, and even after closing
+or archiving. Entries, nominations and scores stay as they are: members who lose
+access simply stop seeing or changing them, and get them back if access returns.
+Change the table, then choose **Save access**; a confirmation lists who will gain
+and who will lose access. Discord role changes reach the site when members next sign
+in, within 12 hours. A published list with named scores can't be shown to more
+people, so no one sees named scores they weren't meant to; make scores private first.
+
+If a list shows **Access needs review**, an older version of the site changed its
+access. It is hidden from members (only site admins can view it) until you choose
+access again or restore its previous viewers. The site operator can list every
+list's access with `npm run access:audit`.
+
 ## What can I edit later?
 
 | Setting                                       | After publishing                                                                                        |
@@ -195,12 +217,11 @@ Hiding a list does **not** pause its clock.
 | Score range, confirmed-rank threshold         | Fixed.                                                                                                  |
 | Standings timing                              | Fixed.                                                                                                  |
 | Show nominator names                          | Fixed.                                                                                                  |
-| Participation roles                           | Fixed.                                                                                                  |
 | Participation opening and nomination deadline | Fixed, including before a scheduled opening.                                                            |
 | Nomination limit                              | While scheduled or open, remove a finite limit entirely; no other changes.                              |
 | Voting end                                    | While scheduled or open, extend/remove a deadline or give open-ended voting a future end. No reopening. |
 | Individual-score visibility                   | Named to private only.                                                                                  |
-| List visibility                               | Change any time, including after closing or archiving.                                                  |
+| Who can view, nominate and rate               | Change any time, including after closing or archiving, with a confirmation.                             |
 
 The editor labels these policies beside the settings. Once voting closes, ordinary
 configuration edits stop. To correct an unsuitable entry, use moderation rather than
@@ -296,7 +317,7 @@ remains. Deleting a list removes its history. **Activity history is not included
 backups**: an imported copy starts with a new import event attributed to the importing
 admin, not the original list's history.
 
-The **Roles** page gives names to Discord roles for participation choices. It does
+The **Roles** page gives names to Discord roles for the access table. It does
 not grant site-admin access or assign roles in Discord. Ask the site operator about
 admin access; Discord role changes apply on the next sign-in.
 
@@ -347,8 +368,8 @@ when results are visible.
 
 ### Why can someone see the list but not rate it?
 
-Check participation roles, opening and closing times, and whether deletion cleanup
-has paused participation. Admins must meet participation-role requirements too.
+Check who can rate in **Who can see and take part**, opening and closing times, and
+whether deletion cleanup has paused participation. Site admins can always rate.
 
 ### Why did an old score return after a nomination was withdrawn?
 

@@ -8,6 +8,18 @@ import {
 } from '../../../shared/kernel/index.ts';
 import { invalidConfig, invalidSchedule, listsErrors, lockedFields } from './errors.ts';
 import type { ActivityEvent } from './activity.ts';
+import {
+  accessProblems,
+  allowedByRoles,
+  inAudience,
+  OPEN_ACCESS,
+  onlySiteAdmins,
+  sameAccess,
+  widens,
+  type AccessAction,
+  type Audience,
+  type ListAccess,
+} from './access.ts';
 
 export type ListId = Brand<string, 'ListId'>;
 
@@ -46,8 +58,8 @@ export interface ListConfig {
   readonly resultsVisibility: ResultsVisibility;
   readonly ranking: RankingConfig;
   readonly showNominators: boolean;
-  /** When non-empty, only members holding at least one of these roles may nominate and vote. */
-  readonly requiredRoleIds: readonly RoleId[];
+  /** Who may view, nominate and rate. Site admins always may. Changeable at any time. */
+  readonly access: ListAccess;
   /**
    * `private`: each member sees only their own scores. `public`: members see who gave what,
    * when results are visible. Chosen before publishing; afterwards it can only become private.
@@ -69,9 +81,6 @@ export interface Schedule {
 /** A saved plan, not publication. Null opening means "when published". */
 export type DraftSchedule = Omit<Schedule, 'opensAt'> & { readonly opensAt: Date | null };
 
-/** `hidden`: only Admins can see the list. Changeable at any time. */
-export type Visibility = 'public' | 'hidden';
-
 /** What is stored. `scheduled`, `open` and `closed` are derived from the schedule and the Clock. */
 export type Phase = 'draft' | 'published' | 'archived';
 export type Lifecycle = 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
@@ -88,7 +97,13 @@ export interface List {
   readonly createdAt: Date;
   /** When it was archived; snapshot retention counts from here. */
   readonly archivedAt: Date | null;
-  readonly visibility: Visibility;
+  /** Who could view before the list was limited to site admins, so they can be restored. */
+  readonly previousView?: Audience | null;
+  /**
+   * Set when an older version of the app changed this list's access fields: the list is
+   * limited to site admins until an Admin sets its access again.
+   */
+  readonly accessNeedsReview?: boolean;
   /** Changes on entry-write admission, fencing source edits against in-flight nominations. */
   readonly entryWriteToken?: string;
   readonly deletionRequested?: boolean;
@@ -113,12 +128,11 @@ export const LIST_DEFAULTS = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 2 },
   showNominators: true,
-  requiredRoleIds: [],
+  access: OPEN_ACCESS,
   scoreVisibility: 'private',
 } as const satisfies Partial<ListConfig>;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const MAX_REQUIRED_ROLES = 25;
 const isWhole = (value: number, min: number, max: number): boolean =>
   Number.isInteger(value) && value >= min && value <= max;
 const lengthWithin = (value: string, min: number, max: number): boolean =>
@@ -140,10 +154,7 @@ export const validateConfig = (config: ListConfig): Result<ListConfig, DomainErr
   if (config.entryMode === 'nominations' && cap !== null && !isWhole(cap, 1, 50)) {
     problems.push('maxNominationsPerMember must be a whole number from 1 to 50, or unlimited');
   }
-  const roles = config.requiredRoleIds;
-  if (roles.length > MAX_REQUIRED_ROLES || new Set(roles).size !== roles.length) {
-    problems.push(`requiredRoleIds must list at most ${String(MAX_REQUIRED_ROLES)} distinct roles`);
-  }
+  problems.push(...accessProblems(config.access));
   if (!isWhole(config.ranking.minVotes, 0, 1000)) {
     problems.push('ranking.minVotes must be a whole number from 0 to 1000');
   }
@@ -199,7 +210,8 @@ export const newList = (id: ListId, config: ListConfig, now: Date): List => ({
   phase: 'draft',
   createdAt: now,
   archivedAt: null,
-  visibility: 'public',
+  previousView: null,
+  accessNeedsReview: false,
 });
 
 export const lifecycleOf = (list: List, now: Date): Lifecycle => {
@@ -283,6 +295,7 @@ export const editList = (
         const current = list.config[field as keyof ListConfig];
         const removesCap =
           field === 'maxNominationsPerMember' && current !== null && value === null;
+        if (field === 'access') return !sameAccess(value as ListAccess, list.config.access);
         const changesUnusedSource =
           field === 'itemSource' &&
           list.config.entryMode === 'nominations' &&
@@ -315,15 +328,16 @@ export const editList = (
   }
 
   const config = validateConfig({ ...list.config, ...configEdit });
-  return config.ok
-    ? ok({
-        ...list,
-        settingsVersion: (list.settingsVersion ?? 0) + 1,
-        config: config.value,
-        schedule,
-        ...(draftSchedule === undefined ? {} : { draftSchedule }),
-      })
-    : config;
+  if (!config.ok) return config;
+  const accessChanged = !sameAccess(config.value.access, list.config.access);
+  return ok({
+    ...list,
+    settingsVersion: (list.settingsVersion ?? 0) + 1,
+    config: config.value,
+    schedule,
+    ...(draftSchedule === undefined ? {} : { draftSchedule }),
+    ...(accessChanged ? accessChangeEffects(list, config.value.access) : {}),
+  });
 };
 
 /** Nominations: the list is open, it is not seeded, and `nominationsCloseAt` has not passed. */
@@ -332,10 +346,48 @@ export const nominationsOpen = (list: List, now: Date): boolean =>
   lifecycleOf(list, now) === 'open' &&
   (list.schedule?.nominationsCloseAt == null || now < list.schedule.nominationsCloseAt);
 
-/** Everyone, unless the list requires roles; then any one of them. */
-export const mayParticipate = (list: List, roleIds: readonly RoleId[]): boolean =>
-  list.config.requiredRoleIds.length === 0 ||
-  list.config.requiredRoleIds.some((role) => roleIds.includes(role));
+/** Who is asking, as far as access goes. */
+export interface Viewer {
+  readonly isAdmin: boolean;
+  readonly roleIds: readonly RoleId[];
+}
+
+/** What this viewer may do on the list. Site admins may always do everything. */
+export const allowedFor = (list: List, viewer: Viewer): Record<AccessAction, boolean> =>
+  viewer.isAdmin
+    ? { view: true, nominate: true, rate: true }
+    : allowedByRoles(list.config.access, viewer.roleIds);
+
+/**
+ * The actions a site admin may take here only because they are a site admin: their roles alone
+ * would not allow them. Lets the UI say so, rather than imply members like them can too.
+ */
+export const viaSiteAdmin = (list: List, viewer: Viewer): readonly AccessAction[] => {
+  if (!viewer.isAdmin) return [];
+  const byRoles = allowedByRoles(list.config.access, viewer.roleIds);
+  return (['view', 'nominate', 'rate'] as const).filter(
+    (action) =>
+      !byRoles[action] && (action !== 'nominate' || list.config.entryMode === 'nominations'),
+  );
+};
+
+/**
+ * Whether this viewer may see the list at all. Drafts, lists being deleted and lists whose
+ * viewers don't include them don't exist for them; site admins see everything.
+ */
+export const mayView = (list: List, viewer: Viewer): boolean =>
+  viewer.isAdmin ||
+  (list.deletionRequested !== true &&
+    list.phase !== 'draft' &&
+    inAudience(list.config.access.view, viewer.roleIds));
+
+export const mayNominate = (list: List, viewer: Viewer): boolean =>
+  allowedFor(list, viewer).nominate;
+
+export const mayRate = (list: List, viewer: Viewer): boolean => allowedFor(list, viewer).rate;
+
+/** Members other than site admins can't see the list. */
+export const hiddenFromMembers = (list: List): boolean => onlySiteAdmins(list.config.access.view);
 
 /** Whether a member who has used this many nominations may make another. */
 export const underNominationCap = (list: List, used: number): boolean =>
@@ -358,17 +410,46 @@ export const changeScoreVisibility = (
         config: { ...list.config, scoreVisibility },
       });
 
-/** Hidden lists exist only for Admins. */
-export const setVisibility = (list: List, visibility: Visibility): List => ({
-  ...list,
-  settingsVersion: (list.settingsVersion ?? 0) + 1,
-  visibility,
-});
+/**
+ * Changes who may view, nominate and rate, in any lifecycle. Existing entries and scores stay.
+ * Named public scores were given for the audience at the time, so once published a list with
+ * public scores can't gain viewers: make its scores private first.
+ */
+export const changeAccess = (
+  list: List,
+  access: ListAccess,
+  now: Date,
+): Result<List, DomainError> => {
+  const problems = accessProblems(access);
+  if (problems.length > 0) return err(invalidConfig(problems));
+  const current = list.config.access;
+  if (
+    list.config.scoreVisibility === 'public' &&
+    lifecycleOf(list, now) !== 'draft' &&
+    widens(current.view, access.view)
+  ) {
+    return err(listsErrors.publicScoresViewers);
+  }
+  return ok({
+    ...list,
+    settingsVersion: (list.settingsVersion ?? 0) + 1,
+    config: { ...list.config, access },
+    ...accessChangeEffects(list, access),
+  });
+};
 
-/** Whether this member may see the list at all: drafts and hidden lists are Admin-only. */
-export const visibleTo = (list: List, isAdmin: boolean): boolean =>
-  isAdmin ||
-  (list.deletionRequested !== true && list.phase !== 'draft' && list.visibility === 'public');
+/** Hiding remembers who could view, and any change settles a review after a rollback. */
+const accessChangeEffects = (
+  list: List,
+  access: ListAccess,
+): Pick<List, 'previousView' | 'accessNeedsReview'> => {
+  const current = list.config.access.view;
+  const hiding = onlySiteAdmins(access.view) && !onlySiteAdmins(current);
+  return {
+    previousView: hiding ? current : (list.previousView ?? null),
+    accessNeedsReview: false,
+  };
+};
 
 /** When retention starts for an archived list. Lists archived before `archivedAt` existed use their close. */
 export const archivedSince = (list: List): Date | null =>

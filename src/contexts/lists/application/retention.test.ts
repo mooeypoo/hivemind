@@ -1,3 +1,4 @@
+import { OPEN_ACCESS } from '../domain/access.ts';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { MemberId } from '../../../shared/kernel/index.ts';
 import { FixedClock } from '../../../shared/kernel/testing/index.ts';
@@ -42,7 +43,7 @@ const listOf = (id: string, archived: boolean): List => {
       resultsVisibility: 'live',
       ranking: { strategy: 'bayesian', minVotes: 0 },
       showNominators: true,
-      requiredRoleIds: [],
+      access: OPEN_ACCESS,
       scoreVisibility: 'private',
     },
     new Date('2026-01-01T00:00:00Z'),

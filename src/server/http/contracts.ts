@@ -58,7 +58,7 @@ export type ListInsightDto = {
   readonly title: string;
   readonly slug: string;
   readonly lifecycle: Lifecycle;
-  readonly visibility: Visibility;
+  readonly viewers: Viewers;
   readonly source: string;
   readonly entryMode: 'nominations' | 'seeded';
 } & (
@@ -139,8 +139,8 @@ export interface ListConfigDto {
   readonly resultsVisibility: 'live' | 'after-close';
   readonly ranking: { readonly strategy: 'bayesian'; readonly minVotes: number };
   readonly showNominators: boolean;
-  /** Empty: every member may take part. Otherwise, holders of any of these Discord role IDs. */
-  readonly requiredRoleIds: readonly string[];
+  /** Who may view, nominate and rate. Site admins always may, whatever this says. */
+  readonly access: ListAccessDto;
   /**
    * `public`: members see who gave what score, when results are visible. Set before publishing;
    * afterwards it can only become private.
@@ -161,8 +161,24 @@ export interface ScheduleDto {
 /** Draft-only plan. Null opening means "when published"; no participation starts on save. */
 export type DraftScheduleDto = Omit<ScheduleDto, 'opensAt'> & { readonly opensAt: string | null };
 
-/** `hidden`: only Admins can see the list. */
-export type Visibility = 'public' | 'hidden';
+/**
+ * `everyone`: every member of the Discord server, with or without roles. `roles`: members
+ * holding any of these Discord role IDs; with none, only site admins.
+ */
+export type AudienceDto =
+  { readonly kind: 'everyone' } | { readonly kind: 'roles'; readonly roleIds: readonly string[] };
+
+/** Nominating and rating also need viewing. Seeded lists ignore `nominate`. */
+export interface ListAccessDto {
+  readonly view: AudienceDto;
+  readonly nominate: AudienceDto;
+  readonly rate: AudienceDto;
+}
+
+export type AccessActionDto = keyof ListAccessDto;
+
+/** Who may view, at a glance. `site-admins`: hidden from members. */
+export type Viewers = 'everyone' | 'roles' | 'site-admins';
 
 export interface ListDto extends ListConfigDto {
   /** Admin-only, null for older lists or after attribution expires/erasure. */
@@ -178,11 +194,23 @@ export interface ListDto extends ListConfigDto {
   readonly lifecycle: Lifecycle;
   readonly schedule: ScheduleDto | null;
   readonly draftSchedule?: DraftScheduleDto | null;
-  readonly visibility: Visibility;
+  readonly viewers: Viewers;
+  /** Admin-only: who could view before the list was hidden from members. */
+  readonly previousView?: AudienceDto | null;
+  /**
+   * Admin-only: an older version of the app changed this list's access, so it was hidden from
+   * members until an Admin reviews who may view, nominate and rate.
+   */
+  readonly accessNeedsReview?: boolean;
   readonly viewer: {
-    readonly canParticipate: boolean;
+    /** What the list's access allows the caller, whatever its lifecycle. */
+    readonly allowed: { readonly nominate: boolean; readonly rate: boolean };
+    /** Allowed to rate, and the list isn't paused; the lifecycle still decides if it is open. */
+    readonly canRate: boolean;
     readonly canNominate: boolean;
     readonly nominationsUsed: number;
+    /** What a site admin may do here only because they are a site admin. */
+    readonly viaSiteAdmin: readonly AccessActionDto[];
   };
 }
 
@@ -235,6 +263,7 @@ export interface ListActivityDto {
       | 'archived'
       | 'voting-closed'
       | 'visibility-changed'
+      | 'access-changed'
       | 'score-privacy-changed'
       | 'entry-set-aside'
       | 'entry-returned'
@@ -289,9 +318,9 @@ export type EditListRequest = Partial<ListConfigDto> & {
   readonly closesAt?: string | null;
 };
 
-/** `PUT /api/lists/:list/visibility` body. */
-export interface SetVisibilityRequest {
-  readonly visibility: Visibility;
+/** `PUT /api/lists/:list/access` body. Any lifecycle; the list's entries and scores stay. */
+export interface ChangeAccessRequest {
+  readonly access: ListAccessDto;
   readonly expectedSettingsVersion?: number;
 }
 

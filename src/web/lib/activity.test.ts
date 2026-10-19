@@ -20,5 +20,12 @@ test('structured activity settings are rendered in plain language', () => {
   expect(activityValue('ranking', '{"strategy":"bayesian","minVotes":5}')).toBe('5');
   expect(activityValue('requiredRoleIds', '[]')).toBe('All members');
   expect(activityValue('visibility', 'hidden')).toBe('Admins only');
+  expect(
+    activityValue(
+      'access',
+      '{"view":{"kind":"everyone"},"nominate":{"kind":"roles","roleIds":[]},"rate":{"kind":"roles","roleIds":["77"]}}',
+      [{ roleId: '77', name: 'Film Club' }],
+    ),
+  ).toBe('View: Everyone on the server · Nominate: Only site admins · Rate: Film Club');
   expect(activityValue('itemSource', '{"kind":"freeform"}')).toBe('Free text');
 });

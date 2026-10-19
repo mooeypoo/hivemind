@@ -36,7 +36,7 @@ export {
   withdrawNomination,
   scheduleList,
   searchForList,
-  setVisibility,
+  changeAccess,
   setScoreVisibility,
   setEntryAside,
 } from './http/endpoints/lists.ts';

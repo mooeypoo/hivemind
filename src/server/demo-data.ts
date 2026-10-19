@@ -33,7 +33,11 @@ export const ensureDemoData = async (app: App): Promise<void> => {
     resultsVisibility: 'live',
     ranking: { strategy: 'bayesian', minVotes: 3 },
     showNominators: true,
-    requiredRoleIds: [],
+    access: {
+      view: { kind: 'everyone' },
+      nominate: { kind: 'everyone' },
+      rate: { kind: 'everyone' },
+    },
     scoreVisibility: 'public',
   });
   if (!games.ok) return; // Another demo sign-in created the samples at the same moment.
@@ -89,7 +93,11 @@ export const ensureDemoData = async (app: App): Promise<void> => {
       resultsVisibility: 'after-close',
       ranking: { strategy: 'bayesian', minVotes: 2 },
       showNominators: false,
-      requiredRoleIds: [],
+      access: {
+        view: { kind: 'everyone' },
+        nominate: { kind: 'everyone' },
+        rate: { kind: 'everyone' },
+      },
       scoreVisibility: 'private',
     });
     if (albums.ok)
@@ -109,7 +117,11 @@ export const ensureDemoData = async (app: App): Promise<void> => {
       resultsVisibility: 'live',
       ranking: { strategy: 'bayesian', minVotes: 3 },
       showNominators: true,
-      requiredRoleIds: [],
+      access: {
+        view: { kind: 'everyone' },
+        nominate: { kind: 'everyone' },
+        rate: { kind: 'everyone' },
+      },
       scoreVisibility: 'private',
     });
     if (movies.ok)

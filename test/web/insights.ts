@@ -28,7 +28,7 @@ export const insightsFixture = (
     title: 'The Greatest Science-Fiction Films Of All Time, Ranked Together',
     slug: 'films',
     lifecycle: 'open',
-    visibility: 'public',
+    viewers: 'everyone',
     source: 'freeform',
     entryMode: 'nominations',
   } as const;
@@ -56,7 +56,7 @@ export const insightsFixture = (
           id: 'list-2',
           title: 'A surprise for closing night',
           slug: 'surprise',
-          visibility: 'hidden',
+          viewers: 'site-admins',
           status: 'after-close',
           revealsAt: null,
         };

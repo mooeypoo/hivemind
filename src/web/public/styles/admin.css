@@ -560,3 +560,128 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Access table: who can view, nominate and rate. Rows are audiences, columns are actions. */
+
+.access-table__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.access-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.access-table th,
+.access-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.access-table thead th {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.access-table thead th:not(:first-child),
+.access-table td {
+  width: 4.5rem;
+  text-align: center;
+}
+
+.access-table tbody th {
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.access-table tbody th .meta {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+.access-table__everyone th,
+.access-table__everyone td {
+  background: var(--accent-soft);
+}
+
+.access-table__all th,
+.access-table__all td {
+  border-bottom-width: 2px;
+}
+
+.access-table__cell {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.access-table__cell input {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.access-table__always {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.access-table__result {
+  display: grid;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.access-table__result > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+}
+
+.access-table__result dt {
+  font-weight: 600;
+}
+
+.access-table__result dt::after {
+  content: ':';
+}
+
+.access-table__result dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 40rem) {
+  .access-table thead th:not(:first-child),
+  .access-table td {
+    width: 6.5rem;
+  }
+}
+
+@media (max-width: 39.99rem) {
+  .access-table th,
+  .access-table td {
+    padding: 0.35rem 0.3rem;
+  }
+
+  .access-table thead th:not(:first-child),
+  .access-table td {
+    width: 3.25rem;
+  }
+}

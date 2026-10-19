@@ -33,6 +33,12 @@ const sourceUrl = import.meta.env.VITE_SOURCE_URL;
       voting closes, but not after the list is archived.
     </p>
     <p>
+      Each list can limit who sees it, who nominates and who rates to members with particular
+      Discord roles. Most lists are open to everyone on the server. If a list is limited, the list
+      page says what you can do there. Role changes in Discord reach this site the next time you
+      sign in.
+    </p>
+    <p>
       Scores are private unless a list says they are public. Public lists explain this before you
       vote, and show who gave each score when results are visible. Admins can make public scores
       private later, but can’t make a published private list public.

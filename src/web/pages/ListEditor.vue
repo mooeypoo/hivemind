@@ -2,11 +2,13 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type {
+  ChangeAccessRequest,
   CreateListRequest,
   DraftScheduleDto,
   DeleteListRequest,
   ItemSourceKind,
   ListDetailDto,
+  ListAccessDto,
   ListDto,
   PresetImportedDto,
   RefreshMovieDetailsDto,
@@ -15,6 +17,7 @@ import type {
   SourcesDto,
 } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
+import AccessTable from '../components/AccessTable.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ListActivity from '../components/ListActivity.vue';
 import AppDialog from '../components/ui/AppDialog.vue';
@@ -30,6 +33,17 @@ import { usePageTitle } from '../lib/page-title.ts';
 import { site } from '../state/site.ts';
 import { adminGuideUrl } from '../lib/navigation.ts';
 import { compareListSettings } from '../lib/list-settings.ts';
+import {
+  ONLY_SITE_ADMINS,
+  OPEN_ACCESS,
+  accessActions,
+  accessChanges,
+  accessSummary,
+  describeAudience,
+  onlySiteAdmins,
+  roleIdsOf,
+  sameAccess,
+} from '../lib/access.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -57,9 +71,8 @@ interface Form {
   scoreVisibility: 'private' | 'public';
   minVotes: number;
   showNominators: boolean;
-  /** Role IDs as typed: separated by commas, spaces or new lines. */
-  /** Ticked role IDs; none means every member may take part. */
-  requiredRoleIds: string[];
+  /** Who may view, nominate and rate. On published lists it is saved on its own. */
+  access: ListAccessDto;
   /** `datetime-local` values, in the Admin's time zone. */
   /** `now`: opens when published. */
   opensMode: 'now' | 'at';
@@ -87,7 +100,7 @@ const form = reactive<Form>({
   scoreVisibility: 'private',
   minVotes: 2,
   showNominators: true,
-  requiredRoleIds: [],
+  access: { ...OPEN_ACCESS },
   opensMode: 'now',
   opensAt: '',
   nominationsCloseAt: '',
@@ -155,7 +168,12 @@ const roleLabels = ref<readonly RoleLabelDto[]>([]);
 /** Named roles, plus any role a list already requires that has no name yet, so nothing is lost. */
 const roleChoices = computed(() => {
   const named = new Set(roleLabels.value.map((label) => label.roleId));
-  const unnamed = form.requiredRoleIds
+  const used = new Set(
+    [form.access, existing.value?.access ?? OPEN_ACCESS].flatMap((access) =>
+      accessActions.flatMap((action) => roleIdsOf(access[action])),
+    ),
+  );
+  const unnamed = [...used]
     .filter((roleId) => !named.has(roleId))
     .map((roleId) => ({ roleId, name: `Unnamed role (${roleId})` }));
   return [...roleLabels.value, ...unnamed];
@@ -208,7 +226,7 @@ const fillFrom = (list: ListDto) => {
     scoreVisibility: list.scoreVisibility,
     minVotes: list.ranking.minVotes,
     showNominators: list.showNominators,
-    requiredRoleIds: [...list.requiredRoleIds],
+    access: list.access,
     opensMode: dates?.opensAt == null ? 'now' : 'at',
     opensAt: dates?.opensAt == null ? '' : toLocalInput(dates.opensAt),
     nominationsCloseAt:
@@ -371,7 +389,7 @@ const config = (sourceKind: ItemSourceKind): CreateListRequest => ({
   scoreVisibility: form.scoreVisibility,
   ranking: { strategy: 'bayesian', minVotes: form.minVotes },
   showNominators: form.showNominators,
-  requiredRoleIds: form.requiredRoleIds,
+  access: form.access,
 });
 
 const setupProblem = (): string | null => {
@@ -406,7 +424,7 @@ const setupProblem = (): string | null => {
       form.maxNominationsPerMember > 50)
   )
     return 'Choose 1-50 nominations per member, or unlimited.';
-  if (form.requiredRoleIds.length > 25) return 'Choose no more than 25 participation roles.';
+  if (accessProblem.value !== null) return accessProblem.value;
   return null;
 };
 
@@ -519,13 +537,11 @@ const reviewDate = (value: string) => {
   const iso = fromLocalInput(value);
   return iso === null ? 'Not set' : formatDateTime(iso);
 };
-const participationSummary = computed(() =>
-  form.requiredRoleIds.length === 0
-    ? 'All community members'
-    : `Members with any of: ${roleChoices.value
-        .filter((role) => form.requiredRoleIds.includes(role.roleId))
-        .map((role) => role.name)
-        .join(', ')}`,
+const seeded = computed(() => form.entryMode === 'seeded');
+const accessProblem = computed(() =>
+  accessActions.some((action) => roleIdsOf(form.access[action]).length > 25)
+    ? 'Choose no more than 25 roles for each of view, nominate and rate.'
+    : null,
 );
 
 const expectation = () =>
@@ -592,6 +608,7 @@ const resolveSettingsConflict = (keepInput: boolean) => {
       endMode: form.endMode,
       closesAt: form.closesAt,
       unlimitedNominations: form.unlimitedNominations,
+      access: form.access,
       ...(latest.itemSourceEditable
         ? { sourceKind: form.sourceKind, presetId: form.presetId, presetCount: form.presetCount }
         : {}),
@@ -719,9 +736,9 @@ const schedule = async () => {
   }
 };
 
-const confirming = ref<'close' | 'archive' | 'private-scores' | 'delete' | 'remove-cap' | null>(
-  null,
-);
+const confirming = ref<
+  'close' | 'archive' | 'private-scores' | 'delete' | 'remove-cap' | 'access' | null
+>(null);
 
 const deleteList = async () => {
   const list = existing.value;
@@ -764,20 +781,64 @@ const closeVotingNow = async () => {
   if (list !== null) await afterSave(list);
 };
 
-const changeVisibility = async (visibility: 'public' | 'hidden') => {
+/** Published lists: access is saved on its own, after the Admin confirms who gains or loses it. */
+const accessDirty = computed(
+  () =>
+    existing.value !== null &&
+    locked.value &&
+    !sameAccess(existing.value.access, form.access, seeded.value),
+);
+const pendingAccessChanges = computed(() =>
+  existing.value === null
+    ? []
+    : accessChanges(existing.value.access, form.access, roleChoices.value, seeded.value),
+);
+/** Named scores never reach more people after publishing. */
+const accessWidensNamedScores = computed(
+  () =>
+    existing.value?.scoreVisibility === 'public' &&
+    pendingAccessChanges.value.some(
+      (change) => change.action === 'view' && change.kind === 'gains',
+    ),
+);
+const reviewAccess = () => {
+  if (existing.value === null || busy.value || settingsConflict.value) return;
+  if (accessProblem.value !== null) {
+    error.value = null;
+    status.value = accessProblem.value;
+    return;
+  }
+  if (pendingAccessChanges.value.length === 0) {
+    void saveAccess();
+    return;
+  }
+  confirming.value = 'access';
+};
+const saveAccess = async () => {
   if (existing.value === null || busy.value || settingsConflict.value) return;
   const id = existing.value.id;
+  const request: ChangeAccessRequest = { access: form.access, ...expectation() };
   const list = await run(
-    () => api.put<ListDto>(`/api/lists/${id}/visibility`, { visibility, ...expectation() }),
-    visibility === 'hidden'
-      ? 'Hidden: only Admins can see it now.'
-      : 'Public: all members can see it.',
+    () => api.put<ListDto>(`/api/lists/${encodeURIComponent(id)}/access`, request),
+    'Access saved.',
   );
+  confirming.value = null;
   if (list !== null) {
     existing.value = list;
     baseSettingsVersion.value = list.settingsVersion;
+    form.access = list.access;
     cacheForm();
   }
+};
+const hideFromMembers = () => {
+  form.access = { ...form.access, view: ONLY_SITE_ADMINS };
+};
+const restoreViewers = () => {
+  const previous = existing.value?.previousView;
+  if (previous != null) form.access = { ...form.access, view: previous };
+};
+const resetAccess = () => {
+  if (existing.value !== null) form.access = existing.value.access;
 };
 
 const makeScoresPrivate = async () => {
@@ -861,7 +922,8 @@ const importCsv = async () => {
       <StatusBadge
         v-if="existing !== null"
         :lifecycle="existing.lifecycle"
-        :hidden="existing.visibility === 'hidden'"
+        :viewers="existing.viewers"
+        :review="existing.accessNeedsReview === true"
       />
     </header>
 
@@ -949,7 +1011,7 @@ const importCsv = async () => {
                   {{
                     latestSettings.lifecycle === 'draft'
                       ? 'Current saved draft — not published'
-                      : latestSettings.visibility === 'hidden'
+                      : latestSettings.viewers === 'site-admins'
                         ? 'Current saved version — hidden from members'
                         : 'This is the version members see now.'
                   }}
@@ -1008,8 +1070,8 @@ const importCsv = async () => {
       are blocked; retry deletion below to finish cleanup and release its address.
     </p>
     <p v-if="locked && !finished" class="notice">
-      This list is published, so its settings are fixed. You can still change the description and
-      when voting ends (later, or not at all).<template
+      This list is published, so its settings are fixed. You can still change the description, when
+      voting ends (later, or not at all), and who can see and take part.<template
         v-if="existing?.entryMode === 'nominations' && existing.maxNominationsPerMember !== null"
       >
         You can also remove its nomination cap, but you can’t add one back.</template
@@ -1019,10 +1081,11 @@ const importCsv = async () => {
       </template>
     </p>
     <p v-if="existing?.lifecycle === 'closed' && !deleting" class="notice">
-      Voting has closed, so the list can’t be edited. You can still hide it or archive it below.
+      Voting has closed, so the list can’t be edited. You can still change who can see it, or
+      archive it below.
     </p>
     <p v-if="existing?.lifecycle === 'archived' && !deleting" class="notice">
-      This list is archived: read-only, with its final results. You can still hide it.
+      This list is archived: read-only, with its final results. You can still change who can see it.
     </p>
     <p v-if="snapshotsExpireAt !== null" class="notice">
       Movie details in this archived list will be removed on
@@ -1039,7 +1102,7 @@ const importCsv = async () => {
       <a href="#editor-items">Items</a>
       <a href="#editor-rating">Rating</a>
       <a href="#editor-scores">Scores</a>
-      <a href="#editor-roles">Who can take part</a>
+      <a href="#editor-access">Who can see and take part</a>
       <a v-if="form.entryMode === 'nominations'" href="#editor-nominations">Nominations</a>
       <a v-if="locked" href="#editor-schedule">Schedule</a>
       <a v-if="existing !== null && existing.lifecycle !== 'draft'" href="#status-heading">
@@ -1349,31 +1412,85 @@ const importCsv = async () => {
             </p>
           </fieldset>
         </FixedSettings>
-        <FixedSettings :fixed="locked" label="Who can take part">
-          <fieldset id="editor-roles" class="card stack" :disabled="locked">
-            <legend>Who can take part</legend>
-            <p class="meta"><span class="pill">Fixed when published</span> Participation roles.</p>
-            <p id="roles-hint" class="meta">
-              Leave every role unticked to let all members take part. Otherwise, members need at
-              least one of the ticked roles.
+        <fieldset id="editor-access" class="card stack">
+          <legend>Who can see and take part</legend>
+          <p class="meta">
+            <span class="pill">Editable any time</span>
+            Choose who can view this list<template v-if="form.entryMode === 'nominations'"
+              >, nominate items</template
+            >
+            and rate. Entries, nominations and scores stay as they are when this changes.
+          </p>
+          <p v-if="existing?.accessNeedsReview === true" class="notice notice--error" role="alert">
+            <strong>Access needs review.</strong> An older version of this site changed who can
+            access this list, so it was hidden from members to be safe.
+            <template v-if="existing.previousView != null">
+              Before that, {{ describeAudience(existing.previousView, roleChoices) }} could view it.
+            </template>
+            Check each column, then save.
+          </p>
+          <AccessTable
+            v-model="form.access"
+            :roles="roleChoices"
+            :seeded="form.entryMode === 'seeded'"
+            :disabled="busy || deleting"
+            id-prefix="editor-access"
+          />
+          <p class="meta">
+            Role not listed?
+            <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
+            back. Discord role changes reach this site when members next sign in, within 12 hours.
+          </p>
+          <div class="actions">
+            <button
+              v-if="!onlySiteAdmins(form.access.view)"
+              type="button"
+              class="button"
+              :disabled="busy"
+              @click="hideFromMembers"
+            >
+              Hide from members
+            </button>
+            <button
+              v-else-if="existing?.previousView != null"
+              type="button"
+              class="button"
+              :disabled="busy"
+              @click="restoreViewers"
+            >
+              Restore previous viewers:
+              {{ describeAudience(existing.previousView, roleChoices) }}
+            </button>
+          </div>
+          <div v-if="locked" class="stack" aria-live="polite">
+            <p v-if="accessWidensNamedScores" class="notice notice--error">
+              Scores on this list are named, so it can’t be shown to more people. Make scores
+              private first, or keep the current viewers.
             </p>
-            <p class="meta">
-              Roles restrict nominating and rating, not viewing. Other signed-in community members
-              can still see a published list unless it is hidden.
-            </p>
-            <div v-if="roleChoices.length > 0" class="choices" aria-describedby="roles-hint">
-              <label v-for="role in roleChoices" :key="role.roleId" class="choice">
-                <input v-model="form.requiredRoleIds" type="checkbox" :value="role.roleId" />
-                {{ role.name }}
-              </label>
+            <div class="actions">
+              <button
+                type="button"
+                class="button button--primary"
+                :disabled="
+                  busy || settingsConflict || !accessDirty || accessWidensNamedScores || deleting
+                "
+                data-save-access
+                @click="reviewAccess"
+              >
+                Save access
+              </button>
+              <button
+                v-if="accessDirty"
+                type="button"
+                class="button button--quiet"
+                :disabled="busy"
+                @click="resetAccess"
+              >
+                Undo access changes
+              </button>
             </div>
-            <p class="meta">
-              Role not listed?
-              <RouterLink :to="{ name: 'roles' }">Name it on the Roles page</RouterLink>, then come
-              back.
-            </p>
-          </fieldset>
-        </FixedSettings>
+          </div>
+        </fieldset>
         <FixedSettings
           v-if="form.entryMode === 'nominations'"
           :fixed="locked && (finished || existing?.maxNominationsPerMember === null)"
@@ -1613,38 +1730,22 @@ const importCsv = async () => {
           }}
         </button>
       </div>
-      <fieldset class="stack" :disabled="busy || settingsConflict">
-        <legend class="legend--small">Who can see this list</legend>
-        <div class="choices">
-          <label class="choice">
-            <input
-              type="radio"
-              name="visibility"
-              value="public"
-              :checked="existing.visibility === 'public'"
-              :disabled="busy"
-              @change="changeVisibility('public')"
-            />
-            Community members: sign-in required
-          </label>
-          <label class="choice">
-            <input
-              type="radio"
-              name="visibility"
-              value="hidden"
-              :checked="existing.visibility === 'hidden'"
-              :disabled="busy"
-              @change="changeVisibility('hidden')"
-            />
-            Hidden: only Admins can see it
-          </label>
-        </div>
+      <div class="stack">
         <p class="meta">
-          <span class="pill">Editable any time</span>
-          Hiding keeps every nomination and score; show it again any time. Hiding does not pause the
-          schedule. Shared-link previews may show a non-hidden published list's title.
+          <strong>Who can see and take part</strong>
+          <template
+            v-for="line in accessSummary(
+              existing.access,
+              roleChoices,
+              existing.entryMode === 'seeded',
+            )"
+            :key="line"
+          >
+            <br />{{ line }}
+          </template>
         </p>
-      </fieldset>
+        <a href="#editor-access" class="button button--quiet">Change access</a>
+      </div>
       <p v-if="site.info?.backups === true" class="meta">
         <a :href="`/api/admin/backup?list=${encodeURIComponent(existing.id)}`" download>
           Download a backup of this list
@@ -1780,16 +1881,19 @@ const importCsv = async () => {
               <div>
                 <dt>Who can view</dt>
                 <dd>
-                  {{
-                    existing?.visibility === 'hidden'
-                      ? 'Only admins (hidden list)'
-                      : 'Signed-in community members, from publication—even before participation opens'
-                  }}
+                  {{ describeAudience(form.access.view, roleChoices)
+                  }}<template v-if="!onlySiteAdmins(form.access.view)"
+                    >, from publication—even before participation opens</template
+                  >
                 </dd>
               </div>
+              <div v-if="form.entryMode === 'nominations'">
+                <dt>Who can nominate</dt>
+                <dd>{{ describeAudience(form.access.nominate, roleChoices) }}</dd>
+              </div>
               <div>
-                <dt>Who can take part</dt>
-                <dd>{{ participationSummary }}</dd>
+                <dt>Who can rate</dt>
+                <dd>{{ describeAudience(form.access.rate, roleChoices) }}</dd>
               </div>
             </dl>
           </section>
@@ -1811,7 +1915,7 @@ const importCsv = async () => {
               <dt>Fixed on publishing—not when voting starts</dt>
               <dd>
                 Title, address, nomination mode, rating rules, standings timing, nominator names,
-                participation roles, opening time and nomination deadline.
+                opening time and nomination deadline.
               </dd>
             </div>
             <div>
@@ -1826,8 +1930,8 @@ const importCsv = async () => {
               <dd>
                 While active: edit the description, extend voting, remove its end date or give
                 open-ended voting a future deadline, and remove a nomination limit (never restore
-                it). Make named scores private, but never the reverse. Change list visibility any
-                time.
+                it). Make named scores private, but never the reverse. Change who can view, nominate
+                and rate at any time, even after voting ends.
               </dd>
             </div>
           </dl>
@@ -1901,6 +2005,7 @@ const importCsv = async () => {
       v-if="ready && existing !== null && !deleting"
       :list-id="existing.id"
       :settings-version="existing.settingsVersion"
+      :roles="roleChoices"
     />
 
     <section v-if="ready && existing !== null" class="card stack" aria-labelledby="danger-heading">
@@ -1970,6 +2075,25 @@ const importCsv = async () => {
       <p>
         <strong>Voting cannot be reopened.</strong> Admin corrections and permanent entry deletion
         can still change standings.
+      </p>
+    </ConfirmDialog>
+    <ConfirmDialog
+      :open="confirming === 'access'"
+      title="Change who can access this list?"
+      confirm-label="Save access"
+      :busy="busy"
+      @confirm="saveAccess"
+      @cancel="confirming = null"
+    >
+      <ul class="stack">
+        <li v-for="change in pendingAccessChanges" :key="`${change.action}-${change.kind}`">
+          <strong>{{ change.kind === 'gains' ? 'Gains access' : 'Loses access' }}:</strong>
+          {{ change.text }}
+        </li>
+      </ul>
+      <p class="meta">
+        This applies straight away. Members’ Discord roles are checked when they sign in, so a role
+        given or removed in Discord can take up to 12 hours to count here.
       </p>
     </ConfirmDialog>
     <ConfirmDialog

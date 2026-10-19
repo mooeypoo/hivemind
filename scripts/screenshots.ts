@@ -57,10 +57,20 @@ const base: Omit<ListDto, 'id' | 'title' | 'slug' | 'description' | 'lifecycle'>
   scoreVisibility: 'private',
   ranking: { strategy: 'bayesian', minVotes: 3 },
   showNominators: true,
-  requiredRoleIds: [],
-  visibility: 'public',
+  access: {
+    view: { kind: 'everyone' },
+    nominate: { kind: 'everyone' },
+    rate: { kind: 'everyone' },
+  },
+  viewers: 'everyone',
   schedule: { opensAt: at(-5 * day), nominationsCloseAt: at(4 * day), closesAt: at(12 * day) },
-  viewer: { canParticipate: true, canNominate: true, nominationsUsed: 2 },
+  viewer: {
+    allowed: { nominate: true, rate: true },
+    canRate: true,
+    canNominate: true,
+    nominationsUsed: 2,
+    viaSiteAdmin: [],
+  },
 };
 const list: ListDetailDto = {
   ...base,

@@ -3,7 +3,8 @@ export interface ListSummary {
   readonly title: string;
   readonly slug: string;
   readonly lifecycle: 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
-  readonly visibility: 'public' | 'hidden';
+  /** Who may view: every member, members with certain roles, or only site admins. */
+  readonly viewers: 'everyone' | 'roles' | 'site-admins';
   readonly source: string;
   readonly entryMode: 'nominations' | 'seeded';
 }

@@ -27,12 +27,18 @@ import {
   getListActivity,
   nominate,
   scheduleList,
-  setVisibility,
+  changeAccess,
   withdrawNomination,
   setEntryAside,
 } from './lists.ts';
 import { deleteMyData } from './me.ts';
 import { changeScore, getMyBallot } from './voting.ts';
+
+const OPEN_ACCESS = {
+  view: { kind: 'everyone' },
+  nominate: { kind: 'everyone' },
+  rate: { kind: 'everyone' },
+} as const;
 
 type Endpoint = (request: Request, app: App) => Promise<Response>;
 
@@ -167,11 +173,8 @@ describe('backups', () => {
       'Outside the criteria',
     );
     expect(
-      (
-        await call(setVisibility, 'PUT', '/api/lists/games-2/visibility', admin, {
-          visibility: 'public',
-        })
-      ).status,
+      (await call(changeAccess, 'PUT', '/api/lists/games-2/access', admin, { access: OPEN_ACCESS }))
+        .status,
     ).toBe(200);
     const ballot = await call<BallotDto>(getMyBallot, 'GET', '/api/lists/games-2/ballot', ada);
     expect(ballot.status).toBe(200);
@@ -195,9 +198,7 @@ describe('backups', () => {
       title: 'Root',
     });
     expect(restored.body.id).toBe(root.id);
-    await call(setVisibility, 'PUT', '/api/lists/games-2/visibility', admin, {
-      visibility: 'public',
-    });
+    await call(changeAccess, 'PUT', '/api/lists/games-2/access', admin, { access: OPEN_ACCESS });
     const ballot = await call<BallotDto>(getMyBallot, 'GET', '/api/lists/games-2/ballot', ada);
     expect(ballot.body.scores[root.id]).toBe(9);
   });

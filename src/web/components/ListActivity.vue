@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { ListActivityDto } from '../../server/http/contracts.ts';
+import type { ListActivityDto, RoleLabelDto } from '../../server/http/contracts.ts';
 import { api, type ApiError } from '../services/api.ts';
 import ActivityEvent from './ActivityEvent.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
-const props = defineProps<{ listId: string; settingsVersion: number | undefined }>();
+const props = defineProps<{
+  listId: string;
+  settingsVersion: number | undefined;
+  roles?: readonly RoleLabelDto[] | undefined;
+}>();
 const open = ref(false);
 const busy = ref(false);
 const events = ref<ListActivityDto['events']>([]);
@@ -72,7 +76,7 @@ watch(
       </p>
       <ol v-if="events.length > 0" class="activity__timeline">
         <li v-for="event in events.slice(0, count)" :key="event.id" class="activity__event stack">
-          <ActivityEvent :event="event" />
+          <ActivityEvent :event="event" :roles="roles" />
         </li>
       </ol>
       <button v-if="events.length > count" type="button" class="button" @click="count += 20">

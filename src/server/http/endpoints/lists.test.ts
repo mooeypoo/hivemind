@@ -43,12 +43,23 @@ import {
   scheduleList,
   searchForList,
   setScoreVisibility,
-  setVisibility,
+  changeAccess,
 } from './lists.ts';
 import { deleteMyData, exportMyData } from './me.ts';
 import { changeScore, getMyBallot, getPublicScores } from './voting.ts';
 import { getLeaderboard } from './ranking.ts';
 import { exportBackup, importBackup } from './backup.ts';
+
+const OPEN_ACCESS = {
+  view: { kind: 'everyone' },
+  nominate: { kind: 'everyone' },
+  rate: { kind: 'everyone' },
+} as const;
+const HIDDEN_ACCESS = {
+  view: { kind: 'roles', roleIds: [] },
+  nominate: { kind: 'everyone' },
+  rate: { kind: 'everyone' },
+} as const;
 
 type Endpoint = (request: Request, app: App) => Promise<Response>;
 
@@ -277,7 +288,18 @@ describe('shared draft schedules', () => {
     expect((await call<ListDto>(getList, 'GET', path, ada)).body.settingsVersion).toBeUndefined();
     for (const [endpoint, method, suffix, body] of [
       [editList, 'PUT', '', { description: 'Stale' }],
-      [setVisibility, 'PUT', '/visibility', { visibility: 'hidden' }],
+      [
+        changeAccess,
+        'PUT',
+        '/access',
+        {
+          access: {
+            view: { kind: 'roles', roleIds: [] },
+            nominate: { kind: 'everyone' },
+            rate: { kind: 'everyone' },
+          },
+        },
+      ],
       [setScoreVisibility, 'PUT', '/score-visibility', { scoreVisibility: 'private' }],
       [closeVoting, 'POST', '/close', {}],
       [archiveList, 'POST', '/archive', {}],
@@ -555,11 +577,11 @@ describe('an IGDB game list, end to end', () => {
       200,
     );
     const copy = await call<ListDetailDto>(getList, 'GET', '/api/lists/best-games-2', admin);
-    expect(copy.body.visibility).toBe('hidden');
+    expect(copy.body.viewers).toBe('site-admins');
     expect(copy.body.itemSource).toEqual({ kind: 'igdb-game' });
     expect(copy.body.entries[0]?.item).toEqual(nominated.body.item);
-    await call(setVisibility, 'PUT', '/api/lists/best-games-2/visibility', admin, {
-      visibility: 'public',
+    await call(changeAccess, 'PUT', '/api/lists/best-games-2/access', admin, {
+      access: OPEN_ACCESS,
     });
     const ballot = await call<BallotDto>(getMyBallot, 'GET', '/api/lists/best-games-2/ballot', ada);
     expect(ballot.status).toBe(200);
@@ -646,7 +668,7 @@ describe('a TVDB series list, end to end', () => {
       200,
     );
     const copy = await call<ListDetailDto>(getList, 'GET', '/api/lists/best-tv-2', admin);
-    expect(copy.body.visibility).toBe('hidden');
+    expect(copy.body.viewers).toBe('site-admins');
     expect(copy.body.entries[0]?.item).toEqual(nominated.body.item);
   });
 });
@@ -729,9 +751,11 @@ describe('a TMDB movie list, end to end', () => {
       detail.body.entries.map((entry) => [entry.item.title, entry.nominatedBy, entry.isMine]),
     ).toEqual([['Blade Runner', 'ada', false]]);
     expect(detail.body.viewer).toEqual({
-      canParticipate: true,
+      allowed: { nominate: true, rate: true },
+      canRate: true,
       canNominate: true,
       nominationsUsed: 0,
+      viaSiteAdmin: [],
     });
   });
 });
@@ -970,18 +994,30 @@ describe('preset lists', () => {
 });
 
 describe('list settings', () => {
-  test('accepts unlimited nominations and several required roles', async () => {
+  test('accepts unlimited nominations and access by several roles', async () => {
+    const club = { kind: 'roles', roleIds: ['900000000000000077', '900000000000000078'] };
+    const access = { view: { kind: 'everyone' }, nominate: club, rate: club };
     const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
       title: 'Club picks',
       slug: 'club',
       itemSource: { kind: 'freeform' },
       maxNominationsPerMember: null,
-      requiredRoleIds: ['900000000000000077', '900000000000000078'],
+      access,
     });
     expect(created.body).toMatchObject({
       maxNominationsPerMember: null,
-      requiredRoleIds: ['900000000000000077', '900000000000000078'],
+      access,
+      viewers: 'everyone',
     });
+  });
+
+  test('lists are open to everyone on the server unless told otherwise', async () => {
+    const created = await call<ListDto>(createList, 'POST', '/api/lists', admin, {
+      title: 'Open picks',
+      slug: 'open',
+      itemSource: { kind: 'freeform' },
+    });
+    expect(created.body.access).toEqual(OPEN_ACCESS);
   });
 
   test('role IDs must be Discord IDs, not role names', async () => {
@@ -989,10 +1025,10 @@ describe('list settings', () => {
       title: 'Club picks',
       slug: 'club',
       itemSource: { kind: 'freeform' },
-      requiredRoleIds: ['Moderators'],
+      access: { ...OPEN_ACCESS, rate: { kind: 'roles', roleIds: ['Moderators'] } },
     });
     expect(result.status).toBe(422);
-    expect(result.body.error.details).toEqual(['requiredRoleIds.0: must be a Discord role ID']);
+    expect(result.body.error.details).toEqual(['access.rate.roleIds.0: must be a Discord role ID']);
   });
 
   test('public scores are selected on a draft and can only be disabled after publishing', async () => {
@@ -1181,27 +1217,16 @@ describe('open-ended lists, closing voting and visibility', () => {
 
   test('a hidden list is not found for members until it is public again', async () => {
     await openList({ title: 'Secret', slug: 'secret', itemSource: { kind: 'freeform' } });
-    const hidden = await call<ListDto>(
-      setVisibility,
-      'PUT',
-      '/api/lists/secret/visibility',
-      admin,
-      {
-        visibility: 'hidden',
-      },
-    );
-    expect(hidden.body.visibility).toBe('hidden');
+    const hidden = await call<ListDto>(changeAccess, 'PUT', '/api/lists/secret/access', admin, {
+      access: HIDDEN_ACCESS,
+    });
+    expect(hidden.body.viewers).toBe('site-admins');
     expect((await call(getList, 'GET', '/api/lists/secret', ada)).status).toBe(404);
     expect(
-      (
-        await call(setVisibility, 'PUT', '/api/lists/secret/visibility', ada, {
-          visibility: 'public',
-        })
-      ).status,
+      (await call(changeAccess, 'PUT', '/api/lists/secret/access', ada, { access: OPEN_ACCESS }))
+        .status,
     ).toBe(403);
-    await call(setVisibility, 'PUT', '/api/lists/secret/visibility', admin, {
-      visibility: 'public',
-    });
+    await call(changeAccess, 'PUT', '/api/lists/secret/access', admin, { access: OPEN_ACCESS });
     expect((await call(getList, 'GET', '/api/lists/secret', ada)).status).toBe(200);
   });
 });

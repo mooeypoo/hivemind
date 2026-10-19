@@ -312,7 +312,13 @@ describe('NominatePanel', () => {
       props: {
         list: openTmdbList({
           maxNominationsPerMember: null,
-          viewer: { canParticipate: true, canNominate: true, nominationsUsed: 7 },
+          viewer: {
+            allowed: { nominate: true, rate: true },
+            canRate: true,
+            canNominate: true,
+            nominationsUsed: 7,
+            viaSiteAdmin: [],
+          },
         }),
       },
     });
@@ -324,18 +330,42 @@ describe('NominatePanel', () => {
   test.each([
     [
       'the cap is reached',
-      { viewer: { canParticipate: true, canNominate: false, nominationsUsed: 3 } },
+      {
+        viewer: {
+          allowed: { nominate: true, rate: true },
+          canRate: true,
+          canNominate: false,
+          nominationsUsed: 3,
+          viaSiteAdmin: [],
+        },
+      },
       'You’ve used all 3 of your nominations.',
     ],
     ['the list is not open yet', { lifecycle: 'scheduled' as const }, 'Nominations open'],
     [
       'a role is required',
-      { viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 } },
+      {
+        viewer: {
+          allowed: { nominate: false, rate: false },
+          canRate: false,
+          canNominate: false,
+          nominationsUsed: 0,
+          viaSiteAdmin: [],
+        },
+      },
       'open only to members with a particular role',
     ],
     [
       'nominations have closed',
-      { viewer: { canParticipate: true, canNominate: false, nominationsUsed: 1 } },
+      {
+        viewer: {
+          allowed: { nominate: true, rate: true },
+          canRate: true,
+          canNominate: false,
+          nominationsUsed: 1,
+          viaSiteAdmin: [],
+        },
+      },
       'Nominations are closed',
     ],
   ])('explains why you cannot nominate when %s', (_, overrides, text) => {

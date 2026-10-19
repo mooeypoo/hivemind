@@ -14,7 +14,9 @@ import { makeGetListActivity, makeGetAdminActivity, makeAnonymiseActivity } from
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
 import { makeArchiveList } from './archive-list.ts';
-import { makeCloseVoting, makeSetVisibility } from './close-voting.ts';
+import { makeCloseVoting } from './close-voting.ts';
+import { makeChangeAccess } from './change-access.ts';
+import { OPEN_ACCESS, SITE_ADMINS_ONLY } from '../domain/access.ts';
 import { makeSetScoreVisibility } from './score-visibility.ts';
 import { makeScheduleList } from './schedule-list.ts';
 import { makeNominate } from './nominate.ts';
@@ -28,6 +30,8 @@ import {
   makeWithEntryDeletion,
 } from './delete-entry.ts';
 import { makePrepareListDeletion, makeFinishListDeletion } from './delete-list.ts';
+
+const hiddenAccess = { ...OPEN_ACCESS, view: SITE_ADMINS_ONLY };
 
 const admin: MemberActor = {
   kind: 'member',
@@ -79,7 +83,7 @@ test('combined activity authorizes before reading and includes draft, hidden and
     itemSource: { kind: 'freeform' },
   });
   if (!hidden.ok) throw new Error('fixture');
-  await makeSetVisibility(deps)(admin, { list: hidden.value.id, visibility: 'hidden' });
+  await makeChangeAccess(deps)(admin, { list: hidden.value.id, access: hiddenAccess });
   await makeScheduleList(deps)(admin, {
     list: hidden.value.id,
     schedule: { opensAt: deps.clock.now(), nominationsCloseAt: null, closesAt: null },
@@ -294,7 +298,7 @@ test('list status and score privacy actions retain named, structured decisions',
     (await makeEditList(deps)(admin, { list: id, edit: { scoreVisibility: 'public' } })).ok,
   ).toBe(true);
   await entries();
-  expect((await makeSetVisibility(deps)(admin, { list: id, visibility: 'hidden' })).ok).toBe(true);
+  expect((await makeChangeAccess(deps)(admin, { list: id, access: hiddenAccess })).ok).toBe(true);
   expect(
     (await makeSetScoreVisibility(deps)(admin, { list: id, scoreVisibility: 'private' })).ok,
   ).toBe(true);
@@ -306,7 +310,7 @@ test('list status and score privacy actions retain named, structured decisions',
       'created',
       'settings-edited',
       'published',
-      'visibility-changed',
+      'access-changed',
       'score-privacy-changed',
       'voting-closed',
       'archived',

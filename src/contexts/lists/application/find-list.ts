@@ -6,7 +6,7 @@ import {
   type Result,
 } from '../../../shared/kernel/index.ts';
 import { listsErrors } from '../domain/errors.ts';
-import { visibleTo, type List, type ListId } from '../domain/list.ts';
+import { mayView, type List, type ListId } from '../domain/list.ts';
 import type { ListRepository, SlugIndex, Versioned } from './ports.ts';
 
 export interface FindListDeps {
@@ -15,8 +15,8 @@ export interface FindListDeps {
 }
 
 /**
- * Finds a list by id or slug, as the caller may see it: drafts and hidden lists exist only for
- * Admins. Everyone else gets not-found, so they do not leak.
+ * Finds a list by id or slug, as the caller may see it: drafts, and lists whose viewers don't
+ * include the caller, exist only for site admins. Everyone else gets not-found, so they do not leak.
  */
 export const findList = async (
   deps: FindListDeps,
@@ -27,7 +27,7 @@ export const findList = async (
   const byId = await deps.lists.get(idOrSlug as ListId);
   const found = byId ?? (await findBySlug(deps, idOrSlug));
   if (found === null) return err(listsErrors.notFound);
-  if (!visibleTo(found.value, actor.isAdmin)) return err(listsErrors.notFound);
+  if (!mayView(found.value, actor)) return err(listsErrors.notFound);
   if (found.value.deletionRequested === true && options.allowDeleting !== true) {
     return err(listsErrors.deleting);
   }

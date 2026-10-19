@@ -16,7 +16,11 @@ const remaining = computed(() =>
 <template>
   <article class="list-card" :class="`list-card--${list.lifecycle}`">
     <header class="list-card__header">
-      <StatusBadge :lifecycle="list.lifecycle" :hidden="list.visibility === 'hidden'" />
+      <StatusBadge
+        :lifecycle="list.lifecycle"
+        :viewers="list.viewers"
+        :review="list.accessNeedsReview === true"
+      />
       <span class="list-card__source">{{ sourceLabel[list.itemSource.kind] }}</span>
     </header>
     <h3 class="list-card__title">

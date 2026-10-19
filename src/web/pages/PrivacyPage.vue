@@ -117,13 +117,13 @@ const siteName = import.meta.env.VITE_SITE_NAME;
       still attributed to you. Losing admin access does not erase your earlier attribution.
     </p>
     <p>
-      Events record which fields changed and old/new structured choices, including dates and
-      participation-role IDs. They never copy old or new titles, addresses, descriptions or
-      moderation explanations, and never record scores or request bodies. Entry titles shown
-      alongside events come from the current entry, not a history snapshot. Entry deletion removes
-      its identifying history and leaves only a generic deletion event; list deletion removes all
-      its activity. History is excluded from list backups; an imported list starts with a new import
-      event naming the importing admin.
+      Events record which fields changed and old/new structured choices, including dates and the
+      role IDs chosen for who can view, nominate and rate. They never copy old or new titles,
+      addresses, descriptions or moderation explanations, and never record scores or request bodies.
+      Entry titles shown alongside events come from the current entry, not a history snapshot. Entry
+      deletion removes its identifying history and leaves only a generic deletion event; list
+      deletion removes all its activity. History is excluded from list backups; an imported list
+      starts with a new import event naming the importing admin.
     </p>
     <h2>Withdrawing a nomination</h2>
     <p>
@@ -171,10 +171,10 @@ const siteName = import.meta.env.VITE_SITE_NAME;
 
     <h2>Shared links</h2>
     <p>
-      Link previews can show the site and community names and the title of a published list. Draft
-      and hidden list titles are not included. Entries, nominations, scores and member details are
-      never included in these previews. Viewing a list still requires sign-in. Social platforms may
-      keep a preview after a list is hidden.
+      Link previews can show the site and community names and the title of a published list. Titles
+      of drafts and of lists limited to some roles are not included. Entries, nominations, scores
+      and member details are never included in these previews. Viewing a list still requires
+      sign-in. Social platforms may keep a preview after a list is limited or hidden.
     </p>
 
     <h2>Cookies and browser storage</h2>

@@ -1,3 +1,10 @@
+import {
+  EVERYONE,
+  OPEN_ACCESS,
+  SITE_ADMINS_ONLY,
+  type Audience,
+  type ListAccess,
+} from '../domain/access.ts';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { anonymous, type Actor, type MemberId, type RoleId } from '../../../shared/kernel/index.ts';
 import { FixedClock, SequentialIds } from '../../../shared/kernel/testing/index.ts';
@@ -12,7 +19,8 @@ import {
 } from '../infrastructure/testing/in-memory-lists.ts';
 import { makeArchiveList } from './archive-list.ts';
 import { makeExportForBackup, makeRestoreFromBackup } from './backup.ts';
-import { makeCloseVoting, makeSetVisibility } from './close-voting.ts';
+import { makeCloseVoting } from './close-voting.ts';
+import { makeChangeAccess } from './change-access.ts';
 import { makeSetScoreVisibility } from './score-visibility.ts';
 import { makeCreateList } from './create-list.ts';
 import { makeEditList } from './edit-list.ts';
@@ -35,6 +43,12 @@ const actor = (id: string, opts: { admin?: boolean; roles?: string[] } = {}): Ac
   isAdmin: opts.admin ?? false,
 });
 const admin = actor('admin', { admin: true });
+const roles = (...ids: string[]): Audience => ({ kind: 'roles', roleIds: ids as RoleId[] });
+/** The access lists had before per-action access: one set of roles for taking part. */
+const participation = (...ids: string[]): { access: ListAccess } => ({
+  access: { view: EVERYONE, nominate: roles(...ids), rate: roles(...ids) },
+});
+const hiddenAccess: ListAccess = { ...OPEN_ACCESS, view: SITE_ADMINS_ONLY };
 const ada = actor('ada');
 const bob = actor('bob');
 
@@ -49,7 +63,7 @@ const config: ListConfig = {
   resultsVisibility: 'live',
   ranking: { strategy: 'bayesian', minVotes: 3 },
   showNominators: true,
-  requiredRoleIds: [],
+  access: OPEN_ACCESS,
   scoreVisibility: 'private',
 };
 const at = (day: number) => new Date(Date.UTC(2026, 2, day));
@@ -231,9 +245,9 @@ describe('creating and editing', () => {
     expect(view.value.settingsVersion).toBe(1);
     expect(
       (
-        await makeSetVisibility(deps)(admin, {
+        await makeChangeAccess(deps)(admin, {
           list: view.value.id,
-          visibility: 'hidden',
+          access: hiddenAccess,
           expectedSettingsVersion: 1,
         })
       ).ok,
@@ -242,13 +256,13 @@ describe('creating and editing', () => {
     const results = await Promise.all([
       makeCloseVoting(deps)(admin, stale),
       makeArchiveList(deps)(admin, stale),
-      makeSetVisibility(deps)(admin, { ...stale, visibility: 'public' }),
+      makeChangeAccess(deps)(admin, { ...stale, access: OPEN_ACCESS }),
       makeSetScoreVisibility(deps)(admin, { ...stale, scoreVisibility: 'private' }),
     ]);
     expect(results.map((result) => !result.ok && result.error.code)).toEqual(
       Array(4).fill('lists.settings-changed'),
     );
-    await makeSetVisibility(deps)(admin, { list: stale.list, visibility: 'public' });
+    await makeChangeAccess(deps)(admin, { list: stale.list, access: OPEN_ACCESS });
     const memberView = await makeGetList(deps)(ada, { list: stale.list });
     expect(memberView.ok && memberView.value.settingsVersion).toBeUndefined();
   });
@@ -474,9 +488,9 @@ describe('creating and editing', () => {
     const list = await openList();
     const archived = await makeArchiveList(deps)(admin, { list: list.id });
     expect(archived.ok && archived.value.lifecycle).toBe('archived');
-    const rules = await makeRulesForVoting(deps)(list.id, { isAdmin: false });
+    const rules = await makeRulesForVoting(deps)(list.id, { isAdmin: false, roleIds: [] });
     expect(rules.ok && rules.value.isOpen).toBe(false);
-    const ranking = await makeRankingContext(deps)(list.id, { isAdmin: false });
+    const ranking = await makeRankingContext(deps)(list.id, { isAdmin: false, roleIds: [] });
     expect(ranking.ok && ranking.value.votingEnded).toBe(true);
   });
 });
@@ -492,7 +506,12 @@ describe('visibility', () => {
     const expected = { title: config.title, slug: config.slug };
     expect(await preview({ list: config.slug })).toEqual(expected);
     expect(await preview({ list: created.value.id })).toEqual(expected);
-    await makeSetVisibility(deps)(admin, { list: created.value.id, visibility: 'hidden' });
+    await makeChangeAccess(deps)(admin, {
+      list: created.value.id,
+      access: { ...OPEN_ACCESS, view: roles('r-film') },
+    });
+    expect(await preview({ list: config.slug })).toBeNull();
+    await makeChangeAccess(deps)(admin, { list: created.value.id, access: hiddenAccess });
     expect(await preview({ list: config.slug })).toBeNull();
     expect(await preview({ list: created.value.id })).toBeNull();
     const detail = await makeGetList(deps)(anonymous, { list: config.slug });
@@ -551,7 +570,7 @@ describe('nominating', () => {
   );
 
   test('withdrawal is refused after archiving and does not require a participation role', async () => {
-    const list = await openList({ requiredRoleIds: ['r-film' as RoleId] });
+    const list = await openList(participation('r-film'));
     await nominate(actor('ada', { roles: ['r-film'] }), '78');
     expect((await withdraw(ada)).ok).toBe(true);
     await nominate(actor('ada', { roles: ['r-film'] }), '78');
@@ -708,9 +727,11 @@ describe('nominating', () => {
     }
     const detail = await makeGetList(deps)(ada, { list: 'best-sci-fi' });
     expect(detail.ok && detail.value.viewer).toEqual({
-      canParticipate: true,
+      allowed: { nominate: true, rate: true },
+      canRate: true,
       canNominate: true,
       nominationsUsed: 4,
+      viaSiteAdmin: [],
     });
   });
 
@@ -721,7 +742,7 @@ describe('nominating', () => {
   });
 
   test('a list with a required role is closed to members without it', async () => {
-    await openList({ requiredRoleIds: ['r-film' as RoleId] });
+    await openList(participation('r-film'));
     const denied = await nominate(ada, '78');
     expect(!denied.ok && denied.error.code).toBe('lists.role-required');
     expect((await nominate(actor('cy', { roles: ['r-film'] }), '78')).ok).toBe(true);
@@ -844,29 +865,33 @@ describe('personal data', () => {
 });
 
 describe('services for voting', () => {
-  test('report the scale, required roles and whether the list is open', async () => {
-    const list = await openList({ scale: { min: 0, max: 5 }, requiredRoleIds: ['r1' as RoleId] });
+  test('report the scale, whether this viewer may rate and whether the list is open', async () => {
+    const list = await openList({ scale: { min: 0, max: 5 }, ...participation('r1') });
     const rules = makeRulesForVoting(deps);
-    expect(await rules('best-sci-fi', { isAdmin: false })).toEqual({
+    expect(await rules('best-sci-fi', { isAdmin: false, roleIds: [] })).toEqual({
       ok: true,
       value: {
         listId: list.id,
         writeRevision: null,
         isOpen: true,
         scale: { min: 0, max: 5 },
-        requiredRoleIds: ['r1'],
+        mayRate: false,
         scoresPublic: false,
         namesWithScores: false,
       },
     });
+    const rater = await rules(list.id, { isAdmin: false, roleIds: ['r1' as RoleId] });
+    expect(rater.ok && rater.value.mayRate).toBe(true);
+    const siteAdmin = await rules(list.id, { isAdmin: true, roleIds: [] });
+    expect(siteAdmin.ok && siteAdmin.value.mayRate).toBe(true);
     clock.set(at(20));
-    const closed = await rules(list.id, { isAdmin: false });
+    const closed = await rules(list.id, { isAdmin: false, roleIds: [] });
     expect(closed.ok && closed.value.isOpen).toBe(false);
   });
 
   test('treat drafts as not found', async () => {
     await create();
-    const result = await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false });
+    const result = await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false, roleIds: [] });
     expect(!result.ok && result.error.code).toBe('lists.not-found');
   });
 
@@ -883,7 +908,7 @@ describe('services for ranking', () => {
   test('report visibility, close time, strategy and current entry ids', async () => {
     const list = await openList({ resultsVisibility: 'after-close' });
     await nominate(ada, '78');
-    expect(await makeRankingContext(deps)('best-sci-fi', { isAdmin: false })).toEqual({
+    expect(await makeRankingContext(deps)('best-sci-fi', { isAdmin: false, roleIds: [] })).toEqual({
       ok: true,
       value: {
         listId: list.id,
@@ -910,20 +935,23 @@ describe('open-ended lists and closing voting', () => {
     await scheduleIt(created.value.id, { ...schedule, closesAt: null });
     clock.set(new Date('2030-01-01T00:00:00Z'));
     expect((await nominate(ada, '78')).ok).toBe(false); // nominations closed on day 15
-    const rules = await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false });
+    const rules = await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false, roleIds: [] });
     expect(rules.ok && rules.value.isOpen).toBe(true);
 
     expect((await makeCloseVoting(deps)(ada, { list: 'best-sci-fi' })).ok).toBe(false);
     const closed = await makeCloseVoting(deps)(admin, { list: 'best-sci-fi' });
     expect(closed.ok && closed.value.lifecycle).toBe('closed');
-    const ranking = await makeRankingContext(deps)('best-sci-fi', { isAdmin: false });
+    const ranking = await makeRankingContext(deps)('best-sci-fi', { isAdmin: false, roleIds: [] });
     expect(ranking.ok && ranking.value.votingEnded).toBe(true);
   });
 });
 
 describe('hidden lists', () => {
-  const hide = (visibility: 'public' | 'hidden') =>
-    makeSetVisibility(deps)(admin, { list: 'best-sci-fi', visibility });
+  const hide = (visibility: 'public' | 'hidden', by: Actor = admin) =>
+    makeChangeAccess(deps)(by, {
+      list: 'best-sci-fi',
+      access: visibility === 'hidden' ? hiddenAccess : OPEN_ACCESS,
+    });
 
   test('exist only for Admins, everywhere', async () => {
     await openList();
@@ -936,27 +964,124 @@ describe('hidden lists', () => {
       await makeGetList(deps)(ada, { list: 'best-sci-fi' }),
       await nominate(ada, '603'),
       await makeSearchForList(deps)(ada, { list: 'best-sci-fi', query: 'the' }),
-      await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false }),
-      await makeRankingContext(deps)('best-sci-fi', { isAdmin: false }),
+      await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false, roleIds: [] }),
+      await makeRankingContext(deps)('best-sci-fi', { isAdmin: false, roleIds: [] }),
     ]) {
       expect(!result.ok && result.error.code).toBe('lists.not-found');
     }
 
     const adminView = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
-    expect(adminView.ok && adminView.value.visibility).toBe('hidden');
+    expect(adminView.ok && adminView.value.viewers).toBe('site-admins');
+    expect(adminView.ok && adminView.value.previousView).toEqual(EVERYONE);
     expect(adminView.ok && adminView.value.entries).toHaveLength(1);
   });
 
   test('can be made public again, and only by Admins, even when archived', async () => {
     const list = await openList();
     await makeArchiveList(deps)(admin, { list: list.id });
-    expect((await makeSetVisibility(deps)(ada, { list: list.id, visibility: 'hidden' })).ok).toBe(
-      false,
-    );
+    expect((await hide('hidden', ada)).ok).toBe(false);
     expect((await hide('hidden')).ok).toBe(true);
     const shown = await hide('public');
-    expect(shown.ok && shown.value.visibility).toBe('public');
+    expect(shown.ok && shown.value.viewers).toBe('everyone');
     expect((await makeGetList(deps)(ada, { list: 'best-sci-fi' })).ok).toBe(true);
+  });
+});
+
+describe('access', () => {
+  const film = actor('film', { roles: ['r-film'] });
+  const critic = actor('critic', { roles: ['r-critic'] });
+  const change = (access: ListAccess, by: Actor = admin) =>
+    makeChangeAccess(deps)(by, { list: 'best-sci-fi', access });
+
+  test('a list limited to roles does not exist for anyone else', async () => {
+    await openList({ access: { view: roles('r-film'), nominate: EVERYONE, rate: EVERYONE } });
+    expect(await makeListLists(deps)(ada)).toEqual({ ok: true, value: [] });
+    for (const result of [
+      await makeGetList(deps)(ada, { list: 'best-sci-fi' }),
+      await nominate(ada, '603'),
+      await makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false, roleIds: [] }),
+      await makeRankingContext(deps)('best-sci-fi', { isAdmin: false, roleIds: [] }),
+    ]) {
+      expect(!result.ok && result.error.code).toBe('lists.not-found');
+    }
+    const seen = await makeGetList(deps)(film, { list: 'best-sci-fi' });
+    expect(seen.ok && seen.value.viewers).toBe('roles');
+    expect((await nominate(film, '78')).ok).toBe(true);
+  });
+
+  test('viewing, nominating and rating are separate, and taking part needs viewing', async () => {
+    await openList({
+      access: {
+        view: roles('r-film', 'r-critic'),
+        nominate: roles('r-film'),
+        rate: roles('r-critic', 'r-other'),
+      },
+    });
+    const viewerOf = async (who: Actor) => {
+      const detail = await makeGetList(deps)(who, { list: 'best-sci-fi' });
+      if (!detail.ok) throw new Error('fixture');
+      return detail.value.viewer;
+    };
+    expect(await viewerOf(film)).toMatchObject({ allowed: { nominate: true, rate: false } });
+    expect(await viewerOf(critic)).toMatchObject({ allowed: { nominate: false, rate: true } });
+    const denied = await nominate(critic, '78');
+    expect(!denied.ok && denied.error.code).toBe('lists.role-required');
+    // Can rate, but can't view: the list does not exist for them.
+    const other = await makeRulesForVoting(deps)('best-sci-fi', {
+      isAdmin: false,
+      roleIds: ['r-other' as RoleId],
+    });
+    expect(!other.ok && other.error.code).toBe('lists.not-found');
+  });
+
+  test('site admins may do everything, and are told when only as site admins', async () => {
+    await openList({
+      access: { view: roles('r-film'), nominate: roles('r-film'), rate: EVERYONE },
+    });
+    const detail = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
+    expect(detail.ok && detail.value.viewer).toMatchObject({
+      allowed: { nominate: true, rate: true },
+      viaSiteAdmin: ['view', 'nominate', 'rate'],
+    });
+    expect((await nominate(admin, '78')).ok).toBe(true);
+    const member = await makeGetList(deps)(film, { list: 'best-sci-fi' });
+    expect(member.ok && member.value.viewer.viaSiteAdmin).toEqual([]);
+    expect(member.ok && 'previousView' in member.value).toBe(false);
+  });
+
+  test('changes at any time, by Admins only, keeping entries', async () => {
+    const list = await openList();
+    await nominate(ada, '78');
+    const limited: ListAccess = {
+      view: roles('r-film'),
+      nominate: roles('r-film'),
+      rate: roles('r-film'),
+    };
+    expect((await change(limited, ada)).ok).toBe(false);
+    expect((await change(limited)).ok).toBe(true);
+    expect((await makeGetList(deps)(ada, { list: list.id })).ok).toBe(false);
+    const seen = await makeGetList(deps)(film, { list: list.id });
+    expect(seen.ok && seen.value.entries.map((e) => e.item.title)).toEqual(['Blade Runner']);
+    await makeArchiveList(deps)(admin, { list: list.id });
+    expect((await change(OPEN_ACCESS)).ok).toBe(true);
+    expect((await makeGetList(deps)(ada, { list: list.id })).ok).toBe(true);
+  });
+
+  test('a published list with public scores cannot gain viewers', async () => {
+    await openList({
+      scoreVisibility: 'public',
+      access: { view: roles('r-film'), nominate: EVERYONE, rate: EVERYONE },
+    });
+    const widened = await change(OPEN_ACCESS);
+    expect(!widened.ok && widened.error.code).toBe('lists.public-scores-viewers');
+    expect((await change(hiddenAccess)).ok).toBe(true);
+  });
+
+  test('a change is recorded in the activity log', async () => {
+    await openList();
+    await change(hiddenAccess);
+    const detail = await deps.lists.get((await deps.slugs.lookup('best-sci-fi')) ?? ('' as never));
+    expect(detail?.value.activity?.at(-1)).toMatchObject({ action: 'access-changed' });
   });
 });
 
@@ -983,7 +1108,7 @@ describe('backups', () => {
         })
       ).ok,
     ).toBe(true);
-    expect(await makeRankingContext(deps)(list.id, { isAdmin: false })).toMatchObject({
+    expect(await makeRankingContext(deps)(list.id, { isAdmin: false, roleIds: [] })).toMatchObject({
       ok: true,
       value: { setAsideEntryIds: [entry.value.id] },
     });
@@ -1067,7 +1192,9 @@ describe('backups', () => {
       entries: 1,
     });
     const original = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
-    expect(original.ok && original.value.visibility).toBe('public');
+    expect(original.ok && original.value.viewers).toBe('everyone');
+    const hiddenCopy = await makeGetList(deps)(admin, { list: 'best-sci-fi-2' });
+    expect(hiddenCopy.ok && hiddenCopy.value.previousView).toEqual(EVERYONE);
     const copy = await makeGetList(deps)(admin, { list: 'best-sci-fi-2' });
     expect(copy.ok && copy.value.entries.map((e) => e.nominatedBy)).toEqual(['Member ada']);
   });
@@ -1084,6 +1211,46 @@ describe('backups', () => {
       slug: 'best-sci-fi',
       renamed: false,
       hidden: false,
+    });
+  });
+
+  test('a list limited to roles is restored for site admins only, remembering its viewers', async () => {
+    await openList({ access: { view: roles('r-film'), nominate: EVERYONE, rate: EVERYONE } });
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    expect(exported.value[0].backup.list).toMatchObject({
+      visibility: 'hidden',
+      config: { requiredRoleIds: [] },
+    });
+    deps.lists = new InMemoryListRepository();
+    deps.slugs = new InMemorySlugIndex();
+    deps.entries = new InMemoryEntryRepository();
+    const restored = await restore(exported.value[0].backup);
+    expect(restored.ok && restored.value).toMatchObject({ renamed: false, hidden: true });
+    const copy = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
+    expect(copy.ok && copy.value.access.view).toEqual(SITE_ADMINS_ONLY);
+    expect(copy.ok && copy.value.previousView).toEqual(roles('r-film'));
+  });
+
+  test('files from before per-action access restore exactly as those lists were', async () => {
+    await openList();
+    const exported = await exportBackup('best-sci-fi');
+    if (!exported.ok || exported.value[0] === undefined) throw new Error('fixture');
+    const { access, ...oldConfig } = exported.value[0].backup.list.config;
+    expect(access).toBeDefined();
+    deps.lists = new InMemoryListRepository();
+    deps.slugs = new InMemorySlugIndex();
+    deps.entries = new InMemoryEntryRepository();
+    const restored = await restore({
+      ...exported.value[0].backup,
+      list: { ...exported.value[0].backup.list, config: { ...oldConfig, requiredRoleIds: ['r1'] } },
+    });
+    expect(restored.ok && restored.value.hidden).toBe(false);
+    const copy = await makeGetList(deps)(admin, { list: 'best-sci-fi' });
+    expect(copy.ok && copy.value.access).toEqual({
+      view: EVERYONE,
+      nominate: roles('r1'),
+      rate: roles('r1'),
     });
   });
 
@@ -1121,7 +1288,7 @@ describe('backups', () => {
 });
 
 describe('public scores', () => {
-  const rules = () => makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false });
+  const rules = () => makeRulesForVoting(deps)('best-sci-fi', { isAdmin: false, roleIds: [] });
 
   test('only Admins choose, and published lists can only go private', async () => {
     const created = await create();

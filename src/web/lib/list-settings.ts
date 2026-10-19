@@ -1,4 +1,5 @@
 import type { ListDto, RoleLabelDto } from '../../server/http/contracts.ts';
+import { describeAudience } from './access.ts';
 import { formatDateTime } from './datetime.ts';
 import { sourceLabel } from './labels.ts';
 
@@ -28,17 +29,10 @@ export const compareListSettings = (
       'Individual scores': list.scoreVisibility === 'public' ? 'Named' : 'Private',
       'Nominator names': list.showNominators ? 'Visible' : 'Hidden',
       'Votes before a confirmed rank': String(list.ranking.minVotes),
-      'Who can take part':
-        list.requiredRoleIds.length === 0
-          ? 'All members'
-          : [...list.requiredRoleIds]
-              .sort()
-              .map(
-                (id) =>
-                  `${roles.find((role) => role.roleId === id)?.name ?? 'Unnamed role'} (${id})`,
-              )
-              .join(', '),
-      'List visibility': list.visibility === 'hidden' ? 'Admins only' : 'All signed-in members',
+      'Who can view': describeAudience(list.access.view, roles),
+      'Who can nominate':
+        list.entryMode === 'seeded' ? 'Not used' : describeAudience(list.access.nominate, roles),
+      'Who can rate': describeAudience(list.access.rate, roles),
       Opens: date(dates?.opensAt, 'When published'),
       'Nominations close': date(dates?.nominationsCloseAt, 'No separate deadline'),
       'Voting closes': date(dates?.closesAt, 'No automatic end'),

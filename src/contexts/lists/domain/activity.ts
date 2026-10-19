@@ -7,7 +7,9 @@ export type ActivityAction =
   | 'published'
   | 'archived'
   | 'voting-closed'
+  /** Recorded before per-action access; kept so older events still read. */
   | 'visibility-changed'
+  | 'access-changed'
   | 'score-privacy-changed'
   | 'entry-set-aside'
   | 'entry-returned'
