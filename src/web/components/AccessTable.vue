@@ -134,16 +134,14 @@ const unseen = computed(() =>
             </td>
           </tr>
         </tbody>
-        <tfoot>
-          <tr>
-            <th scope="row">Result</th>
-            <td v-for="action in actions" :key="action" :data-action="action">
-              {{ describeAudience(modelValue[action], roles) }}
-            </td>
-          </tr>
-        </tfoot>
       </table>
     </div>
+    <dl class="access-table__result" aria-label="Result">
+      <div v-for="action in actions" :key="action">
+        <dt>{{ actionLabel[action] }}</dt>
+        <dd :data-action="action">{{ describeAudience(modelValue[action], roles) }}</dd>
+      </div>
+    </dl>
     <div :id="`${idPrefix}-help`" class="meta stack">
       <p>
         <strong>Everyone on the server</strong> includes members with no roles at all.

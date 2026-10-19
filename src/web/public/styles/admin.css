@@ -639,14 +639,39 @@
   font-size: 0.85rem;
 }
 
-.access-table tfoot th,
-.access-table tfoot td {
-  border-bottom: 0;
+.access-table__result {
+  display: grid;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
   background: var(--surface-2);
-  font-size: 0.85rem;
-  text-align: left;
-  vertical-align: top;
+}
+
+.access-table__result > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+}
+
+.access-table__result dt {
+  font-weight: 600;
+}
+
+.access-table__result dt::after {
+  content: ':';
+}
+
+.access-table__result dd {
+  margin: 0;
   overflow-wrap: anywhere;
+}
+
+@media (min-width: 40rem) {
+  .access-table thead th:not(:first-child),
+  .access-table td {
+    width: 6.5rem;
+  }
 }
 
 @media (max-width: 39.99rem) {
@@ -658,9 +683,5 @@
   .access-table thead th:not(:first-child),
   .access-table td {
     width: 3.25rem;
-  }
-
-  .access-table tfoot td {
-    font-size: 0.75rem;
   }
 }
