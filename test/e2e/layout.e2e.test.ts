@@ -49,7 +49,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
                       token: withdrawn.deletionToken,
                       title: withdrawn.item.title,
                     },
-                    viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 },
+                    viewer: {
+                      allowed: { nominate: false, rate: false },
+                      canRate: false,
+                      canNominate: false,
+                      nominationsUsed: 0,
+                      viaSiteAdmin: [],
+                    },
                   }
                 : {}),
             },

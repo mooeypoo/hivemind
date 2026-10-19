@@ -52,15 +52,25 @@ export const list: ListDetailDto = {
   scoreVisibility: 'public',
   ranking: { strategy: 'bayesian', minVotes: 3 },
   showNominators: true,
-  requiredRoleIds: [],
+  access: {
+    view: { kind: 'everyone' },
+    nominate: { kind: 'everyone' },
+    rate: { kind: 'everyone' },
+  },
   lifecycle: 'open',
-  visibility: 'public',
+  viewers: 'everyone',
   schedule: {
     opensAt: '2026-01-01T00:00:00.000Z',
     nominationsCloseAt: '2098-01-01T00:00:00.000Z',
     closesAt: '2099-01-01T00:00:00.000Z',
   },
-  viewer: { canParticipate: true, canNominate: true, nominationsUsed: 1 },
+  viewer: {
+    allowed: { nominate: true, rate: true },
+    canRate: true,
+    canNominate: true,
+    nominationsUsed: 1,
+    viaSiteAdmin: [],
+  },
   itemSourceEditable: false,
   entries: [
     entry('a', 'Eternal Sunshine of the Spotless Mind', '2004'),

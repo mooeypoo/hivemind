@@ -1,4 +1,5 @@
-import type { ListActivityDto } from '../../server/http/contracts.ts';
+import type { ListAccessDto, ListActivityDto, RoleLabelDto } from '../../server/http/contracts.ts';
+import { accessSummary } from './access.ts';
 import { formatDateTime } from './datetime.ts';
 import { sourceLabel } from './labels.ts';
 
@@ -11,6 +12,7 @@ export const activityLabel: Record<Event['action'], string> = {
   archived: 'Archived list',
   'voting-closed': 'Closed voting',
   'visibility-changed': 'Changed who can see the list',
+  'access-changed': 'Changed who can view, nominate and rate',
   'score-privacy-changed': 'Changed individual score privacy',
   'entry-set-aside': 'Set an entry aside',
   'entry-returned': 'Returned an entry to the main ranking',
@@ -40,6 +42,7 @@ export const activityField: Record<string, string> = {
   requiredRoleIds: 'Participation roles',
   scoreVisibility: 'Individual scores',
   visibility: 'List visibility',
+  access: 'Who can view, nominate and rate',
   'schedule.opensAt': 'Participation opens',
   'schedule.nominationsCloseAt': 'Nominations close',
   'schedule.closesAt': 'Voting closes',
@@ -48,7 +51,18 @@ export const activityField: Record<string, string> = {
   'draftSchedule.closesAt': 'Planned voting deadline',
 };
 
-export const activityValue = (field: string, value: string | null): string => {
+const isAccess = (value: unknown): value is ListAccessDto =>
+  typeof value === 'object' &&
+  value !== null &&
+  'view' in value &&
+  'nominate' in value &&
+  'rate' in value;
+
+export const activityValue = (
+  field: string,
+  value: string | null,
+  roles: readonly RoleLabelDto[] = [],
+): string => {
   if (value === null || value === 'null')
     return field === 'maxNominationsPerMember' ? 'Unlimited' : 'Not set';
   if (field.startsWith('schedule.') || field.startsWith('draftSchedule.'))
@@ -62,6 +76,8 @@ export const activityValue = (field: string, value: string | null): string => {
     return parsed === 'live' ? 'While voting is open' : 'After voting closes';
   if (field === 'entryMode')
     return parsed === 'seeded' ? 'Include the whole collection' : 'Member nominations';
+  if (field === 'access' && isAccess(parsed))
+    return accessSummary(parsed, roles, false).join(' · ');
   if (field === 'requiredRoleIds' && Array.isArray(parsed))
     return parsed.length === 0 ? 'All members' : parsed.join(', ');
   if (typeof parsed === 'object' && parsed !== null) {

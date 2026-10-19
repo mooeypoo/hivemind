@@ -560,3 +560,107 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Access table: who can view, nominate and rate. Rows are audiences, columns are actions. */
+
+.access-table__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.access-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.access-table th,
+.access-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.access-table thead th {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.access-table thead th:not(:first-child),
+.access-table td {
+  width: 4.5rem;
+  text-align: center;
+}
+
+.access-table tbody th {
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.access-table tbody th .meta {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+.access-table__everyone th,
+.access-table__everyone td {
+  background: var(--accent-soft);
+}
+
+.access-table__all th,
+.access-table__all td {
+  border-bottom-width: 2px;
+}
+
+.access-table__cell {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.access-table__cell input {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.access-table__always {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.access-table tfoot th,
+.access-table tfoot td {
+  border-bottom: 0;
+  background: var(--surface-2);
+  font-size: 0.85rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 39.99rem) {
+  .access-table th,
+  .access-table td {
+    padding: 0.35rem 0.3rem;
+  }
+
+  .access-table thead th:not(:first-child),
+  .access-table td {
+    width: 3.25rem;
+  }
+
+  .access-table tfoot td {
+    font-size: 0.75rem;
+  }
+}

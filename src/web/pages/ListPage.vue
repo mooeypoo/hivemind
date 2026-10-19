@@ -14,6 +14,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import EventCountdown from '../components/EventCountdown.vue';
 import LeaderboardPanel from '../components/LeaderboardPanel.vue';
+import AdminAccessNotice from '../components/AdminAccessNotice.vue';
 import NominatePanel from '../components/NominatePanel.vue';
 import PublicScoreDisclosure from '../components/PublicScoreDisclosure.vue';
 import RateOneByOne from '../components/RateOneByOne.vue';
@@ -31,8 +32,8 @@ const router = useRouter();
 const toast = useToast();
 const page = useListPage(() => String(route.params.slug));
 const { list, error, ballot, entries, standings, publicScores, canVote, hasStandings } = page;
-const { canNominateHere, isClosed, resultsSealed, unrated, ratedCount, next, requiredRolesText } =
-  page;
+const { canNominateHere, isClosed, resultsSealed, unrated, ratedCount, next } = page;
+const { rateRolesText, nominateRolesText } = page;
 const { scores, saving, errors } = ballot;
 const { withdrawing, withdrawalError } = page;
 const management = ref<InstanceType<typeof EntryManagement> | null>(null);
@@ -161,7 +162,11 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
       />
       <div class="list-hero__content">
         <p class="list-hero__kicker">
-          <StatusBadge :lifecycle="list.lifecycle" :hidden="list.visibility === 'hidden'" />
+          <StatusBadge
+            :lifecycle="list.lifecycle"
+            :viewers="list.viewers"
+            :review="list.accessNeedsReview === true"
+          />
           <span
             >{{ sourceLabel[list.itemSource.kind] }} · rated {{ list.scale.min }}–{{
               list.scale.max
@@ -220,9 +225,10 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
         Retry entry deletion...
       </button>
     </div>
-    <p v-else-if="list.lifecycle === 'open' && !list.viewer.canParticipate" class="notice">
-      This list is open only to members with {{ requiredRolesText }}, so you can’t rate it.
+    <p v-else-if="list.lifecycle === 'open' && !list.viewer.allowed.rate" class="notice">
+      Rating is open only to members with {{ rateRolesText }}, so you can’t rate this list.
     </p>
+    <AdminAccessNotice :list="list" />
 
     <AppTabs
       v-if="tabs.length > 1"
@@ -376,6 +382,7 @@ const backdrop = computed(() => entries.value.find((entry) => entry.item.imageUr
     >
       <NominatePanel
         :list="list"
+        :roles-text="nominateRolesText"
         :score-state="canVote ? scoreState : undefined"
         @nominated="page.load"
         @rate="ballot.set"

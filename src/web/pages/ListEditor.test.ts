@@ -39,12 +39,12 @@ afterEach(() => {
 
 describe('ListEditor', () => {
   test.each([
-    ['draft', 'public', 'Current saved draft — not published'],
-    ['open', 'hidden', 'Current saved version — hidden from members'],
-    ['open', 'public', 'This is the version members see now.'],
+    ['draft', 'everyone', 'Current saved draft — not published'],
+    ['open', 'site-admins', 'Current saved version — hidden from members'],
+    ['open', 'everyone', 'This is the version members see now.'],
   ] as const)(
     'comparison labels saved %s/%s settings accurately',
-    async (lifecycle, visibility, label) => {
+    async (lifecycle, viewers, label) => {
       sessionStorage.setItem(
         'draft:editor:best-sci-fi',
         JSON.stringify({
@@ -57,7 +57,7 @@ describe('ListEditor', () => {
         'GET /api/catalog/sources': sources,
         'GET /api/roles': roles,
         'GET /api/lists/best-sci-fi': () =>
-          Response.json(openTmdbList({ lifecycle, visibility, settingsVersion: 1 })),
+          Response.json(openTmdbList({ lifecycle, viewers, settingsVersion: 1 })),
       });
       const editor = await mountAt('/admin/lists/best-sci-fi');
       const comparison = editor.get('.settings-comparison');
@@ -651,7 +651,7 @@ describe('ListEditor', () => {
     const editor = await mountAt('/admin/lists/best-sci-fi');
     expect(editor.get('#editor-items').attributes('disabled')).toBeUndefined();
     expect(editor.get('#editor-rating').attributes('disabled')).toBeDefined();
-    expect(editor.get('#editor-roles').attributes('disabled')).toBeDefined();
+    expect(editor.get('#editor-access').attributes('disabled')).toBeUndefined();
     await editor.get('input[value=freeform]').setValue(true);
     await editor.get('form').trigger('submit');
     await flushPromises();
@@ -784,16 +784,21 @@ describe('ListEditor', () => {
     const checkbox = (label: string) =>
       editor
         .findAll('input[type=checkbox]')
-        .find((box) => box.element.closest('label')?.textContent.includes(label));
+        .find((box) => box.element.closest('label')?.textContent.trim() === label);
     expect((editor.get('#unlimited').element as HTMLInputElement).checked).toBe(true);
     expect(editor.get('.editor-next-step').text()).toContain('Next step: choose dates and publish');
     expect((editor.get('#cap').element as HTMLInputElement).disabled).toBe(true);
-    await checkbox('Film Club')?.setValue(true);
+    await checkbox('Rate: Everyone on the server')?.setValue(false);
+    await checkbox('Rate: Film Club')?.setValue(true);
     await editor.get('form').trigger('submit');
     await flushPromises();
     expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
       maxNominationsPerMember: null,
-      requiredRoleIds: ['900000000000000077'],
+      access: {
+        view: { kind: 'everyone' },
+        nominate: { kind: 'everyone' },
+        rate: { kind: 'roles', roleIds: ['900000000000000077'] },
+      },
       showNominators: true,
       scoreVisibility: 'private',
       ranking: { strategy: 'bayesian', minVotes: 2 },
@@ -806,14 +811,23 @@ describe('ListEditor', () => {
       'GET /api/roles': roles,
       'GET /api/lists/best-sci-fi': () =>
         Response.json(
-          openTmdbList({ lifecycle: 'draft', requiredRoleIds: ['900000000000000099'] }),
+          openTmdbList({
+            lifecycle: 'draft',
+            access: {
+              view: { kind: 'everyone' },
+              nominate: { kind: 'roles', roleIds: ['900000000000000099'] },
+              rate: { kind: 'everyone' },
+            },
+          }),
         ),
     });
     const editor = await mountAt('/admin/lists/best-sci-fi');
     const unnamed = editor
       .findAll('input[type=checkbox]')
       .find((box) =>
-        box.element.closest('label')?.textContent.includes('Unnamed role (900000000000000099)'),
+        box.element
+          .closest('label')
+          ?.textContent.includes('Nominate: Unnamed role (900000000000000099)'),
       );
     expect((unnamed?.element as HTMLInputElement | undefined)?.checked).toBe(true);
     expect(editor.text()).toContain('Name it on the Roles page');
@@ -891,34 +905,102 @@ describe('ListEditor', () => {
     expect((button.element as HTMLButtonElement).disabled).toBe(true);
   });
 
-  test('a published list can be hidden, and voting closed after confirming', async () => {
+  test('a published list is hidden only after confirming who loses access', async () => {
+    const hidden = { ...openTmdbList().access, view: { kind: 'roles', roleIds: [] } } as const;
     const calls = stubApi({
       'GET /api/catalog/sources': sources,
       'GET /api/roles': roles,
       'GET /api/lists/best-sci-fi': () => Response.json(openTmdbList()),
-      'PUT /api/lists/list-1/visibility': () =>
-        Response.json(openTmdbList({ visibility: 'hidden' })),
+      'PUT /api/lists/list-1/access': () =>
+        Response.json(
+          openTmdbList({
+            access: hidden,
+            viewers: 'site-admins',
+            previousView: { kind: 'everyone' },
+          }),
+        ),
       'POST /api/lists/list-1/close': () => Response.json(openTmdbList({ lifecycle: 'closed' })),
     });
     const editor = await mountAt('/admin/lists/best-sci-fi');
-    await editor.get('input[name=visibility][value=hidden]').setValue(true);
+    const button = (text: string) => editor.findAll('button').find((b) => b.text() === text);
+    await button('Hide from members')?.trigger('click');
+    expect(editor.get('[data-action=view]').text()).toBe('Only site admins');
+    await editor.get('[data-save-access]').trigger('click');
+    expect(calls.some((call) => call.url.endsWith('/access'))).toBe(false);
+    const dialog = editor.get('dialog[open]');
+    expect(dialog.text()).toContain(
+      'Some people will no longer see this list: Everyone on the server → Only site admins.',
+    );
+    await dialog
+      .findAll('button')
+      .find((b) => b.text() === 'Save access')
+      ?.trigger('click');
     await flushPromises();
-    expect(calls.find((call) => call.url.endsWith('/visibility'))?.body).toMatchObject({
-      visibility: 'hidden',
+    expect(calls.find((call) => call.url.endsWith('/access'))?.body).toMatchObject({
+      access: hidden,
+      expectedSettingsVersion: 0,
     });
-    expect(editor.text()).toContain('Hidden: only Admins can see it now.');
+    expect(editor.text()).toContain('Access saved.');
+    expect(editor.text()).toContain('Restore previous viewers');
 
-    await editor
-      .findAll('button')
-      .find((b) => b.text() === 'Close voting now')
-      ?.trigger('click');
+    await button('Close voting now')?.trigger('click');
     expect(calls.some((call) => call.url.endsWith('/close'))).toBe(false);
-    await editor
-      .findAll('button')
-      .find((b) => b.text() === 'Close voting')
-      ?.trigger('click');
+    await button('Close voting')?.trigger('click');
     await flushPromises();
     expect(calls.some((call) => call.url.endsWith('/close'))).toBe(true);
+  });
+
+  test('named scores block showing a published list to more people', async () => {
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(
+          openTmdbList({
+            scoreVisibility: 'public',
+            viewers: 'roles',
+            access: {
+              view: { kind: 'roles', roleIds: ['900000000000000077'] },
+              nominate: { kind: 'everyone' },
+              rate: { kind: 'everyone' },
+            },
+          }),
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    const viewEveryone = editor
+      .findAll('input[type=checkbox]')
+      .find(
+        (box) =>
+          box.element.closest('label')?.textContent.trim() === 'View: Everyone on the server',
+      );
+    await viewEveryone?.setValue(true);
+    expect(editor.text()).toContain('Scores on this list are named, so it can’t be shown');
+    expect((editor.get('[data-save-access]').element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test('a list hidden after an older version changed it asks for review', async () => {
+    stubApi({
+      'GET /api/catalog/sources': sources,
+      'GET /api/roles': roles,
+      'GET /api/lists/best-sci-fi': () =>
+        Response.json(
+          openTmdbList({
+            viewers: 'site-admins',
+            accessNeedsReview: true,
+            previousView: { kind: 'everyone' },
+            access: { ...openTmdbList().access, view: { kind: 'roles', roleIds: [] } },
+          }),
+        ),
+    });
+    const editor = await mountAt('/admin/lists/best-sci-fi');
+    expect(editor.text()).toContain('Access needs review.');
+    expect(editor.text()).toContain('Before that, Everyone on the server could view it.');
+    await editor
+      .findAll('button')
+      .find((b) => b.text().startsWith('Restore previous viewers'))
+      ?.trigger('click');
+    expect(editor.get('[data-action=view]').text()).toBe('Everyone on the server');
   });
 
   test('refreshes missing movie details and reports the result', async () => {

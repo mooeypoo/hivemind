@@ -137,7 +137,13 @@ describe('ListPage rating', () => {
       games({
         participationPaused: true,
         entryDeletion: { entryId: 'a', token: 'incarnation', title: 'Root' },
-        viewer: { canParticipate: false, canNominate: false, nominationsUsed: 1 },
+        viewer: {
+          allowed: { nominate: false, rate: false },
+          canRate: false,
+          canNominate: false,
+          nominationsUsed: 1,
+          viaSiteAdmin: [],
+        },
         lifecycle: 'archived',
       }),
       {},
@@ -229,7 +235,13 @@ describe('ListPage rating', () => {
     const owned = { ...entry('a', 'Root'), isMine: true, withdrawalToken: 'claim-a' };
     let detail = games({
       entries: [owned, entry('b', 'Wingspan')],
-      viewer: { canParticipate: true, canNominate: false, nominationsUsed: 1 },
+      viewer: {
+        allowed: { nominate: true, rate: true },
+        canRate: true,
+        canNominate: false,
+        nominationsUsed: 1,
+        viaSiteAdmin: [],
+      },
       maxNominationsPerMember: 1,
     });
     const page = await mountWith(detail, { a: 7 }, undefined, true);
@@ -241,7 +253,13 @@ describe('ListPage rating', () => {
         detail = {
           ...detail,
           entries: [entry('b', 'Wingspan')],
-          viewer: { canParticipate: true, canNominate: true, nominationsUsed: 0 },
+          viewer: {
+            allowed: { nominate: true, rate: true },
+            canRate: true,
+            canNominate: true,
+            nominationsUsed: 0,
+            viaSiteAdmin: [],
+          },
         };
         return Promise.resolve(new Response(null, { status: 204 }));
       }
@@ -426,10 +444,18 @@ describe('ListPage rating', () => {
 
   test('without a required role there is nothing to rate with', async () => {
     const page = await mountWith(
-      games({ viewer: { canParticipate: false, canNominate: false, nominationsUsed: 0 } }),
+      games({
+        viewer: {
+          allowed: { nominate: false, rate: false },
+          canRate: false,
+          canNominate: false,
+          nominationsUsed: 0,
+          viaSiteAdmin: [],
+        },
+      }),
     );
     expect(page.findAll('.score-input')).toHaveLength(0);
-    expect(page.text()).toContain('so you can’t rate it');
+    expect(page.text()).toContain('so you can’t rate this list');
   });
 
   test('a scheduled list has no score inputs yet', async () => {

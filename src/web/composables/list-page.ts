@@ -6,8 +6,10 @@ import type {
   LeaderboardRowDto,
   ListDetailDto,
   PublicScoresDto,
+  RoleLabelDto,
   RoleLabelsDto,
 } from '../../server/http/contracts.ts';
+import { roleIdsOf, rolesPhrase } from '../lib/access.ts';
 import { nextEvent } from '../lib/next-event.ts';
 import { api, type ApiError } from '../services/api.ts';
 import { useBallot } from './ballot.ts';
@@ -103,9 +105,7 @@ export const useListPage = (slug: () => string) => {
       list.value?.participationPaused !== true && (lifecycle.value === 'open' || isClosed.value),
   );
   /** Members rate while the list is open; once it closes they still see their own scores. */
-  const canVote = computed(
-    () => lifecycle.value === 'open' && list.value?.viewer.canParticipate === true,
-  );
+  const canVote = computed(() => lifecycle.value === 'open' && list.value?.viewer.canRate === true);
   const canNominateHere = computed(
     () =>
       list.value?.entryMode === 'nominations' &&
@@ -122,28 +122,26 @@ export const useListPage = (slug: () => string) => {
   const resultsSealed = computed(() => leaderboard.value?.hidden === true);
   const next = computed(() => (list.value === null ? null : nextEvent(list.value, new Date())));
 
-  /** "the Film Club or Moderators role", from the Admins' role names where there are some. */
-  const roleNames = ref<Readonly<Record<string, string>>>({});
+  /** Role names, loaded only when this list limits nominating or rating to roles. */
+  const roleLabels = ref<readonly RoleLabelDto[]>([]);
   watch(
-    () => list.value?.requiredRoleIds.length ?? 0,
+    () =>
+      list.value === null
+        ? 0
+        : roleIdsOf(list.value.access.nominate).length + roleIdsOf(list.value.access.rate).length,
     async (count) => {
       if (count === 0) return;
       const result = await api.get<RoleLabelsDto>('/api/roles');
-      if (result.ok) {
-        roleNames.value = Object.fromEntries(
-          result.data.labels.map((label) => [label.roleId, label.name]),
-        );
-      }
+      if (result.ok) roleLabels.value = result.data.labels;
     },
   );
-  const requiredRolesText = computed(() => {
-    const ids = list.value?.requiredRoleIds ?? [];
-    const names = ids.map((id) => roleNames.value[id]).filter((name) => name !== undefined);
-    if (names.length !== ids.length || names.length === 0) return 'a particular role';
-    const joined =
-      names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} or ${String(names.at(-1))}`;
-    return `the ${String(joined)} role`;
-  });
+  /** "the Film Club or Moderators role" for members who may not rate. */
+  const rateRolesText = computed(() =>
+    list.value === null ? '' : rolesPhrase(list.value.access.rate, roleLabels.value),
+  );
+  const nominateRolesText = computed(() =>
+    list.value === null ? '' : rolesPhrase(list.value.access.nominate, roleLabels.value),
+  );
 
   return {
     list,
@@ -162,7 +160,8 @@ export const useListPage = (slug: () => string) => {
     unrated,
     resultsSealed,
     next,
-    requiredRolesText,
+    rateRolesText,
+    nominateRolesText,
     withdraw,
     withdrawing,
     withdrawalError,

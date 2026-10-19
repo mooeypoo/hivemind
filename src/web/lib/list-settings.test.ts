@@ -19,8 +19,11 @@ test('settings comparison covers every admin choice and date without technical v
     scoreVisibility: 'public',
     showNominators: false,
     ranking: { strategy: 'bayesian', minVotes: 10 },
-    requiredRoleIds: ['123456'],
-    visibility: 'hidden',
+    access: {
+      view: { kind: 'roles', roleIds: [] },
+      nominate: { kind: 'everyone' },
+      rate: { kind: 'roles', roleIds: ['123456'] },
+    },
     draftSchedule: {
       opensAt: '2099-01-01T12:00:00Z',
       nominationsCloseAt: '2099-01-02T12:00:00Z',
@@ -41,11 +44,15 @@ test('settings comparison covers every admin choice and date without technical v
     'Individual scores',
     'Nominator names',
     'Votes before a confirmed rank',
-    'Who can take part',
-    'List visibility',
+    'Who can view',
+    'Who can nominate',
+    'Who can rate',
     'Opens',
     'Nominations close',
     'Voting closes',
   ]);
-  expect(rows.find((row) => row.label === 'Who can take part')?.yours).toBe('Film Club (123456)');
+  const yoursOf = (label: string) => rows.find((row) => row.label === label)?.yours;
+  expect(yoursOf('Who can view')).toBe('Only site admins');
+  expect(yoursOf('Who can nominate')).toBe('Not used');
+  expect(yoursOf('Who can rate')).toBe('Film Club');
 });

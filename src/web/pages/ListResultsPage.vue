@@ -74,7 +74,7 @@ const final = computed(
 const canRate = computed(
   () =>
     list.value?.lifecycle === 'open' &&
-    list.value.viewer.canParticipate &&
+    list.value.viewer.canRate &&
     !list.value.participationPaused,
 );
 const canNominate = computed(
@@ -92,7 +92,11 @@ const canNominate = computed(
     </p>
     <header class="results-hero">
       <p class="results-hero__kicker">
-        <StatusBadge :lifecycle="list.lifecycle" :hidden="list.visibility === 'hidden'" />
+        <StatusBadge
+          :lifecycle="list.lifecycle"
+          :viewers="list.viewers"
+          :review="list.accessNeedsReview === true"
+        />
         <span>{{ final ? 'Final results' : 'Live standings' }}</span>
       </p>
       <h1>{{ list.title }}</h1>

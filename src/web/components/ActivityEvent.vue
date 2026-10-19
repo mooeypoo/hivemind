@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ListActivityDto } from '../../server/http/contracts.ts';
+import type { ListActivityDto, RoleLabelDto } from '../../server/http/contracts.ts';
 import { activityField, activityLabel, activityValue } from '../lib/activity.ts';
 import { formatDateTime } from '../lib/datetime.ts';
 
@@ -7,6 +7,7 @@ defineProps<{
   event: ListActivityDto['events'][number];
   list?: { readonly title: string; readonly slug: string };
   collapsible?: boolean;
+  roles?: readonly RoleLabelDto[] | undefined;
 }>();
 </script>
 
@@ -33,8 +34,8 @@ defineProps<{
         <li v-for="change in event.changes" :key="change.field">
           <strong>{{ activityField[change.field] ?? change.field }}</strong
           ><template v-if="change.before !== null || change.after !== null"
-            >: {{ activityValue(change.field, change.before) }} →
-            {{ activityValue(change.field, change.after) }}</template
+            >: {{ activityValue(change.field, change.before, roles) }} →
+            {{ activityValue(change.field, change.after, roles) }}</template
           >
           <template v-else> changed</template>
         </li>

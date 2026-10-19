@@ -322,8 +322,17 @@ legend {
   background: transparent;
 }
 
-.badge--hidden::before {
+.badge--hidden::before,
+.badge--review::before {
   background: var(--danger);
+}
+
+.badge--limited::before {
+  background: var(--accent);
+}
+
+.badge--review {
+  border-color: var(--danger);
 }
 
 .tag {
